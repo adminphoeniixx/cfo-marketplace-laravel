@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
+import AppLogo from '@/components/admin/AppLogo.vue';
 
 const emit = defineEmits<{ toggleSidebar: [] }>();
 const page = usePage();
@@ -49,13 +50,10 @@ const logout = () => router.post('/logout');
         </button>
 
         <Link href="/admin" class="flex shrink-0 items-center gap-2 pr-2">
+            <AppLogo :size="28" />
             <span
-                class="flex size-7 items-center justify-center rounded-lg bg-[#00a47c] text-sm font-bold"
-                >M</span
-            >
-            <span
-                class="hidden text-sm font-semibold whitespace-nowrap sm:block"
-                >Marketplace</span
+                class="hidden text-sm font-semibold tracking-wide whitespace-nowrap sm:block"
+                >CFO</span
             >
         </Link>
 

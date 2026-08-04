@@ -1020,7 +1020,7 @@ const submit = () => {
                     </div>
                 </PCard>
 
-                <PCard title="Marketplace">
+                <PCard title="Vendor">
                     <PSelect
                         v-model="form.vendor_id"
                         label="Vendor"

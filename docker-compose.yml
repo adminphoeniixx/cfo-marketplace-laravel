@@ -17,7 +17,7 @@ services:
       RUNNING_MIGRATIONS_AND_SEEDERS: "false"
       WITH_SCHEDULER: "true"
       # App
-      APP_NAME: "CFO Marketplace"
+      APP_NAME: "CFO"
       APP_ENV: production
       APP_DEBUG: "false"
       APP_KEY: ${APP_KEY}

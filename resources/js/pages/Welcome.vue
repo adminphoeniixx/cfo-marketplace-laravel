@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
+import AppLogo from '@/components/admin/AppLogo.vue';
 import { dashboard, login } from '@/routes';
 
 const page = usePage();
@@ -94,11 +95,8 @@ const statusRows = [
                 class="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4 sm:px-6"
             >
                 <Link href="/" class="flex items-center gap-2">
-                    <span
-                        class="flex size-7 items-center justify-center rounded-lg bg-[#00a47c] text-sm font-bold text-white"
-                        >M</span
-                    >
-                    <span class="text-sm font-semibold">Marketplace</span>
+                    <AppLogo :size="28" />
+                    <span class="text-sm font-semibold tracking-wide">CFO</span>
                 </Link>
 
                 <div
@@ -487,13 +485,8 @@ const statusRows = [
                 class="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 sm:flex-row sm:px-6"
             >
                 <div class="flex items-center gap-2">
-                    <span
-                        class="flex size-6 items-center justify-center rounded-md bg-[#00a47c] text-xs font-bold text-white"
-                        >M</span
-                    >
-                    <span class="text-[13px] font-semibold"
-                        >Marketplace Admin</span
-                    >
+                    <AppLogo :size="24" />
+                    <span class="text-[13px] font-semibold">CFO Admin</span>
                 </div>
                 <p class="text-xs text-[#8a8a8a]">
                     Built with Laravel, Inertia and Vue.

@@ -42,6 +42,8 @@ const icons: Record<string, string> = {
         'M10 6.5A3.5 3.5 0 1010 13.5 3.5 3.5 0 0010 6.5zM8.9 1h2.2l.4 2.1 1.7 1 2-.7 1.1 1.9-1.6 1.4.2 2-.2 2 1.6 1.4-1.1 1.9-2-.7-1.7 1-.4 2.1H8.9l-.4-2.1-1.7-1-2 .7-1.1-1.9 1.6-1.4L5.1 10l-.2-2-1.6-1.4 1.1-1.9 2 .7 1.7-1L8.9 1z',
     payouts:
         'M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm2 1v2h12V6H4zm0 4v5h12v-5H4zm2 2h4v1.5H6V12z',
+    analytics:
+        'M3 3h1.5v12.5H17V17H3V3zm3.5 8h2v4h-2v-4zm3.5-3h2v7h-2V8zm3.5-3h2v10h-2V5z',
 };
 
 const groups = computed<NavGroup[]>(() => [
@@ -53,6 +55,12 @@ const groups = computed<NavGroup[]>(() => [
                 href: '/admin',
                 match: '/admin',
                 icon: 'home',
+            },
+            {
+                label: 'Analytics',
+                href: '/admin/analytics',
+                match: '/admin/analytics',
+                icon: 'analytics',
             },
         ],
     },
@@ -112,7 +120,7 @@ const groups = computed<NavGroup[]>(() => [
         ],
     },
     {
-        label: 'Marketplace',
+        label: 'Partners',
         items: [
             {
                 label: 'Vendors',
@@ -220,7 +228,7 @@ const open = defineModel<boolean>('open', { default: false });
         <div
             class="border-t border-[#e1e1e1] px-3 py-2.5 text-[11px] text-[#8a8a8a] dark:border-[#2a2a2a]"
         >
-            Marketplace Admin · v1.0
+            CFO Admin · v1.0
         </div>
     </aside>
 

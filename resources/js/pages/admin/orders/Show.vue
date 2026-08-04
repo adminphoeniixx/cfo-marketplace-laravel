@@ -416,7 +416,7 @@ const submitNote = () =>
             <!-- Vendor split -->
             <PCard
                 v-if="vendorRows.length > 1 || order.commission_total > '0'"
-                title="Marketplace split"
+                title="Vendor split"
                 subtitle="Earnings by vendor for this order"
             >
                 <div class="overflow-x-auto">

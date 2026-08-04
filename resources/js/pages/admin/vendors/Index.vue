@@ -77,7 +77,7 @@ const setStatus = (vendor: Vendor, status: string) =>
 
     <div class="mb-4 grid gap-3 sm:grid-cols-3">
         <MetricCard
-            label="Marketplace GMV"
+            label="Total GMV"
             :value="compactCurrency(summary.gmv)"
             caption="vendor sales"
         />

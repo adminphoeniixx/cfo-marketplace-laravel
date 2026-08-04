@@ -236,7 +236,7 @@ const actionItems = computed(() =>
             />
         </PCard>
 
-        <PCard title="Top vendors" subtitle="Marketplace leaderboard">
+        <PCard title="Top vendors" subtitle="Vendor leaderboard">
             <template #actions>
                 <PButton href="/admin/vendors" variant="plain" size="slim"
                     >View all</PButton

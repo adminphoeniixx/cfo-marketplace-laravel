@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AnalyticsController;
 use App\Http\Controllers\Admin\AttributeController;
 use App\Http\Controllers\Admin\CancellationController;
 use App\Http\Controllers\Admin\CategoryController;
@@ -20,6 +21,8 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', DashboardController::class)->name('dashboard');
     Route::get('search', SearchController::class)->name('search');
+    Route::get('analytics', [AnalyticsController::class, 'index'])->name('analytics.index');
+    Route::get('analytics/export/{report}', [AnalyticsController::class, 'export'])->name('analytics.export');
 
     /*
     |--------------------------------------------------------------------------

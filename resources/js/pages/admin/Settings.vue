@@ -112,7 +112,7 @@ const submit = () => form.put('/admin/settings', { preserveScroll: true });
                     </div>
                 </PCard>
 
-                <PCard title="Marketplace defaults">
+                <PCard title="Store defaults">
                     <div class="space-y-3">
                         <PTextField
                             v-model="form.default_commission"
