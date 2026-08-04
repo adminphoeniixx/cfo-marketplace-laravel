@@ -58,8 +58,8 @@ RUN apt-get update; \
     mbstring \
     bcmath \
     sockets \
-    mysqli \
-    pdo_mysql \
+    pgsql \
+    pdo_pgsql \
     opcache \
     exif \
     zip \

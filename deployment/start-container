@@ -4,13 +4,18 @@ set -e
 container_mode=${CONTAINER_MODE:-"http"}
 octane_server=${OCTANE_SERVER}
 running_migrations_and_seeders=${RUNNING_MIGRATIONS_AND_SEEDERS:-"false"}
+running_migrations=${RUNNING_MIGRATIONS:-"false"}
 
 initialStuff() {
     echo "Container mode: $container_mode"
-    
+
     if [ "${running_migrations_and_seeders}" = "true" ]; then
         echo "Running migrations and seeding database ..."
         php artisan migrate --isolated --seed --force || php artisan migrate --seed --force
+    elif [ "${running_migrations}" = "true" ]; then
+        # Migrations only — safe against a live database, no demo data.
+        echo "Running migrations ..."
+        php artisan migrate --isolated --force || php artisan migrate --force
     fi
 	
     php artisan storage:link; \

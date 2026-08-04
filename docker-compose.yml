@@ -11,23 +11,28 @@ services:
     environment:
       CONTAINER_MODE: http
       OCTANE_SERVER: frankenphp
-      RUNNING_MIGRATIONS_AND_SEEDERS: "true"
+      # Migrations run on boot; seeders do NOT (they would push demo catalog/
+      # sales data into the live database). Seed once, by hand, if you want it.
+      RUNNING_MIGRATIONS: "true"
+      RUNNING_MIGRATIONS_AND_SEEDERS: "false"
       WITH_SCHEDULER: "true"
-      # App. APP_KEY is read from the local .env; everything else is pinned here
-      # so the Laravel .env (dev values) cannot leak into the container.
+      # App
       APP_NAME: "CFO Marketplace"
       APP_ENV: production
       APP_DEBUG: "false"
       APP_KEY: ${APP_KEY}
-      APP_URL: http://localhost:8081
-      # MySQL. Points at the bundled service below — swap these for a managed
-      # DB's host/credentials when deploying.
-      DB_CONNECTION: mysql
-      DB_HOST: mysql
-      DB_PORT: "3306"
-      DB_DATABASE: marketplace_admin
-      DB_USERNAME: marketplace
-      DB_PASSWORD: secret
+      APP_URL: ${APP_URL:-http://localhost:8081}
+      # Postgres — credentials come from the local .env, never from this file.
+      # DB_HOST defaults to the external host; when this container runs on the
+      # same Docker network as the database, use the internal host instead
+      # (projects_cfo-postgres / port 5432).
+      DB_CONNECTION: pgsql
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_SSLMODE: ${DB_SSLMODE:-prefer}
       # Queue / cache / session use the database by default
       QUEUE_CONNECTION: database
       CACHE_STORE: database
@@ -35,27 +40,4 @@ services:
       # Mail
       MAIL_MAILER: log
       MAIL_FROM_ADDRESS: hello@example.com
-    depends_on:
-      mysql:
-        condition: service_healthy
     restart: unless-stopped
-
-  mysql:
-    image: mysql:8.4
-    environment:
-      MYSQL_DATABASE: marketplace_admin
-      MYSQL_USER: marketplace
-      MYSQL_PASSWORD: secret
-      MYSQL_ROOT_PASSWORD: secret
-    volumes:
-      - mysql-data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-psecret"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
-    restart: unless-stopped
-
-volumes:
-  mysql-data:
