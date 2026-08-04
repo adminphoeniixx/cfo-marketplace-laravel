@@ -27,8 +27,9 @@ export default defineConfig({
                 },
             },
         }),
-        wayfinder({
-            formVariants: true,
-        }),
+        // Wayfinder runs `php artisan` to generate route/action helpers. During a
+        // Node-only Docker build there is no PHP, so it is skipped and the
+        // already-generated files under resources/js are used instead.
+        ...(process.env.DISABLE_WAYFINDER ? [] : [wayfinder({ formVariants: true })]),
     ],
 });
