@@ -48,6 +48,7 @@ const props = defineProps<{
     vendors: { id: number; name: string }[];
     statuses: string[];
     paymentStatuses: string[];
+    paymentMethods: string[];
     counts: Record<string, number>;
     summary: { revenue: number; unfulfilled: number; unpaid: number };
 }>();
@@ -120,6 +121,27 @@ const tabs = [
                         :value="status"
                     >
                         {{ titleCase(status) }}
+                    </option>
+                </select>
+                <select
+                    class="rounded-lg border border-[#8a8a8a] bg-white px-2 py-1.5 text-[13px] text-[#303030] outline-none dark:border-[#616161] dark:bg-[#303030] dark:text-[#e3e3e3]"
+                    :value="filters.payment_method ?? ''"
+                    @change="
+                        apply({
+                            payment_method:
+                                ($event.target as HTMLSelectElement).value ||
+                                undefined,
+                            page: undefined,
+                        })
+                    "
+                >
+                    <option value="">Any method</option>
+                    <option
+                        v-for="method in paymentMethods"
+                        :key="method"
+                        :value="method"
+                    >
+                        {{ method }}
                     </option>
                 </select>
                 <select

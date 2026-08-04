@@ -46,6 +46,7 @@ const props = defineProps<{
     customers: Customer[];
     statuses: string[];
     paymentStatuses: string[];
+    paymentMethods: string[];
 }>();
 
 type Line = {
@@ -506,11 +507,18 @@ const submit = () => form.post('/admin/orders', { preserveScroll: true });
                             "
                             :error="form.errors.payment_status"
                         />
-                        <PTextField
+                        <PSelect
                             v-model="form.payment_method"
                             label="Payment method"
-                            placeholder="Cash, UPI, Bank transfer…"
+                            placeholder="Not specified"
+                            :options="
+                                paymentMethods.map((name) => ({
+                                    value: name,
+                                    label: name,
+                                }))
+                            "
                             :error="form.errors.payment_method"
+                            help-text="Managed under Settings › Payments."
                         />
                     </div>
                 </PCard>

@@ -57,6 +57,11 @@ const props = defineProps<{
         orders_count: number;
         spend: number;
     }[];
+    byPaymentMethod: {
+        name: string;
+        orders_count: number;
+        gross_sales: number;
+    }[];
     statusBreakdown: Record<string, number>;
     paymentBreakdown: Record<string, number>;
     fulfillmentBreakdown: Record<string, number>;
@@ -495,6 +500,25 @@ const totalOf = (rows: Record<string, number>) =>
                     </span>
                 </li>
             </ul>
+        </PCard>
+
+        <PCard title="Payment methods" subtitle="Orders and revenue by method">
+            <ul v-if="byPaymentMethod.length" class="space-y-2">
+                <li
+                    v-for="row in byPaymentMethod"
+                    :key="row.name"
+                    class="flex items-center justify-between gap-3"
+                >
+                    <span class="truncate text-[13px]">{{ row.name }}</span>
+                    <span class="shrink-0 text-[13px] tabular-nums">
+                        {{ number(row.orders_count) }} ·
+                        {{ currency(row.gross_sales) }}
+                    </span>
+                </li>
+            </ul>
+            <p v-else class="text-[13px] text-[#8a8a8a]">
+                No payments in this period.
+            </p>
         </PCard>
 
         <PCard

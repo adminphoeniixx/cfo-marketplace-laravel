@@ -108,6 +108,7 @@ const props = defineProps<{
     statuses: string[];
     paymentStatuses: string[];
     fulfillmentStatuses: string[];
+    paymentMethods: string[];
     vendorBreakdown: Record<
         string,
         { items: number; total: number; commission: number; earning: number }
@@ -121,6 +122,7 @@ const showFulfil = ref(false);
 const statusForm = useForm({ status: props.order.status, note: '' });
 const paymentForm = useForm({
     payment_status: props.order.payment_status,
+    payment_method: props.order.payment_method ?? '',
     transaction_id: props.order.transaction_id ?? '',
 });
 const noteForm = useForm({ body: '' });
@@ -845,6 +847,18 @@ const submitNote = () =>
                     }))
                 "
                 :error="paymentForm.errors.payment_status"
+            />
+            <PSelect
+                v-model="paymentForm.payment_method"
+                label="Payment method"
+                placeholder="Not specified"
+                :options="
+                    paymentMethods.map((name) => ({
+                        value: name,
+                        label: name,
+                    }))
+                "
+                :error="paymentForm.errors.payment_method"
             />
             <PTextField
                 v-model="paymentForm.transaction_id"

@@ -44,6 +44,8 @@ const icons: Record<string, string> = {
         'M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm2 1v2h12V6H4zm0 4v5h12v-5H4zm2 2h4v1.5H6V12z',
     analytics:
         'M3 3h1.5v12.5H17V17H3V3zm3.5 8h2v4h-2v-4zm3.5-3h2v7h-2V8zm3.5-3h2v10h-2V5z',
+    payments:
+        'M3 4h14a1 1 0 011 1v3H2V5a1 1 0 011-1zm-1 6h16v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zm2.5 2v1.5h4V12h-4z',
 };
 
 const groups = computed<NavGroup[]>(() => [
@@ -140,6 +142,12 @@ const groups = computed<NavGroup[]>(() => [
     {
         label: 'Settings',
         items: [
+            {
+                label: 'Payments',
+                href: '/admin/payments',
+                match: '/admin/payments',
+                icon: 'payments',
+            },
             {
                 label: 'Taxes',
                 href: '/admin/taxes',

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\PaymentMethod;
 use App\Models\Product;
 use App\Models\Vendor;
 use Illuminate\Database\Eloquent\Collection;
@@ -33,6 +34,7 @@ class OrderController extends Controller
             ))
             ->when($request->string('status')->toString(), fn ($query, $status) => $query->where('status', $status))
             ->when($request->string('payment_status')->toString(), fn ($query, $status) => $query->where('payment_status', $status))
+            ->when($request->string('payment_method')->toString(), fn ($query, $method) => $query->where('payment_method', $method))
             ->when($request->string('fulfillment_status')->toString(), fn ($query, $status) => $query->where('fulfillment_status', $status))
             ->when($request->filled('vendor'), fn ($query) => $query->whereHas(
                 'items', fn ($q) => $q->where('vendor_id', $request->integer('vendor'))
@@ -45,10 +47,11 @@ class OrderController extends Controller
 
         return Inertia::render('admin/orders/Index', [
             'orders' => $orders,
-            'filters' => $request->only(['search', 'status', 'payment_status', 'fulfillment_status', 'vendor', 'from', 'to']),
+            'filters' => $request->only(['search', 'status', 'payment_status', 'payment_method', 'fulfillment_status', 'vendor', 'from', 'to']),
             'vendors' => Vendor::orderBy('name')->get(['id', 'name']),
             'statuses' => Order::STATUSES,
             'paymentStatuses' => Order::PAYMENT_STATUSES,
+            'paymentMethods' => PaymentMethod::orderBy('position')->orderBy('name')->pluck('name'),
             'counts' => collect(Order::STATUSES)
                 ->mapWithKeys(fn ($status) => [$status => Order::where('status', $status)->count()])
                 ->put('all', Order::count()),
@@ -107,6 +110,8 @@ class OrderController extends Controller
                 ->get(['id', 'first_name', 'last_name', 'email', 'phone']),
             'statuses' => Order::STATUSES,
             'paymentStatuses' => Order::PAYMENT_STATUSES,
+            'paymentMethods' => PaymentMethod::active()
+                ->orderBy('position')->orderBy('name')->pluck('name'),
         ]);
     }
 
@@ -310,6 +315,8 @@ class OrderController extends Controller
             'statuses' => Order::STATUSES,
             'paymentStatuses' => Order::PAYMENT_STATUSES,
             'fulfillmentStatuses' => Order::FULFILLMENT_STATUSES,
+            'paymentMethods' => PaymentMethod::active()
+                ->orderBy('position')->orderBy('name')->pluck('name'),
             'vendorBreakdown' => $order->items
                 ->groupBy(fn (OrderItem $item) => $item->vendor->name ?? 'Store')
                 ->map(fn ($items) => [
@@ -353,6 +360,7 @@ class OrderController extends Controller
     {
         $data = $request->validate([
             'payment_status' => ['required', Rule::in(Order::PAYMENT_STATUSES)],
+            'payment_method' => ['nullable', 'string', 'max:60'],
             'transaction_id' => ['nullable', 'string', 'max:120'],
         ]);
 

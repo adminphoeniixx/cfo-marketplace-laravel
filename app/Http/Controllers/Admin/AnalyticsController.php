@@ -77,6 +77,7 @@ class AnalyticsController extends Controller
             'statusBreakdown' => $this->breakdown($from, $to, $vendorId, 'status'),
             'paymentBreakdown' => $this->breakdown($from, $to, $vendorId, 'payment_status'),
             'fulfillmentBreakdown' => $this->breakdown($from, $to, $vendorId, 'fulfillment_status'),
+            'byPaymentMethod' => $this->byPaymentMethod($from, $to, $vendorId),
             'returns' => $storeWide ? [
                 'refunds_count' => Refund::whereBetween('created_at', [$from, $to])->count(),
                 'refunds_value' => (float) Refund::where('status', 'processed')
@@ -353,6 +354,23 @@ class AnalyticsController extends Controller
             ->groupBy('customers.id', 'customers.first_name', 'customers.last_name', 'customers.email')
             ->orderByDesc('spend')
             ->when($limit, fn (BuilderContract $query) => $query->limit($limit))
+            ->get();
+    }
+
+    /**
+     * Orders and revenue per payment method, so the mix is visible next to the
+     * rest of the reporting.
+     *
+     * @return Collection<int, \stdClass>
+     */
+    private function byPaymentMethod(Carbon $from, Carbon $to, ?int $vendorId)
+    {
+        return $this->items($from, $to, $vendorId)
+            ->selectRaw("coalesce(orders.payment_method, 'Not specified') as name")
+            ->selectRaw('count(distinct order_items.order_id) as orders_count')
+            ->selectRaw('coalesce(sum(order_items.total), 0) as gross_sales')
+            ->groupBy('orders.payment_method')
+            ->orderByDesc('gross_sales')
             ->get();
     }
 

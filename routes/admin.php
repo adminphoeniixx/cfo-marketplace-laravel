@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\CustomerAddressController;
 use App\Http\Controllers\Admin\CustomerController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\OrderController;
+use App\Http\Controllers\Admin\PaymentMethodController;
 use App\Http\Controllers\Admin\PayoutController;
 use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\RefundController;
@@ -119,6 +120,17 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     Route::post('taxes/rates', [TaxController::class, 'storeRate'])->name('taxes.rates.store');
     Route::put('taxes/rates/{taxRate}', [TaxController::class, 'updateRate'])->name('taxes.rates.update');
     Route::delete('taxes/rates/{taxRate}', [TaxController::class, 'destroyRate'])->name('taxes.rates.destroy');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Payment methods
+    |--------------------------------------------------------------------------
+    */
+    Route::get('payments', [PaymentMethodController::class, 'index'])->name('payments.index');
+    Route::post('payments', [PaymentMethodController::class, 'store'])->name('payments.store');
+    Route::put('payments/{payment}', [PaymentMethodController::class, 'update'])->name('payments.update');
+    Route::patch('payments/{payment}/toggle', [PaymentMethodController::class, 'toggle'])->name('payments.toggle');
+    Route::delete('payments/{payment}', [PaymentMethodController::class, 'destroy'])->name('payments.destroy');
 
     /*
     |--------------------------------------------------------------------------
