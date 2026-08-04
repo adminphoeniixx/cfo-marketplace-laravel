@@ -144,8 +144,10 @@ const totalOf = (rows: Record<string, number>) =>
         :subtitle="`${date(filters.from)} – ${date(filters.to)}${lockedToVendor ? ' · your store' : ''}`"
     >
         <template #actions>
-            <PButton :href="exportUrl('orders')">Export orders</PButton>
-            <PButton :href="exportUrl('vendors')" variant="primary">
+            <PButton external :href="exportUrl('orders')">
+                Export orders
+            </PButton>
+            <PButton external :href="exportUrl('vendors')" variant="primary">
                 Export vendor report
             </PButton>
         </template>
@@ -285,7 +287,9 @@ const totalOf = (rows: Record<string, number>) =>
             :padding="false"
         >
             <template #actions>
-                <PButton size="slim" :href="exportUrl('vendors')">CSV</PButton>
+                <PButton external size="slim" :href="exportUrl('vendors')">
+                    CSV
+                </PButton>
             </template>
 
             <PTable
@@ -341,7 +345,7 @@ const totalOf = (rows: Record<string, number>) =>
             subtitle="Where the revenue comes from"
         >
             <template #actions>
-                <PButton size="slim" :href="exportUrl('categories')">
+                <PButton external size="slim" :href="exportUrl('categories')">
                     CSV
                 </PButton>
             </template>
@@ -367,7 +371,9 @@ const totalOf = (rows: Record<string, number>) =>
     <div class="mb-4 grid gap-4 lg:grid-cols-2">
         <PCard title="Top products" subtitle="By gross sales" :padding="false">
             <template #actions>
-                <PButton size="slim" :href="exportUrl('products')">CSV</PButton>
+                <PButton external size="slim" :href="exportUrl('products')">
+                    CSV
+                </PButton>
             </template>
 
             <PTable
@@ -409,7 +415,7 @@ const totalOf = (rows: Record<string, number>) =>
 
         <PCard title="Top customers" subtitle="By spend" :padding="false">
             <template #actions>
-                <PButton size="slim" :href="exportUrl('customers')">
+                <PButton external size="slim" :href="exportUrl('customers')">
                     CSV
                 </PButton>
             </template>

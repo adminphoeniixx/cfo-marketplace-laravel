@@ -6,6 +6,12 @@ type Props = {
     variant?: 'primary' | 'secondary' | 'plain' | 'critical' | 'success';
     size?: 'micro' | 'slim' | 'medium' | 'large';
     href?: string;
+    /**
+     * Render a plain anchor instead of an Inertia link. Needed for anything the
+     * browser must handle itself — file downloads, or links off the app — since
+     * an Inertia visit expects an Inertia response back.
+     */
+    external?: boolean;
     method?: 'get' | 'post' | 'put' | 'patch' | 'delete';
     type?: 'button' | 'submit' | 'reset';
     disabled?: boolean;
@@ -56,8 +62,11 @@ const classes = computed(() => {
 </script>
 
 <template>
+    <a v-if="href && external" :href="href" :class="classes">
+        <slot />
+    </a>
     <Link
-        v-if="href && method && method !== 'get'"
+        v-else-if="href && method && method !== 'get'"
         :href="href"
         :method="method"
         as="button"

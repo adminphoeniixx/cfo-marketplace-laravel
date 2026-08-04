@@ -177,6 +177,38 @@ test('reports can be exported as csv', function () {
         ->toContain('Table Lamp');
 });
 
+test('every export produces a header row and its data', function () {
+    actingAsAdmin();
+
+    $vendor = Vendor::factory()->create(['name' => 'Casa Luz']);
+    $category = Category::factory()->create(['name' => 'Lighting']);
+    $product = Product::factory()->for($vendor)->create(['category_id' => $category->id]);
+    $customer = Customer::factory()->create(['first_name' => 'Ishaan', 'last_name' => 'Roy']);
+
+    soldItem(
+        $vendor,
+        ['product_id' => $product->id, 'name' => 'Table Lamp', 'sku' => 'LAMP-1'],
+        ['customer_id' => $customer->id, 'number' => '#7001'],
+    );
+
+    $expected = [
+        'vendors' => 'Casa Luz',
+        'products' => 'Table Lamp',
+        'categories' => 'Lighting',
+        'customers' => $customer->email,
+        'orders' => '#7001',
+    ];
+
+    foreach ($expected as $report => $needle) {
+        $csv = $this->get(route('admin.analytics.export', ['report' => $report]))
+            ->assertOk()
+            ->streamedContent();
+
+        expect($csv)->toContain($needle)
+            ->and(substr_count(trim($csv), "\n"))->toBe(1, "{$report} should have one data row");
+    }
+});
+
 test('an unknown export is rejected', function () {
     actingAsAdmin();
 

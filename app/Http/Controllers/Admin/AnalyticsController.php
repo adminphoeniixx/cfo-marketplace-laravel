@@ -148,10 +148,12 @@ class AnalyticsController extends Controller
                 return;
             }
 
-            fputcsv($handle, $headers);
+            // PHP 8.4 deprecates the implicit backslash escape; an empty one is
+            // both the future default and the correct behaviour for CSV.
+            fputcsv($handle, $headers, ',', '"', '');
 
             foreach ($rows as $row) {
-                fputcsv($handle, $row);
+                fputcsv($handle, $row, ',', '"', '');
             }
 
             fclose($handle);
