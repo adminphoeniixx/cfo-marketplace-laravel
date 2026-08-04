@@ -1,0 +1,62 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\Setting;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
+
+class SettingController extends Controller
+{
+    /**
+     * @var array<string, string>
+     */
+    protected array $defaults = [
+        'store_name' => 'Marketplace',
+        'store_email' => 'support@marketplace.test',
+        'store_phone' => '',
+        'currency' => 'INR',
+        'weight_unit' => 'kg',
+        'order_prefix' => '#',
+        'default_commission' => '10',
+        'auto_approve_vendors' => '0',
+        'auto_approve_cancellations' => '0',
+        'low_stock_threshold' => '5',
+        'address' => '',
+    ];
+
+    public function index(): Response
+    {
+        $stored = Setting::pluck('value', 'key')->all();
+
+        return Inertia::render('admin/Settings', [
+            'settings' => [...$this->defaults, ...$stored],
+        ]);
+    }
+
+    public function update(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'store_name' => ['required', 'string', 'max:120'],
+            'store_email' => ['required', 'email', 'max:180'],
+            'store_phone' => ['nullable', 'string', 'max:25'],
+            'currency' => ['required', 'string', 'max:3'],
+            'weight_unit' => ['required', 'string', 'max:5'],
+            'order_prefix' => ['required', 'string', 'max:5'],
+            'default_commission' => ['required', 'numeric', 'min:0', 'max:100'],
+            'auto_approve_vendors' => ['boolean'],
+            'auto_approve_cancellations' => ['boolean'],
+            'low_stock_threshold' => ['required', 'integer', 'min:0'],
+            'address' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        foreach ($data as $key => $value) {
+            Setting::put($key, is_bool($value) ? (string) (int) $value : (string) $value);
+        }
+
+        return back()->with('success', 'Store settings saved.');
+    }
+}
