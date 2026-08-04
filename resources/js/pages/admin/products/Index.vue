@@ -25,7 +25,7 @@ type Product = {
     variants_count: number;
     vendor: { id: number; name: string } | null;
     category: { id: number; name: string } | null;
-    images: { id: number; path: string }[];
+    images: { id: number; path: string; url: string | null }[];
 };
 
 const props = defineProps<{
@@ -256,7 +256,10 @@ const confirmDelete = () => {
                         >
                             <img
                                 v-if="product.images?.length"
-                                :src="product.images[0].path"
+                                :src="
+                                    product.images[0].url ??
+                                    product.images[0].path
+                                "
                                 :alt="product.name"
                                 class="size-full object-cover"
                             />

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import PageHeader from '@/components/admin/PageHeader.vue';
 import PButton from '@/components/admin/PButton.vue';
 import PCard from '@/components/admin/PCard.vue';
@@ -16,6 +16,7 @@ type Category = {
     parent_id: number | null;
     description: string | null;
     image_path: string | null;
+    image_url: string | null;
     position: number;
     is_active: boolean;
     is_featured: boolean;
@@ -42,6 +43,59 @@ const form = useForm({
     seo_title: props.category?.seo_title ?? '',
     seo_description: props.category?.seo_description ?? '',
 });
+
+/* Preview follows whatever the field currently holds: the resolved URL for a
+   saved image, the pasted URL, or the URL returned by an upload. */
+const preview = ref(
+    props.category?.image_url ?? props.category?.image_path ?? '',
+);
+const fileInput = ref<HTMLInputElement | null>(null);
+const uploading = ref(false);
+const uploadError = ref('');
+
+const uploadImage = async (event: Event) => {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+
+    if (!file) {
+        return;
+    }
+
+    uploading.value = true;
+    uploadError.value = '';
+
+    try {
+        const body = new FormData();
+        body.append('file', file);
+        body.append('folder', 'categories');
+
+        const response = await fetch('/admin/uploads', {
+            method: 'POST',
+            body,
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin',
+        });
+
+        if (!response.ok) {
+            const payload = await response.json().catch(() => ({}));
+
+            throw new Error(
+                payload.message ?? `Upload failed (${response.status})`,
+            );
+        }
+
+        const { path, url } = await response.json();
+
+        form.image_path = path;
+        preview.value = url;
+    } catch (error) {
+        uploadError.value =
+            error instanceof Error ? error.message : 'Upload failed.';
+    } finally {
+        uploading.value = false;
+        input.value = '';
+    }
+};
 
 const parentOptions = computed(() => [
     { value: '', label: 'None (top level)' },
@@ -207,13 +261,34 @@ const submit = () => {
                         label="Image URL"
                         placeholder="https://…"
                         :error="form.errors.image_path"
+                        @update:model-value="preview = String($event)"
                     />
+                    <div class="mt-2 flex items-center gap-2">
+                        <PButton
+                            size="slim"
+                            :loading="uploading"
+                            :disabled="uploading"
+                            @click="fileInput?.click()"
+                        >
+                            {{ uploading ? 'Uploading…' : 'Upload image' }}
+                        </PButton>
+                        <input
+                            ref="fileInput"
+                            type="file"
+                            accept="image/*"
+                            class="hidden"
+                            @change="uploadImage"
+                        />
+                        <span v-if="uploadError" class="text-xs text-[#e51c00]">
+                            {{ uploadError }}
+                        </span>
+                    </div>
                     <div
-                        v-if="form.image_path"
+                        v-if="preview"
                         class="mt-3 overflow-hidden rounded-lg border border-[#e3e3e3] dark:border-[#3a3a3a]"
                     >
                         <img
-                            :src="form.image_path"
+                            :src="preview"
                             :alt="form.name"
                             class="h-32 w-full object-cover"
                         />

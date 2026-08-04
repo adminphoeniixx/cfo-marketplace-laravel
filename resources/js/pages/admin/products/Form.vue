@@ -37,7 +37,12 @@ type Variant = {
     is_active: boolean;
     values: VariantValue[];
 };
-type ImageRow = { id: number | null; path: string; alt: string };
+type ImageRow = {
+    id: number | null;
+    path: string;
+    url: string | null;
+    alt: string;
+};
 
 type Product = {
     id: number;
@@ -69,7 +74,12 @@ type Product = {
     tags: string[] | null;
     seo_title: string | null;
     seo_description: string | null;
-    images: { id: number; path: string; alt: string | null }[];
+    images: {
+        id: number;
+        path: string;
+        url: string | null;
+        alt: string | null;
+    }[];
     variants: (Variant & {
         values: { attribute_id: number; attribute_value_id: number }[];
     })[];
@@ -158,6 +168,7 @@ const form = useForm<{
         props.product?.images?.map((image) => ({
             id: image.id,
             path: image.path,
+            url: image.url ?? image.path,
             alt: image.alt ?? '',
         })) ?? [],
     attribute_ids:
@@ -197,13 +208,62 @@ const removeTag = (tag: string) =>
 
 /* ---------------------------------------------------------------- images */
 const imageInput = ref('');
+const fileInput = ref<HTMLInputElement | null>(null);
+const uploading = ref(false);
+const uploadError = ref('');
 
 const addImage = () => {
     const path = imageInput.value.trim();
 
     if (path) {
-        form.images.push({ id: null, path, alt: form.name });
+        form.images.push({ id: null, path, url: path, alt: form.name });
         imageInput.value = '';
+    }
+};
+
+// Files go straight to BunnyCDN; the form only ever carries the returned path.
+const uploadImages = async (event: Event) => {
+    const input = event.target as HTMLInputElement;
+    const files = [...(input.files ?? [])];
+
+    if (!files.length) {
+        return;
+    }
+
+    uploading.value = true;
+    uploadError.value = '';
+
+    try {
+        for (const file of files) {
+            const body = new FormData();
+            body.append('file', file);
+            body.append('folder', 'products');
+
+            const response = await fetch('/admin/uploads', {
+                method: 'POST',
+                body,
+                headers: { Accept: 'application/json' },
+                credentials: 'same-origin',
+            });
+
+            if (!response.ok) {
+                const payload = await response.json().catch(() => ({}));
+
+                throw new Error(
+                    payload.message ?? `Upload failed (${response.status})`,
+                );
+            }
+
+            const { path, url } = await response.json();
+
+            form.images.push({ id: null, path, url, alt: form.name });
+        }
+    } catch (error) {
+        uploadError.value =
+            error instanceof Error ? error.message : 'Upload failed.';
+    } finally {
+        uploading.value = false;
+        input.value = '';
     }
 };
 
@@ -511,7 +571,30 @@ const submit = () => {
                                 />
                             </div>
                             <PButton @click="addImage">Add</PButton>
+                            <PButton
+                                variant="primary"
+                                :loading="uploading"
+                                :disabled="uploading"
+                                @click="fileInput?.click()"
+                            >
+                                {{ uploading ? 'Uploading…' : 'Upload' }}
+                            </PButton>
+                            <input
+                                ref="fileInput"
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                class="hidden"
+                                @change="uploadImages"
+                            />
                         </div>
+
+                        <p
+                            v-if="uploadError"
+                            class="mt-2 text-xs text-[#e51c00]"
+                        >
+                            {{ uploadError }}
+                        </p>
 
                         <ul
                             v-if="form.images.length"
@@ -523,7 +606,7 @@ const submit = () => {
                                 class="group relative overflow-hidden rounded-lg border border-[#e3e3e3] dark:border-[#3a3a3a]"
                             >
                                 <img
-                                    :src="image.path"
+                                    :src="image.url ?? image.path"
                                     :alt="image.alt"
                                     class="aspect-square w-full object-cover"
                                 />

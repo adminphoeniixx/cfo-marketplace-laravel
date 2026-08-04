@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\BunnyCdn;
 use Database\Factories\OrderItemFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,6 +14,18 @@ class OrderItem extends Model
     use HasFactory;
 
     protected $guarded = [];
+
+    /** @var list<string> */
+    protected $appends = ['image_url'];
+
+    /**
+     * Renderable URL for the stored image — signed when the pull zone uses
+     * token authentication, and passed through when it is already absolute.
+     */
+    public function getImageUrlAttribute(): ?string
+    {
+        return BunnyCdn::display($this->image_path);
+    }
 
     protected function casts(): array
     {

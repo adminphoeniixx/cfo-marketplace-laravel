@@ -37,6 +37,14 @@ services:
       QUEUE_CONNECTION: database
       CACHE_STORE: database
       SESSION_DRIVER: database
+      # BunnyCDN — image uploads. Credentials come from the local .env.
+      BUNNYCDN_STORAGE_ZONE: ${BUNNYCDN_STORAGE_ZONE}
+      BUNNYCDN_API_KEY: ${BUNNYCDN_API_KEY}
+      BUNNYCDN_REGION: ${BUNNYCDN_REGION:-}
+      BUNNYCDN_HOST: ${BUNNYCDN_HOST:-storage.bunnycdn.com}
+      BUNNYCDN_PULL_ZONE_URL: ${BUNNYCDN_PULL_ZONE_URL}
+      BUNNYCDN_TOKEN_AUTH_KEY: ${BUNNYCDN_TOKEN_AUTH_KEY}
+      BUNNYCDN_PREFIX: ${BUNNYCDN_PREFIX:-cfo}
       # Mail
       MAIL_MAILER: log
       MAIL_FROM_ADDRESS: hello@example.com

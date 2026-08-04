@@ -17,6 +17,7 @@ type Category = {
     name: string;
     slug: string;
     image_path: string | null;
+    image_url: string | null;
     position: number;
     is_active: boolean;
     is_featured: boolean;
@@ -129,7 +130,7 @@ const confirmDelete = () => {
                         >
                             <img
                                 v-if="category.image_path"
-                                :src="category.image_path"
+                                :src="category.image_url ?? category.image_path"
                                 :alt="category.name"
                                 class="size-full object-cover"
                             />

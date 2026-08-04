@@ -22,6 +22,7 @@ type OrderItem = {
     name: string;
     sku: string | null;
     image_path: string | null;
+    image_url: string | null;
     options: Record<string, string> | null;
     unit_price: string;
     quantity: number;
@@ -246,7 +247,7 @@ const submitNote = () =>
                         >
                             <img
                                 v-if="item.image_path"
-                                :src="item.image_path"
+                                :src="item.image_url ?? item.image_path"
                                 :alt="item.name"
                                 class="size-full object-cover"
                             />

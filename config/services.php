@@ -35,4 +35,18 @@ return [
         ],
     ],
 
+    'bunnycdn' => [
+        'storage_zone' => env('BUNNYCDN_STORAGE_ZONE'),
+        'api_key' => env('BUNNYCDN_API_KEY'),
+        'region' => env('BUNNYCDN_REGION', ''),
+        'host' => env('BUNNYCDN_HOST', 'storage.bunnycdn.com'),
+        'pull_zone_url' => env('BUNNYCDN_PULL_ZONE_URL'),
+        'token_auth_key' => env('BUNNYCDN_TOKEN_AUTH_KEY'),
+        // How long a signed (token-authenticated) URL stays valid. Default 7 days.
+        'url_ttl' => (int) env('BUNNYCDN_URL_TTL', 604800),
+        // Everything this app uploads lives under one prefix, because the
+        // storage zone is shared with other projects.
+        'prefix' => env('BUNNYCDN_PREFIX', 'cfo'),
+    ],
+
 ];

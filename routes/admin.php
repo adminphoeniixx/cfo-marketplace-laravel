@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\SearchController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\ShippingController;
 use App\Http\Controllers\Admin\TaxController;
+use App\Http\Controllers\Admin\UploadController;
 use App\Http\Controllers\Admin\VendorController;
 use Illuminate\Support\Facades\Route;
 
@@ -23,6 +24,7 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     Route::get('search', SearchController::class)->name('search');
     Route::get('analytics', [AnalyticsController::class, 'index'])->name('analytics.index');
     Route::get('analytics/export/{report}', [AnalyticsController::class, 'export'])->name('analytics.export');
+    Route::post('uploads', [UploadController::class, 'store'])->name('uploads.store');
 
     /*
     |--------------------------------------------------------------------------
