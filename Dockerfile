@@ -21,6 +21,8 @@ ARG APP_HOST
 ENV DEBIAN_FRONTEND=noninteractive \
     TERM=xterm-color \
     OCTANE_SERVER=frankenphp \
+    OCTANE_PORT=8091 \
+    OCTANE_ADMIN_PORT=2019 \
     TZ=${TZ} \
     USER=octane \
     ROOT=${APP_DIR} \
@@ -176,7 +178,7 @@ RUN composer install \
     --no-dev \
     && composer clear-cache
 
-EXPOSE 8000
+EXPOSE 8091
 EXPOSE 2019
 
 ENTRYPOINT ["start-container"]

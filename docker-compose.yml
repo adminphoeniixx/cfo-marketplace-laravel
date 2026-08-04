@@ -7,7 +7,7 @@ services:
         APP_ENV: production
     image: cfo-marketplace:latest
     ports:
-      - "8081:8000"
+      - "8091:8091"
     environment:
       CONTAINER_MODE: http
       OCTANE_SERVER: frankenphp
@@ -21,7 +21,7 @@ services:
       APP_ENV: production
       APP_DEBUG: "false"
       APP_KEY: ${APP_KEY}
-      APP_URL: ${APP_URL:-http://localhost:8081}
+      APP_URL: ${APP_URL:-http://localhost:8091}
       # Postgres — credentials come from the local .env, never from this file.
       # DB_HOST defaults to the external host; when this container runs on the
       # same Docker network as the database, use the internal host instead
