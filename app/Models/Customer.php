@@ -47,4 +47,18 @@ class Customer extends Model
     {
         return trim($this->first_name.' '.$this->last_name);
     }
+
+    /**
+     * Recalculate the cached order totals shown on customer lists and profiles.
+     */
+    public function refreshOrderStats(): void
+    {
+        $orders = $this->orders()->whereNot('status', 'cancelled')->get();
+
+        $this->update([
+            'orders_count' => $orders->count(),
+            'total_spent' => round((float) $orders->sum('grand_total') - (float) $orders->sum('refunded_total'), 2),
+            'last_order_at' => $orders->max('placed_at'),
+        ]);
+    }
 }

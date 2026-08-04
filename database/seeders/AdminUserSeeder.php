@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Env;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
@@ -22,13 +23,13 @@ class AdminUserSeeder extends Seeder
 
     public function run(): void
     {
-        $email = env('ADMIN_EMAIL', 'admin@marketplace.test');
-        $password = env('ADMIN_PASSWORD') ?: Str::password(20, symbols: false);
+        $email = (string) Env::get('ADMIN_EMAIL', 'admin@marketplace.test');
+        $password = (string) (Env::get('ADMIN_PASSWORD') ?: Str::password(20, symbols: false));
 
         $user = User::firstOrCreate(
             ['email' => $email],
             [
-                'name' => env('ADMIN_NAME', 'Store Admin'),
+                'name' => (string) Env::get('ADMIN_NAME', 'Store Admin'),
                 'password' => Hash::make($password),
                 'role' => 'admin',
                 'email_verified_at' => now(),
@@ -37,12 +38,12 @@ class AdminUserSeeder extends Seeder
         );
 
         if (! $user->wasRecentlyCreated) {
-            $this->command?->warn("Admin [{$email}] already exists — left untouched.");
+            $this->command->warn("Admin [{$email}] already exists — left untouched.");
 
             return;
         }
 
-        $this->command?->info("Admin created: {$email}");
-        $this->command?->info("Password: {$password}");
+        $this->command->info("Admin created: {$email}");
+        $this->command->info("Password: {$password}");
     }
 }

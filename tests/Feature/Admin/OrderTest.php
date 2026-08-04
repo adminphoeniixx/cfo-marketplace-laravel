@@ -3,6 +3,10 @@
 use App\Models\Customer;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\Product;
+use App\Models\TaxClass;
+use App\Models\TaxRate;
+use App\Models\User;
 use App\Models\Vendor;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -239,4 +243,168 @@ test('shipping details can be edited', function () {
         ->admin_note->toBe('Priority customer')
         ->shipping_method->toBe('Express')
         ->tracking_number->toBe('TRK-777');
+});
+
+test('the create form only offers the selected vendor\'s active products', function () {
+    actingAsAdmin();
+
+    $vendor = Vendor::factory()->create();
+    $mine = Product::factory()->for($vendor)->create(['status' => 'active']);
+    Product::factory()->for($vendor)->create(['status' => 'draft']);
+    Product::factory()->create(['status' => 'active']);
+
+    $this->get(route('admin.orders.create', ['vendor' => $vendor->id]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('admin/orders/Create')
+            ->where('selectedVendor', $vendor->id)
+            ->where('lockedToVendor', false)
+            ->has('products', 1)
+            ->where('products.0.id', $mine->id)
+        );
+});
+
+test('an admin creates an order on behalf of a vendor', function () {
+    $admin = actingAsAdmin();
+
+    $vendor = Vendor::factory()->create(['commission_rate' => 10]);
+    $taxClass = TaxClass::factory()->create();
+    TaxRate::factory()->for($taxClass)->create(['rate' => 18, 'is_active' => true]);
+
+    $product = Product::factory()->for($vendor)->create([
+        'status' => 'active',
+        'price' => 1000,
+        'tax_class_id' => $taxClass->id,
+        'track_inventory' => true,
+        'stock_quantity' => 10,
+    ]);
+
+    $customer = Customer::factory()->create();
+
+    $this->post(route('admin.orders.store'), [
+        'vendor_id' => $vendor->id,
+        'customer_id' => $customer->id,
+        'email' => $customer->email,
+        'status' => 'processing',
+        'payment_status' => 'paid',
+        'shipping_total' => 50,
+        'discount_total' => 100,
+        'items' => [
+            ['product_id' => $product->id, 'quantity' => 2],
+        ],
+    ])->assertSessionHas('success');
+
+    $order = Order::latest('id')->first();
+
+    // 2 x 1000 = 2000 subtotal, 18% tax = 360, + 50 shipping - 100 discount.
+    expect($order)
+        ->customer_id->toBe($customer->id)
+        ->status->toBe('processing')
+        ->payment_status->toBe('paid')
+        ->and((float) $order->subtotal)->toBe(2000.0)
+        ->and((float) $order->tax_total)->toBe(360.0)
+        ->and((float) $order->grand_total)->toBe(2310.0)
+        ->and((float) $order->commission_total)->toBe(200.0)
+        ->and($order->placed_at)->not->toBeNull();
+
+    $item = $order->items->first();
+
+    expect($item)
+        ->vendor_id->toBe($vendor->id)
+        ->product_id->toBe($product->id)
+        ->quantity->toBe(2)
+        ->and((float) $item->vendor_earning)->toBe(1800.0);
+
+    // Stock is drawn down and the manual entry is recorded on the timeline.
+    expect($product->fresh()->stock_quantity)->toBe(8);
+    expect($order->events()->where('title', 'Order created manually')->exists())->toBeTrue();
+    expect($order->events()->first()->user_id)->toBe($admin->id);
+    expect($customer->fresh()->orders_count)->toBe(1);
+});
+
+test('a vendor user can only raise orders for their own store', function () {
+    $vendor = Vendor::factory()->create(['commission_rate' => 10]);
+    $other = Vendor::factory()->create();
+
+    $this->actingAs(User::factory()->create([
+        'role' => 'vendor',
+        'vendor_id' => $vendor->id,
+        'email_verified_at' => now(),
+    ]));
+
+    $product = Product::factory()->for($vendor)->create(['status' => 'active', 'price' => 500]);
+
+    // The form is locked to their own store...
+    $this->get(route('admin.orders.create'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('lockedToVendor', true)
+            ->has('vendors', 1)
+            ->where('vendors.0.id', $vendor->id)
+        );
+
+    // ...and a forged vendor_id in the request is ignored.
+    $this->post(route('admin.orders.store'), [
+        'vendor_id' => $other->id,
+        'email' => 'buyer@example.test',
+        'status' => 'pending',
+        'payment_status' => 'pending',
+        'items' => [['product_id' => $product->id, 'quantity' => 1]],
+    ])->assertSessionHas('success');
+
+    expect(Order::latest('id')->first()->items->first()->vendor_id)->toBe($vendor->id);
+});
+
+test('products belonging to another vendor are rejected', function () {
+    actingAsAdmin();
+
+    $vendor = Vendor::factory()->create();
+    $foreign = Product::factory()->create(['status' => 'active']);
+
+    $this->post(route('admin.orders.store'), [
+        'vendor_id' => $vendor->id,
+        'email' => 'buyer@example.test',
+        'status' => 'pending',
+        'payment_status' => 'pending',
+        'items' => [['product_id' => $foreign->id, 'quantity' => 1]],
+    ])->assertSessionHasErrors('items.0.product_id');
+
+    expect(Order::count())->toBe(0);
+});
+
+test('an order cannot be raised beyond available stock', function () {
+    actingAsAdmin();
+
+    $vendor = Vendor::factory()->create();
+    $product = Product::factory()->for($vendor)->create([
+        'status' => 'active',
+        'track_inventory' => true,
+        'allow_backorder' => false,
+        'stock_quantity' => 3,
+    ]);
+
+    $this->post(route('admin.orders.store'), [
+        'vendor_id' => $vendor->id,
+        'email' => 'buyer@example.test',
+        'status' => 'pending',
+        'payment_status' => 'pending',
+        'items' => [['product_id' => $product->id, 'quantity' => 4]],
+    ])->assertSessionHasErrors('items.0.quantity');
+
+    expect(Order::count())->toBe(0)
+        ->and($product->fresh()->stock_quantity)->toBe(3);
+});
+
+test('an order needs at least one line', function () {
+    actingAsAdmin();
+
+    $vendor = Vendor::factory()->create();
+
+    $this->post(route('admin.orders.store'), [
+        'vendor_id' => $vendor->id,
+        'email' => 'buyer@example.test',
+        'status' => 'pending',
+        'payment_status' => 'pending',
+        'items' => [],
+    ])->assertSessionHasErrors('items');
 });

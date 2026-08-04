@@ -69,6 +69,9 @@ const tabs = [
         <template #actions>
             <PButton href="/admin/cancellations">Cancellations</PButton>
             <PButton href="/admin/refunds">Refunds</PButton>
+            <PButton href="/admin/orders/create" variant="primary"
+                >Create order</PButton
+            >
         </template>
     </PageHeader>
 

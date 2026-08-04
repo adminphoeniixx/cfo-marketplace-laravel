@@ -53,6 +53,8 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     |--------------------------------------------------------------------------
     */
     Route::get('orders', [OrderController::class, 'index'])->name('orders.index');
+    Route::get('orders/create', [OrderController::class, 'create'])->name('orders.create');
+    Route::post('orders', [OrderController::class, 'store'])->name('orders.store');
     Route::get('orders/{order}', [OrderController::class, 'show'])->name('orders.show');
     Route::put('orders/{order}', [OrderController::class, 'update'])->name('orders.update');
     Route::patch('orders/{order}/status', [OrderController::class, 'updateStatus'])->name('orders.status');
