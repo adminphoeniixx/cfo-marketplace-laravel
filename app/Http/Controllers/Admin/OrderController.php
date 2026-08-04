@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
+use App\Models\DeliveryPartner;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\PaymentMethod;
@@ -317,6 +318,10 @@ class OrderController extends Controller
             'fulfillmentStatuses' => Order::FULFILLMENT_STATUSES,
             'paymentMethods' => PaymentMethod::active()
                 ->orderBy('position')->orderBy('name')->pluck('name'),
+            'deliveryPartners' => DeliveryPartner::active()
+                ->orderBy('position')->orderBy('name')->pluck('name'),
+            'trackingUrl' => DeliveryPartner::where('name', $order->carrier)->first()
+                ?->trackingUrlFor($order->tracking_number),
             'vendorBreakdown' => $order->items
                 ->groupBy(fn (OrderItem $item) => $item->vendor->name ?? 'Store')
                 ->map(fn ($items) => [

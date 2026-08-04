@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\CustomerAddressController;
 use App\Http\Controllers\Admin\CustomerController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\DeliveryPartnerController;
 use App\Http\Controllers\Admin\OrderController;
 use App\Http\Controllers\Admin\PaymentMethodController;
 use App\Http\Controllers\Admin\PayoutController;
@@ -152,4 +153,14 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     */
     Route::get('settings', [SettingController::class, 'index'])->name('settings.index');
     Route::put('settings', [SettingController::class, 'update'])->name('settings.update');
+
+    // Delivery partners live on the store settings screen.
+    Route::post('settings/delivery-partners', [DeliveryPartnerController::class, 'store'])
+        ->name('delivery-partners.store');
+    Route::put('settings/delivery-partners/{partner}', [DeliveryPartnerController::class, 'update'])
+        ->name('delivery-partners.update');
+    Route::patch('settings/delivery-partners/{partner}/toggle', [DeliveryPartnerController::class, 'toggle'])
+        ->name('delivery-partners.toggle');
+    Route::delete('settings/delivery-partners/{partner}', [DeliveryPartnerController::class, 'destroy'])
+        ->name('delivery-partners.destroy');
 });

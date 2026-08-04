@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\DeliveryPartner;
+use App\Models\Order;
 use App\Models\Setting;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -32,8 +34,24 @@ class SettingController extends Controller
     {
         $stored = Setting::pluck('value', 'key')->all();
 
+        // Orders keep the courier's name, so usage is counted by name.
+        $shipments = Order::query()
+            ->whereNotNull('carrier')
+            ->selectRaw('carrier, count(*) as total')
+            ->groupBy('carrier')
+            ->pluck('total', 'carrier');
+
+        $partners = DeliveryPartner::orderBy('position')->orderBy('name')->get()
+            ->map(fn (DeliveryPartner $partner) => [
+                ...$partner->only(['id', 'name', 'code', 'tracking_url', 'support_phone', 'notes', 'is_active', 'position']),
+                'orders_count' => (int) ($shipments[$partner->name] ?? 0),
+            ]);
+
         return Inertia::render('admin/Settings', [
             'settings' => [...$this->defaults, ...$stored],
+            'deliveryPartners' => $partners,
+            // Couriers sitting on orders that are not in the managed list.
+            'unlistedPartners' => $shipments->keys()->diff($partners->pluck('name'))->values(),
         ]);
     }
 

@@ -109,6 +109,8 @@ const props = defineProps<{
     paymentStatuses: string[];
     fulfillmentStatuses: string[];
     paymentMethods: string[];
+    deliveryPartners: string[];
+    trackingUrl: string | null;
     vendorBreakdown: Record<
         string,
         { items: number; total: number; commission: number; earning: number }
@@ -761,7 +763,18 @@ const submitNote = () =>
                             Tracking
                         </dt>
                         <dd class="truncate text-right">
-                            {{ order.tracking_number ?? '—' }}
+                            <a
+                                v-if="trackingUrl"
+                                :href="trackingUrl"
+                                target="_blank"
+                                rel="noopener"
+                                class="font-medium text-[#005bd3] hover:underline dark:text-[#8ac1ff]"
+                            >
+                                {{ order.tracking_number }}
+                            </a>
+                            <template v-else>
+                                {{ order.tracking_number ?? '—' }}
+                            </template>
                         </dd>
                     </div>
                     <div
@@ -915,10 +928,16 @@ const submitNote = () =>
             </ul>
 
             <div class="grid gap-3 sm:grid-cols-2">
-                <PTextField
+                <PSelect
                     v-model="fulfilForm.carrier"
-                    label="Carrier"
-                    placeholder="Delhivery, BlueDart…"
+                    label="Delivery partner"
+                    placeholder="Not specified"
+                    :options="
+                        deliveryPartners.map((name) => ({
+                            value: name,
+                            label: name,
+                        }))
+                    "
                     :error="fulfilForm.errors.carrier"
                 />
                 <PTextField
