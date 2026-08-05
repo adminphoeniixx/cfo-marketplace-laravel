@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
 /**
+ * @property array<string, mixed>|null $billing_address
+ * @property array<string, mixed>|null $shipping_address
  * @property Carbon|null $placed_at
  * @property Carbon|null $paid_at
  * @property Carbon|null $shipped_at

@@ -6,7 +6,18 @@ use Database\Factories\VendorPayoutFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property int $id
+ * @property int $vendor_id
+ * @property string $number
+ * @property string $status
+ * @property Carbon|null $period_start
+ * @property Carbon|null $period_end
+ * @property Carbon|null $paid_at
+ * @property Carbon|null $created_at
+ */
 class VendorPayout extends Model
 {
     /** @use HasFactory<VendorPayoutFactory> */

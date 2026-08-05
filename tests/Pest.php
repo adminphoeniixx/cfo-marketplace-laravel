@@ -1,6 +1,8 @@
 <?php
 
+use App\Models\Order;
 use App\Models\User;
+use App\Models\Vendor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -74,4 +76,61 @@ function actingAsAdmin(array $attributes = []): User
     test()->actingAs($user);
 
     return $user;
+}
+
+/**
+ * Create an approved store with a seller login, and act as that seller with a
+ * Sanctum token. Returns [User $seller, Vendor $store].
+ *
+ * @param  array<string, mixed>  $vendorAttributes
+ * @return array{0: User, 1: Vendor}
+ */
+function actingAsSeller(array $vendorAttributes = []): array
+{
+    $vendor = Vendor::factory()->create([
+        'status' => 'approved',
+        ...$vendorAttributes,
+    ]);
+
+    $seller = User::factory()->create([
+        'role' => 'vendor',
+        'vendor_id' => $vendor->id,
+        'is_active' => true,
+        'email_verified_at' => now(),
+    ]);
+
+    // A real bearer token rather than `actingAs`, so the tests exercise the
+    // same path the app does — including `currentAccessToken()`.
+    test()->withHeader(
+        'Authorization',
+        'Bearer '.$seller->createToken('test device')->plainTextToken,
+    );
+
+    return [$seller, $vendor];
+}
+
+/**
+ * An order carrying one line for the given store, so scoping can be asserted.
+ *
+ * @param  array<string, mixed>  $itemAttributes
+ */
+function orderForStore(Vendor $vendor, array $itemAttributes = []): Order
+{
+    $order = Order::factory()->create();
+
+    $order->items()->create([
+        'vendor_id' => $vendor->id,
+        'name' => 'Sample item',
+        'sku' => 'SKU-'.$vendor->id.'-'.fake()->unique()->numberBetween(1, 99999),
+        'unit_price' => 1000,
+        'quantity' => 2,
+        'tax_amount' => 180,
+        'total' => 2000,
+        'commission_rate' => 10,
+        'commission_amount' => 200,
+        'vendor_earning' => 1800,
+        ...$itemAttributes,
+    ]);
+
+    return $order->load('items');
 }

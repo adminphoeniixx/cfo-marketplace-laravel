@@ -7,7 +7,17 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property int $id
+ * @property int $order_id
+ * @property string $number
+ * @property string $status
+ * @property Carbon|null $reviewed_at
+ * @property Carbon|null $processed_at
+ * @property Carbon|null $created_at
+ */
 class Refund extends Model
 {
     /** @use HasFactory<RefundFactory> */

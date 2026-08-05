@@ -10,8 +10,26 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
+/**
+ * @property int $id
+ * @property int|null $vendor_id
+ * @property int|null $category_id
+ * @property int|null $tax_class_id
+ * @property string $name
+ * @property string $slug
+ * @property string|null $sku
+ * @property string $type
+ * @property string $status
+ * @property int $stock_quantity
+ * @property int $low_stock_threshold
+ * @property array<int, string>|null $tags
+ * @property Carbon|null $published_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ */
 class Product extends Model
 {
     /** @use HasFactory<ProductFactory> */
