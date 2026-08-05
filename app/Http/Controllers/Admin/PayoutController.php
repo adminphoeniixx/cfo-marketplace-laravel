@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Vendor;
 use App\Models\VendorPayout;
+use App\Notifications\PayoutRecorded;
+use App\Services\Notifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -82,6 +84,8 @@ class PayoutController extends Controller
             'method' => $vendor->payout_method,
             'note' => $data['note'] ?? null,
         ]);
+
+        Notifier::send(new PayoutRecorded($payout), $request->user());
 
         return to_route('admin.payouts.index')
             ->with('success', "Payout {$payout->number} generated for {$vendor->name}.");

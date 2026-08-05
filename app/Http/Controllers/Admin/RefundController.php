@@ -7,6 +7,8 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Refund;
+use App\Notifications\RefundRequested;
+use App\Services\Notifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -139,6 +141,8 @@ class RefundController extends Controller
 
             return $refund;
         });
+
+        Notifier::send(new RefundRequested($refund), $request->user());
 
         return to_route('admin.refunds.show', $refund)
             ->with('success', "Refund {$refund->number} created.");

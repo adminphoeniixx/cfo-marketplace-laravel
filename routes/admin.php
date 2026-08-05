@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\CustomerAddressController;
 use App\Http\Controllers\Admin\CustomerController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DeliveryPartnerController;
+use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\OrderController;
 use App\Http\Controllers\Admin\PaymentMethodController;
 use App\Http\Controllers\Admin\PayoutController;
@@ -27,6 +28,22 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     Route::get('/', DashboardController::class)->name('dashboard');
     Route::get('search', SearchController::class)->name('search');
     Route::post('uploads', [UploadController::class, 'store'])->name('uploads.store');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Notifications
+    |
+    | Not gated by a section: these belong to the person, and every query is
+    | scoped to the signed-in user's own pile.
+    |--------------------------------------------------------------------------
+    */
+    Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.read-all');
+    Route::delete('notifications/read', [NotificationController::class, 'clearRead'])->name('notifications.clear-read');
+    Route::post('notifications/push', [NotificationController::class, 'subscribe'])->name('notifications.push.subscribe');
+    Route::delete('notifications/push', [NotificationController::class, 'unsubscribe'])->name('notifications.push.unsubscribe');
+    Route::post('notifications/{notification}/read', [NotificationController::class, 'read'])->name('notifications.read');
+    Route::delete('notifications/{notification}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
 
     Route::middleware('role.can:analytics')->group(function () {
         Route::get('analytics', [AnalyticsController::class, 'index'])->name('analytics.index');

@@ -10,6 +10,9 @@ use App\Models\OrderItem;
 use App\Models\PaymentMethod;
 use App\Models\Product;
 use App\Models\Vendor;
+use App\Notifications\LowStockReached;
+use App\Notifications\OrderPlaced;
+use App\Services\Notifier;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -295,6 +298,18 @@ class OrderController extends Controller
 
             return $order;
         });
+
+        $actor = $request->user();
+
+        Notifier::send(new OrderPlaced($order->load('items', 'customer')), $actor);
+
+        // Selling the last few of something is worth hearing about, but only
+        // once it actually crosses the line this order pushed it over.
+        Product::whereIn('id', $order->items->pluck('product_id')->filter())
+            ->where('track_inventory', true)
+            ->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
+            ->get()
+            ->each(fn (Product $product) => Notifier::send(new LowStockReached($product), $actor));
 
         return to_route('admin.orders.show', $order)
             ->with('success', "Order {$order->number} created.");

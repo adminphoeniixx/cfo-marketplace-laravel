@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\OrderEvent;
 use App\Models\User;
 use App\Models\Vendor;
+use App\Notifications\TeamMemberChanged;
+use App\Services\Notifier;
 use App\Support\Roles;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -70,6 +72,8 @@ class TeamController extends Controller
             'email_verified_at' => now(),
         ])->save();
 
+        Notifier::send(TeamMemberChanged::for($user, 'added', $request->user()), $request->user());
+
         return back()->with('success', "{$user->name} can now sign in.");
     }
 
@@ -94,7 +98,13 @@ class TeamController extends Controller
             return back()->with('error', 'This is the last active admin — promote someone else first.');
         }
 
+        $roleChanged = $member->role !== $data['role'];
+
         $member->forceFill($data)->save();
+
+        if ($roleChanged) {
+            Notifier::send(TeamMemberChanged::for($member, 'role-changed', $request->user()), $request->user());
+        }
 
         return back()->with('success', "{$member->name} updated.");
     }
@@ -112,6 +122,10 @@ class TeamController extends Controller
         }
 
         $member->forceFill(['is_active' => ! $member->is_active])->save();
+
+        if (! $member->is_active) {
+            Notifier::send(TeamMemberChanged::for($member, 'deactivated', $request->user()), $request->user());
+        }
 
         return back()->with('success', $member->is_active
             ? "{$member->name} can sign in again."
@@ -136,10 +150,13 @@ class TeamController extends Controller
             return back()->with('error', 'This member has order history — deactivate them instead.');
         }
 
-        $name = $member->name;
+        $removed = TeamMemberChanged::for($member, 'removed', $request->user());
+
         $member->delete();
 
-        return back()->with('success', "{$name} removed.");
+        Notifier::send($removed, $request->user());
+
+        return back()->with('success', "{$member->name} removed.");
     }
 
     /**

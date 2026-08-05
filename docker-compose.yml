@@ -45,6 +45,10 @@ services:
       BUNNYCDN_PULL_ZONE_URL: ${BUNNYCDN_PULL_ZONE_URL}
       BUNNYCDN_TOKEN_AUTH_KEY: ${BUNNYCDN_TOKEN_AUTH_KEY}
       BUNNYCDN_PREFIX: ${BUNNYCDN_PREFIX:-cfo}
+      # Browser push. Blank keys simply leave push switched off.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
       # Mail
       MAIL_MAILER: log
       MAIL_FROM_ADDRESS: hello@example.com

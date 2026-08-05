@@ -7,6 +7,8 @@ use App\Models\Cancellation;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Notifications\CancellationRequested;
+use App\Services\Notifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -124,6 +126,8 @@ class CancellationController extends Controller
 
             return $cancellation;
         });
+
+        Notifier::send(new CancellationRequested($cancellation), $request->user());
 
         return to_route('admin.cancellations.show', $cancellation)
             ->with('success', "Cancellation {$cancellation->number} created.");

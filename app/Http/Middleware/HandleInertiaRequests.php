@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\Refund;
 use App\Models\Vendor;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\DatabaseNotification;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -52,6 +53,40 @@ class HandleInertiaRequests extends Middleware
             'adminCounts' => fn () => $request->user() && $request->is('admin*')
                 ? $this->adminCounts()
                 : null,
+            // Named for the topbar bell rather than "notifications", which the
+            // notification centre already uses for its own paginator — a page
+            // prop of the same name would shadow this one and blank the badge.
+            'bell' => fn () => $request->user() && $request->is('admin*')
+                ? $this->bell($request)
+                : null,
+        ];
+    }
+
+    /**
+     * What the topbar bell needs: the unread count and enough of the newest
+     * few to fill the dropdown without a second request.
+     *
+     * @return array{unread: int, recent: array<int, array<string, mixed>>}
+     */
+    protected function bell(Request $request): array
+    {
+        $user = $request->user();
+
+        return [
+            'unread' => $user->unreadNotifications()->count(),
+            'recent' => $user->notifications()
+                ->latest()
+                ->limit(6)
+                ->get()
+                ->map(fn (DatabaseNotification $notification) => [
+                    'id' => $notification->id,
+                    'read' => $notification->read_at !== null,
+                    'created_at' => $notification->created_at?->toIso8601String(),
+                    ...array_intersect_key($notification->data, array_flip(
+                        ['title', 'body', 'url', 'tone', 'kind']
+                    )),
+                ])
+                ->all(),
         ];
     }
 

@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Vendor;
+use App\Notifications\VendorRegistered;
+use App\Services\Notifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -53,6 +55,10 @@ class VendorController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $vendor = Vendor::create($this->validated($request));
+
+        if ($vendor->status === 'pending') {
+            Notifier::send(new VendorRegistered($vendor), $request->user());
+        }
 
         return to_route('admin.vendors.show', $vendor)
             ->with('success', "Vendor \"{$vendor->name}\" created.");
