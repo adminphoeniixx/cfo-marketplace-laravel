@@ -9,6 +9,7 @@ import PButton from '@/components/admin/PButton.vue';
 import PCard from '@/components/admin/PCard.vue';
 import PEmptyState from '@/components/admin/PEmptyState.vue';
 import SalesChart from '@/components/admin/SalesChart.vue';
+import { useSections } from '@/composables/useSections';
 import {
     compactCurrency,
     currency,
@@ -19,6 +20,10 @@ import {
 } from '@/lib/format';
 
 type Metric = { value: number; change: number | null };
+
+// The dashboard is open to every role, so its shortcuts have to hide
+// themselves rather than send someone to a 403.
+const { can } = useSections();
 
 const props = defineProps<{
     range: number;
@@ -84,26 +89,30 @@ const actionItems = computed(() =>
             count: props.pending.unfulfilled,
             href: '/admin/orders?fulfillment_status=unfulfilled',
             tone: 'warning' as const,
+            section: 'orders',
         },
         {
             label: 'Cancellations to review',
             count: props.pending.cancellations,
             href: '/admin/cancellations?status=pending',
             tone: 'critical' as const,
+            section: 'cancellations',
         },
         {
             label: 'Refunds to review',
             count: props.pending.refunds,
             href: '/admin/refunds?status=pending',
             tone: 'critical' as const,
+            section: 'refunds',
         },
         {
             label: 'Vendors awaiting approval',
             count: props.pending.vendors,
             href: '/admin/vendors?status=pending',
             tone: 'attention' as const,
+            section: 'vendors',
         },
-    ].filter((item) => item.count > 0),
+    ].filter((item) => item.count > 0 && can(item.section)),
 );
 </script>
 
@@ -133,7 +142,10 @@ const actionItems = computed(() =>
                     {{ option.label.replace('Last ', '') }}
                 </button>
             </div>
-            <PButton href="/admin/products/create" variant="primary"
+            <PButton
+                v-if="can('products')"
+                href="/admin/products/create"
+                variant="primary"
                 >Add product</PButton
             >
         </template>
@@ -220,7 +232,11 @@ const actionItems = computed(() =>
             subtitle="By revenue in the selected period"
         >
             <template #actions>
-                <PButton href="/admin/products" variant="plain" size="slim"
+                <PButton
+                    v-if="can('products')"
+                    href="/admin/products"
+                    variant="plain"
+                    size="slim"
                     >View all</PButton
                 >
             </template>
@@ -236,9 +252,17 @@ const actionItems = computed(() =>
             />
         </PCard>
 
-        <PCard title="Top vendors" subtitle="Vendor leaderboard">
+        <PCard
+            v-if="can('vendors')"
+            title="Top vendors"
+            subtitle="Vendor leaderboard"
+        >
             <template #actions>
-                <PButton href="/admin/vendors" variant="plain" size="slim"
+                <PButton
+                    v-if="can('vendors')"
+                    href="/admin/vendors"
+                    variant="plain"
+                    size="slim"
                     >View all</PButton
                 >
             </template>
@@ -284,9 +308,13 @@ const actionItems = computed(() =>
     </div>
 
     <div class="grid gap-4 lg:grid-cols-2">
-        <PCard title="Recent orders">
+        <PCard v-if="can('orders')" title="Recent orders">
             <template #actions>
-                <PButton href="/admin/orders" variant="plain" size="slim"
+                <PButton
+                    v-if="can('orders')"
+                    href="/admin/orders"
+                    variant="plain"
+                    size="slim"
                     >View all</PButton
                 >
             </template>
@@ -334,11 +362,13 @@ const actionItems = computed(() =>
         </PCard>
 
         <PCard
+            v-if="can('products')"
             title="Low stock alerts"
             subtitle="Products at or below their threshold"
         >
             <template #actions>
                 <PButton
+                    v-if="can('products')"
                     href="/admin/products?stock=low"
                     variant="plain"
                     size="slim"

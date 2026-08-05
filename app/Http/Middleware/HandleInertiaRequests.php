@@ -44,6 +44,9 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'auth' => [
                 'user' => $request->user(),
+                // Drives which sidebar entries render. The routes are gated
+                // independently, so this is presentation only.
+                'sections' => $request->user()?->sections() ?? [],
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'adminCounts' => fn () => $request->user() && $request->is('admin*')

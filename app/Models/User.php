@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Support\Roles;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -39,6 +40,17 @@ class User extends Authenticatable implements PasskeyUser
     use HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
 
     /**
+     * Mirrors the column defaults so a freshly made model answers `is_active`
+     * before it has been round-tripped through the database.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'role' => 'staff',
+        'is_active' => true,
+    ];
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -70,5 +82,32 @@ class User extends Authenticatable implements PasskeyUser
     public function isVendor(): bool
     {
         return $this->role === 'vendor' && $this->vendor_id !== null;
+    }
+
+    /**
+     * Admins hold every section and are the only ones who can edit the role
+     * matrix, so this is checked directly rather than through a permission.
+     */
+    public function isAdmin(): bool
+    {
+        return $this->role === Roles::ADMIN;
+    }
+
+    /**
+     * Whether this user's role may open the given admin section.
+     */
+    public function canAccess(string $section): bool
+    {
+        return Roles::allows($this, $section);
+    }
+
+    /**
+     * Sections this user's role may open.
+     *
+     * @return list<string>
+     */
+    public function sections(): array
+    {
+        return $this->is_active ? Roles::forRole($this->role) : [];
     }
 }

@@ -24,10 +24,19 @@ class CreateNewUser implements CreatesNewUsers
             'password' => $this->passwordRules(),
         ])->validate();
 
-        return User::create([
+        $user = new User;
+
+        // Self-registration must never hand out access. The account is parked
+        // on the lowest role and switched off until an admin activates it from
+        // the Team screen.
+        $user->forceFill([
             'name' => $input['name'],
             'email' => $input['email'],
             'password' => $input['password'],
-        ]);
+            'role' => 'staff',
+            'is_active' => false,
+        ])->save();
+
+        return $user;
     }
 }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
+import { useSections } from '@/composables/useSections';
 
 type NavItem = {
     label: string;
@@ -8,6 +9,10 @@ type NavItem = {
     match: string;
     icon: string;
     badge?: number | null;
+    /** Role section this entry needs. Omitted entries are always shown. */
+    section?: string;
+    /** Entries only the admin role may open, regardless of the matrix. */
+    adminOnly?: boolean;
 };
 type NavGroup = { label: string; items: NavItem[] };
 
@@ -46,9 +51,13 @@ const icons: Record<string, string> = {
         'M3 3h1.5v12.5H17V17H3V3zm3.5 8h2v4h-2v-4zm3.5-3h2v7h-2V8zm3.5-3h2v10h-2V5z',
     payments:
         'M3 4h14a1 1 0 011 1v3H2V5a1 1 0 011-1zm-1 6h16v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zm2.5 2v1.5h4V12h-4z',
+    team: 'M7 9a3 3 0 100-6 3 3 0 000 6zm7 0a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM1 16.5C1 13.9 3.7 12 7 12s6 1.9 6 4.5V18H1v-1.5zm13.2 1.5v-1.5c0-1.5-.6-2.8-1.6-3.8 2.9.2 5.4 1.9 5.4 4.3V18h-3.8z',
+    roles: 'M10 1.5l6.5 2.8v4.4c0 4-2.8 7.6-6.5 8.8-3.7-1.2-6.5-4.8-6.5-8.8V4.3L10 1.5zm-.9 10.9l4.6-4.6-1.3-1.3-3.3 3.3-1.5-1.5-1.3 1.3 2.8 2.8z',
 };
 
-const groups = computed<NavGroup[]>(() => [
+const { sections, isAdmin } = useSections();
+
+const allGroups = computed<NavGroup[]>(() => [
     {
         label: '',
         items: [
@@ -63,6 +72,7 @@ const groups = computed<NavGroup[]>(() => [
                 href: '/admin/analytics',
                 match: '/admin/analytics',
                 icon: 'analytics',
+                section: 'analytics',
             },
         ],
     },
@@ -75,6 +85,7 @@ const groups = computed<NavGroup[]>(() => [
                 match: '/admin/orders',
                 icon: 'orders',
                 badge: props.counts?.open_orders,
+                section: 'orders',
             },
             {
                 label: 'Cancellations',
@@ -82,6 +93,7 @@ const groups = computed<NavGroup[]>(() => [
                 match: '/admin/cancellations',
                 icon: 'cancel',
                 badge: props.counts?.pending_cancellations,
+                section: 'cancellations',
             },
             {
                 label: 'Refunds',
@@ -89,12 +101,14 @@ const groups = computed<NavGroup[]>(() => [
                 match: '/admin/refunds',
                 icon: 'refund',
                 badge: props.counts?.pending_refunds,
+                section: 'refunds',
             },
             {
                 label: 'Customers',
                 href: '/admin/customers',
                 match: '/admin/customers',
                 icon: 'customers',
+                section: 'customers',
             },
         ],
     },
@@ -106,18 +120,21 @@ const groups = computed<NavGroup[]>(() => [
                 href: '/admin/products',
                 match: '/admin/products',
                 icon: 'products',
+                section: 'products',
             },
             {
                 label: 'Categories',
                 href: '/admin/categories',
                 match: '/admin/categories',
                 icon: 'category',
+                section: 'categories',
             },
             {
                 label: 'Attributes',
                 href: '/admin/attributes',
                 match: '/admin/attributes',
                 icon: 'attributes',
+                section: 'attributes',
             },
         ],
     },
@@ -130,12 +147,14 @@ const groups = computed<NavGroup[]>(() => [
                 match: '/admin/vendors',
                 icon: 'vendors',
                 badge: props.counts?.pending_vendors,
+                section: 'vendors',
             },
             {
                 label: 'Payouts',
                 href: '/admin/payouts',
                 match: '/admin/payouts',
                 icon: 'payouts',
+                section: 'payouts',
             },
         ],
     },
@@ -147,28 +166,67 @@ const groups = computed<NavGroup[]>(() => [
                 href: '/admin/payments',
                 match: '/admin/payments',
                 icon: 'payments',
+                section: 'payments',
             },
             {
                 label: 'Taxes',
                 href: '/admin/taxes',
                 match: '/admin/taxes',
                 icon: 'tax',
+                section: 'taxes',
             },
             {
                 label: 'Shipping',
                 href: '/admin/shipping',
                 match: '/admin/shipping',
                 icon: 'shipping',
+                section: 'shipping',
             },
             {
                 label: 'Store settings',
                 href: '/admin/settings',
                 match: '/admin/settings',
                 icon: 'settings',
+                section: 'settings',
+            },
+        ],
+    },
+    {
+        label: 'Staff',
+        items: [
+            {
+                label: 'Team',
+                href: '/admin/team',
+                match: '/admin/team',
+                icon: 'team',
+                section: 'team',
+            },
+            {
+                label: 'Roles',
+                href: '/admin/roles',
+                match: '/admin/roles',
+                icon: 'roles',
+                adminOnly: true,
             },
         ],
     },
 ]);
+
+// Hide what the role cannot open — the routes enforce it either way.
+const groups = computed<NavGroup[]>(() =>
+    allGroups.value
+        .map((group) => ({
+            ...group,
+            items: group.items.filter((item) => {
+                if (item.adminOnly) {
+                    return isAdmin.value;
+                }
+
+                return !item.section || sections.value.includes(item.section);
+            }),
+        }))
+        .filter((group) => group.items.length > 0),
+);
 
 const isActive = (item: NavItem) => {
     const url = page.url.split('?')[0];
