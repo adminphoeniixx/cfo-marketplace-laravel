@@ -183,8 +183,8 @@ signed and time-limited.
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/orders` | `?search= &status= &fulfillment_status= &from= &to= &per_page=` |
-| GET | `/orders/summary` | Counts per status plus an unfulfilled count. |
+| GET | `/orders` | `?search= &status= &fulfillment_status= &needs_packing=1 &from= &to= &per_page=` |
+| GET | `/orders/summary` | Counts per status plus `unfulfilled`. |
 | GET | `/orders/{id}` | |
 | POST | `/orders/{id}/fulfill` | `items[].id`, `items[].quantity`, optional `tracking_number`, `carrier`. |
 | POST | `/orders/{id}/notes` | `note`. Lands on the order timeline the admin panel shows. |
@@ -192,6 +192,16 @@ signed and time-limited.
 Fulfilment only moves your own lines. The order-level status is recomputed from
 **every** line, so a two-vendor order stays `partially_fulfilled` until the
 other seller ships too.
+
+That is why the "to pack" list is **`?needs_packing=1`**, not
+`?fulfillment_status=unfulfilled`. `needs_packing` asks whether any of *your*
+lines still has quantity outstanding, so an order you have finished drops off
+even while the other seller's half keeps the order itself partially fulfilled.
+`summary.unfulfilled` and the dashboard's `needs_attention.unfulfilled_orders`
+count the same thing, so the badge and the list it opens always agree.
+
+`?fulfillment_status=` still filters on the order's own state, for when that is
+genuinely what you want.
 
 Customer data is deliberately thin: a name, a phone and the shipping address —
 enough to pack and deliver, nothing that identifies the buyer beyond this order.

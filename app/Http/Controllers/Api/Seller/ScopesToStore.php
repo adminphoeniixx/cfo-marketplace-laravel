@@ -49,6 +49,27 @@ trait ScopesToStore
     }
 
     /**
+     * Orders this store still has packing left to do on.
+     *
+     * Deliberately not the order's own `fulfillment_status`: on a basket shared
+     * with another seller that stays `partially_fulfilled` until *they* ship,
+     * which would nag this seller about an order they have already finished.
+     * What matters is whether any of **our** lines has quantity outstanding.
+     *
+     * @return Builder<Order>
+     */
+    protected function ordersNeedingPacking(Request $request): Builder
+    {
+        $storeId = $this->storeId($request);
+
+        return Order::query()
+            ->whereNot('status', 'cancelled')
+            ->whereHas('items', fn ($query) => $query
+                ->where('vendor_id', $storeId)
+                ->whereRaw('order_items.quantity_fulfilled < order_items.quantity - order_items.quantity_cancelled'));
+    }
+
+    /**
      * @return Builder<Cancellation>
      */
     protected function storeCancellations(Request $request): Builder

@@ -303,3 +303,77 @@ test('the sales window is clamped', function () {
     $this->getJson(route('api.seller.analytics.sales', ['days' => 0]))
         ->assertOk()->assertJsonPath('days', 1);
 });
+
+/*
+|--------------------------------------------------------------------------
+| "Still mine to pack" on a shared basket
+|--------------------------------------------------------------------------
+|
+| The order's own fulfillment_status stays `partially_fulfilled` until every
+| seller on the basket has shipped. Counting from that told a seller who had
+| finished that they still had an order to pack.
+|
+*/
+
+test('a seller who has packed everything of theirs is not nagged about it', function () {
+    [, $store] = actingAsSeller();
+    $elsewhere = Vendor::factory()->create(['status' => 'approved']);
+
+    $order = orderForStore($store);
+    $mine = $order->items()->where('vendor_id', $store->id)->firstOrFail();
+    $order->items()->create([
+        'vendor_id' => $elsewhere->id,
+        'name' => 'Their item',
+        'unit_price' => 500,
+        'quantity' => 1,
+        'total' => 500,
+    ]);
+
+    // Before packing: one order waiting on us.
+    $this->getJson(route('api.seller.dashboard'))
+        ->assertOk()->assertJsonPath('needs_attention.unfulfilled_orders', 1);
+    $this->getJson(route('api.seller.orders.summary'))
+        ->assertOk()->assertJsonPath('unfulfilled', 1);
+
+    $this->postJson(route('api.seller.orders.fulfill', $order->id), [
+        'items' => [['id' => $mine->id, 'quantity' => $mine->quantity]],
+    ])->assertOk();
+
+    // The order is still partially fulfilled — the other seller has not
+    // shipped — but nothing here is ours any more.
+    expect($order->fresh()->fulfillment_status)->toBe('partially_fulfilled');
+
+    $this->getJson(route('api.seller.dashboard'))
+        ->assertOk()->assertJsonPath('needs_attention.unfulfilled_orders', 0);
+    $this->getJson(route('api.seller.orders.summary'))
+        ->assertOk()->assertJsonPath('unfulfilled', 0);
+});
+
+test('the needs_packing filter returns exactly what the chip counts', function () {
+    [, $store] = actingAsSeller();
+
+    $done = orderForStore($store);
+    $todo = orderForStore($store);
+
+    $item = $done->items()->where('vendor_id', $store->id)->firstOrFail();
+    $this->postJson(route('api.seller.orders.fulfill', $done->id), [
+        'items' => [['id' => $item->id, 'quantity' => $item->quantity]],
+    ])->assertOk();
+
+    $count = $this->getJson(route('api.seller.orders.summary'))->json('unfulfilled');
+    $list = $this->getJson(route('api.seller.orders.index', ['needs_packing' => 1]))->assertOk();
+
+    expect($count)->toBe(1)
+        ->and($list->json('meta.total'))->toBe(1)
+        ->and($list->json('data.0.id'))->toBe($todo->id);
+});
+
+test('a cancelled order is never something to pack', function () {
+    [, $store] = actingAsSeller();
+
+    $order = orderForStore($store);
+    $order->forceFill(['status' => 'cancelled'])->save();
+
+    $this->getJson(route('api.seller.orders.summary'))
+        ->assertOk()->assertJsonPath('unfulfilled', 0);
+});

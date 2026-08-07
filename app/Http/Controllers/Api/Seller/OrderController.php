@@ -23,6 +23,11 @@ class OrderController extends Controller
                 ->where('status', $status))
             ->when($request->string('fulfillment_status')->toString(), fn ($query, $status) => $query
                 ->where('fulfillment_status', $status))
+            // "Still mine to pack" — see ordersNeedingPacking(). The raw
+            // `fulfillment_status` filter above stays available for anyone who
+            // wants the order's own state instead.
+            ->when($request->boolean('needs_packing'), fn ($query) => $query
+                ->whereIn('id', $this->ordersNeedingPacking($request)->select('orders.id')))
             ->when($request->date('from'), fn ($query, $from) => $query->where('placed_at', '>=', $from))
             ->when($request->date('to'), fn ($query, $to) => $query->where('placed_at', '<=', $to))
             ->latest('placed_at')
@@ -141,9 +146,9 @@ class OrderController extends Controller
         return response()->json([
             'statuses' => collect(Order::STATUSES)
                 ->mapWithKeys(fn (string $status) => [$status => (int) ($counts[$status] ?? 0)]),
-            'unfulfilled' => (clone $this->storeOrders($request))
-                ->whereIn('fulfillment_status', ['unfulfilled', 'partially_fulfilled'])
-                ->count(),
+            // Counts what `?needs_packing=1` returns, so the chip and the list
+            // it opens can never disagree.
+            'unfulfilled' => $this->ordersNeedingPacking($request)->count(),
         ]);
     }
 }

@@ -1,6 +1,6 @@
 {
   "info": {
-    "_postman_id": "2e13c7db-e9c7-4205-a0e4-cff1814a3b3e",
+    "_postman_id": "a3c53ec6-9077-4a91-bbeb-66c7eb00511c",
     "name": "CFO Marketplace — Seller API",
     "description": "# CFO Seller API\n\nToken-authenticated REST API for the seller app.\n\n## Getting started\n\n1. Set `base_url` (collection variables) to your environment.\n2. Run **1 · Auth → Login**. It stores the bearer token into the `token` variable and every other request picks it up.\n3. New to this environment? Run **Register a new store** first — but note the store lands on `pending` and an admin has to approve it before the trading folders work.\n\n## Three tiers of access\n\n| Tier | Folders |\n|---|---|\n| public | 1 · Auth |\n| signed in, store may be pending | 2 · Account, 3 · Notifications, 4 · Push |\n| approved store only | everything else |\n\n## Status codes\n\n| Code | Meaning |\n|---|---|\n| 401 | No valid token — sign in again. |\n| 403 | Token fine, store cannot trade yet. Read `store_status`. |\n| 404 | Does not exist **or** belongs to another store. |\n| 422 | Validation — standard Laravel `errors` object. |\n| 429 | Rate limited: auth 10/min, uploads 60/min. |\n\n## Scoping\n\nNo request carries a store id. The token decides whose data comes back. On an order shared with another seller you receive **only your own lines**, and the totals are your share — never the buyer's basket.\n\nFull reference: `docs/seller-api.md`.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
@@ -1946,7 +1946,7 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/seller/orders?search=&status=&fulfillment_status=&from=&to=&per_page=25",
+              "raw": "{{base_url}}/api/seller/orders?search=&status=&needs_packing=&fulfillment_status=&from=&to=&per_page=25",
               "host": [
                 "{{base_url}}"
               ],
@@ -1962,6 +1962,10 @@
                 },
                 {
                   "key": "status",
+                  "value": ""
+                },
+                {
+                  "key": "needs_packing",
                   "value": ""
                 },
                 {
@@ -1981,7 +1985,8 @@
                   "value": "25"
                 }
               ]
-            }
+            },
+            "description": "Use `needs_packing=1` for the \"to pack\" tab — it asks whether any of **your** lines is still outstanding. `fulfillment_status` filters on the order's own state, which on a basket shared with another seller stays partial until they ship too."
           },
           "response": [],
           "event": [

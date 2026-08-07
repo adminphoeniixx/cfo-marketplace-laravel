@@ -53,9 +53,7 @@ class DashboardController extends Controller
                 'units' => (int) $totals->units,
             ],
             'needs_attention' => [
-                'unfulfilled_orders' => $this->storeOrders($request)
-                    ->whereIn('fulfillment_status', ['unfulfilled', 'partially_fulfilled'])
-                    ->count(),
+                'unfulfilled_orders' => $this->ordersNeedingPacking($request)->count(),
                 'pending_cancellations' => $this->storeCancellations($request)
                     ->where('status', 'pending')->count(),
                 'pending_refunds' => $this->storeRefunds($request)
