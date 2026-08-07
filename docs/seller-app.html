@@ -537,6 +537,21 @@
           refundReq: true, restock: false, amount: 4999, breakdown: { items: 4999, shipping: 79, tax: 0, adj: 0, total: 5078 } }
     ];
 
+    let team = [
+        { name: 'Meera Shah', email: 'meera@store.test', you: true, active: true },
+        { name: 'Packing desk', email: 'packing@meeratextiles.in', you: false, active: true },
+        { name: 'Weekend cover', email: 'weekend@meeratextiles.in', you: false, active: false }
+    ];
+
+    const rates = [
+        { zone: 'Tamil Nadu', list: [
+            { name: 'Standard', detail: '2–5 days', rate: 60, editable: true },
+            { name: 'Free above ₹2,000', detail: 'Orders over ₹2,000', rate: 0, editable: true } ] },
+        { zone: 'Rest of India', list: [
+            { name: 'Standard', detail: '4–8 days', rate: 120, editable: true },
+            { name: 'Marketplace default', detail: 'Applies where you set nothing', rate: 99, editable: false } ] }
+    ];
+
     const notifications = [
         { t: 'New order #338908', b: '₹9,998 from Priya Nair', w: '12m ago', read: false },
         { t: 'Cancellation CAN-00017 needs your response', b: 'Order #338908', w: '1h ago', read: false },
@@ -966,6 +981,8 @@
                 <div class="card flat">
                     <button class="row" data-go="storeDetails"><span class="grow"><span class="t"><span class="txt">Store details</span></span></span><span class="chev">›</span></button>
                     <button class="row" data-go="payoutAccount"><span class="grow"><span class="t"><span class="txt">Payout account</span></span><span class="s">HDFC ••••4821</span></span><span class="chev">›</span></button>
+                    <button class="row" data-go="shipping"><span class="grow"><span class="t"><span class="txt">Delivery charges</span></span><span class="s">Your rates per zone</span></span><span class="chev">›</span></button>
+                    <button class="row" data-go="team"><span class="grow"><span class="t"><span class="txt">Team</span></span><span class="s">${team.filter(m => m.active).length} active logins</span></span><span class="chev">›</span></button>
                     <div class="row static"><span class="grow"><span class="t"><span class="txt">Commission</span></span><span class="s">Set by the marketplace</span></span><span class="amt">${store.commission}%</span></div>
                 </div>
                 <div class="sect">You</div>
@@ -1041,10 +1058,62 @@
                 <button class="btn ghost" data-act="signoutAll">Sign out everywhere</button>`
         }),
 
+        team: () => ({
+            bar: { title: 'Team', sub: 'Logins on this store' }, chrome: 'back',
+            html: `
+                <p class="note">Everyone here sees the same orders, products and
+                    money. Only passwords, devices and notifications are private
+                    to each person.</p>
+                <div class="card flat">
+                    ${team.map(m => `<button class="row" data-act="soon">
+                        <span class="thumb" style="font-size:15px">${esc(m.name.charAt(0))}</span>
+                        <span class="grow"><span class="t"><span class="txt">${esc(m.name)}</span>
+                            ${m.you ? '<span class="pill ok">You</span>' : ''}
+                            ${m.active ? '' : '<span class="pill mute">Off</span>'}</span>
+                            <span class="s">${esc(m.email)}</span></span>
+                        <span class="chev">›</span></button>`).join('')}
+                </div>
+                <div class="spacer"></div>
+                <button class="btn" data-go="teamAdd">Add a login</button>`
+        }),
+
+        teamAdd: () => ({
+            bar: { title: 'Add a login' }, chrome: 'close-save',
+            html: `
+                <label class="field"><span class="lbl">Name</span><input placeholder="e.g. Packing desk"></label>
+                <label class="field"><span class="lbl">Email</span><input placeholder="packing@meeratextiles.in"></label>
+                <label class="field"><span class="lbl">Phone</span><input placeholder="Optional"></label>
+                <label class="field"><span class="lbl">Password</span><input type="password" placeholder="At least 8 characters"></label>
+                <label class="field"><span class="lbl">Confirm password</span><input type="password"></label>
+                <p class="note">They'll be able to manage everything on this store,
+                    including adding and removing other logins.</p>
+                <div class="spacer"></div>
+                <button class="btn" data-act="addMember">Create login</button>`
+        }),
+
+        shipping: () => ({
+            bar: { title: 'Delivery charges', sub: 'Your rates per zone' }, chrome: 'back',
+            html: `
+                ${rates.map(r => `
+                    <div class="sect">${esc(r.zone)}</div>
+                    <div class="card flat">
+                        ${r.list.map(x => `<div class="row ${x.editable ? '' : 'static'}">
+                            <span class="grow"><span class="t"><span class="txt">${esc(x.name)}</span>
+                                ${x.editable ? '' : '<span class="pill mute">Marketplace</span>'}</span>
+                                <span class="s">${esc(x.detail)}</span></span>
+                            <span class="amt">${x.rate === 0 ? 'Free' : short(x.rate)}</span>
+                            ${x.editable ? '<span class="chev">›</span>' : ''}</div>`).join('')}
+                    </div>`).join('')}
+                <p class="note">Rates marked <em>Marketplace</em> are the
+                    marketplace's own fallback — they apply where you haven't set
+                    your own, and you can't change them.</p>
+                <div class="spacer"></div>
+                <button class="btn" data-act="soon">Add a rate</button>`
+        }),
+
         notifications: () => ({
             bar: { title: 'Notifications' }, chrome: 'back',
             html: `
-                <div class="banner warn">Mock-up only — the API for this isn't built yet. See the handoff notes.</div>
                 <div class="card flat">
                     ${notifications.map(n => `<div class="row static">
                         <span class="notif grow">
@@ -1108,6 +1177,11 @@
         soon() { toast('Not part of this prototype'); },
         createProduct() { back(); toast('Product published'); },
         createDraft() { back(); toast('Saved as a draft'); },
+        addMember() {
+            team.push({ name: 'New login', email: 'new@meeratextiles.in', you: false, active: true });
+            back();
+            toast('Login created');
+        },
 
         'toggleStatus': id => {
             const p = products.find(x => x.id === +id);
