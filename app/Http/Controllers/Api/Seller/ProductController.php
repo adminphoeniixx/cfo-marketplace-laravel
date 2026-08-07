@@ -141,6 +141,42 @@ class ProductController extends Controller
         abort(422, 'Stock for a variable product is the sum of its variants — update those instead.');
     }
 
+    /**
+     * Change several products at once. Ids that are not this store's are
+     * dropped silently rather than failing the whole call — a stale multi-select
+     * on the client should not block the ones that are still valid.
+     */
+    public function bulk(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'action' => ['required', Rule::in(['activate', 'draft', 'archive', 'delete'])],
+            'ids' => ['required', 'array', 'min:1', 'max:200'],
+            'ids.*' => ['integer'],
+        ]);
+
+        $owned = $this->storeProducts($request)->whereIn('id', $data['ids'])->pluck('id');
+
+        if ($owned->isEmpty()) {
+            return response()->json(['message' => 'None of those products belong to your store.'], 404);
+        }
+
+        $query = Product::whereIn('id', $owned);
+
+        match ($data['action']) {
+            'activate' => $query->update(['status' => 'active', 'published_at' => now()]),
+            'draft' => $query->update(['status' => 'draft']),
+            'archive' => $query->update(['status' => 'archived']),
+            'delete' => $query->delete(),
+            default => null,
+        };
+
+        return response()->json([
+            'action' => $data['action'],
+            'changed' => $owned->count(),
+            'skipped' => count($data['ids']) - $owned->count(),
+        ]);
+    }
+
     private function loaded(Product $product): Product
     {
         return $product->load(['images', 'variants.values', 'categories:id', 'attributes:id']);

@@ -1,0 +1,1182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Clickable prototype of the CFO seller app. Hand this to whoever builds the mobile app, alongside docs/seller-api.md.">
+<title>CFO Seller — app prototype</title>
+</head>
+<body>
+
+<style>
+    :root {
+        --ground: #eef0ee;
+        --surface: #ffffff;
+        --surface-2: #f7f9f7;
+        --line: #dfe3df;
+        --line-soft: #ebeeeb;
+        --ink: #2c302c;
+        --ink-2: #5d635d;
+        --ink-3: #8a908a;
+        --chrome: #171917;
+        --accent: #36fba1;
+        --accent-ink: #0c5132;
+        --action: #005bd3;
+        --critical: #e51c00;
+        --ok-bg: #cdfee1; --ok-ink: #0c5132;
+        --warn-bg: #ffd6a4; --warn-ink: #5e4200;
+        --info-bg: #ebf5ff; --info-ink: #00527c;
+        --crit-bg: #ffe5e2; --crit-ink: #8e1f00;
+        --page: #d7dcd8;
+        --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    }
+
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --ground: #0d0f0d; --surface: #171a17; --surface-2: #1f231f;
+            --line: #2f342f; --line-soft: #232823;
+            --ink: #e2e6e2; --ink-2: #b0b6b0; --ink-3: #848a84;
+            --ok-bg: #0c5132; --ok-ink: #cdfee1;
+            --warn-bg: #5e4200; --warn-ink: #ffd6a4;
+            --info-bg: #002d47; --info-ink: #a5d3ff;
+            --crit-bg: #5c1400; --crit-ink: #ffd6cf;
+            --page: #050605;
+        }
+    }
+
+    :root[data-theme="dark"] {
+        --ground: #0d0f0d; --surface: #171a17; --surface-2: #1f231f;
+        --line: #2f342f; --line-soft: #232823;
+        --ink: #e2e6e2; --ink-2: #b0b6b0; --ink-3: #848a84;
+        --ok-bg: #0c5132; --ok-ink: #cdfee1;
+        --warn-bg: #5e4200; --warn-ink: #ffd6a4;
+        --info-bg: #002d47; --info-ink: #a5d3ff;
+        --crit-bg: #5c1400; --crit-ink: #ffd6cf;
+        --page: #050605;
+    }
+
+    :root[data-theme="light"] {
+        --ground: #eef0ee; --surface: #ffffff; --surface-2: #f7f9f7;
+        --line: #dfe3df; --line-soft: #ebeeeb;
+        --ink: #2c302c; --ink-2: #5d635d; --ink-3: #8a908a;
+        --ok-bg: #cdfee1; --ok-ink: #0c5132;
+        --warn-bg: #ffd6a4; --warn-ink: #5e4200;
+        --info-bg: #ebf5ff; --info-ink: #00527c;
+        --crit-bg: #ffe5e2; --crit-ink: #8e1f00;
+        --page: #d7dcd8;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    /* `.iconbtn { display: grid }` outranks the UA rule for [hidden], so the
+       chrome buttons have to be hidden explicitly or they never go away. */
+    [hidden] { display: none !important; }
+
+    body {
+        margin: 0;
+        background: var(--page);
+        font-family: var(--sans);
+        color: var(--ink);
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+        padding: 24px;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    /* --------------------------------------------------------- the device */
+
+    .device {
+        width: 390px;
+        height: 844px;
+        max-height: calc(100vh - 48px);
+        border-radius: 46px;
+        background: #101210;
+        padding: 11px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, .3), 0 30px 70px rgba(0, 0, 0, .35);
+        flex-shrink: 0;
+    }
+
+    @media (max-width: 460px), (max-height: 700px) {
+        body { padding: 0; display: block; }
+        .device {
+            width: 100%; height: 100vh; max-height: none;
+            border-radius: 0; padding: 0; box-shadow: none;
+        }
+        .app { border-radius: 0 !important; }
+    }
+
+    .app {
+        position: relative;
+        height: 100%;
+        border-radius: 36px;
+        overflow: hidden;
+        background: var(--ground);
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* ---------------------------------------------------------- app chrome */
+
+    .statusbar {
+        background: var(--chrome);
+        color: #fff;
+        font-size: 11px;
+        font-family: var(--mono);
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 24px 3px;
+        opacity: .8;
+        flex-shrink: 0;
+    }
+
+    .appbar {
+        background: var(--chrome);
+        color: #fff;
+        padding: 6px 12px 13px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+        min-height: 52px;
+    }
+
+    .appbar .titles { min-width: 0; flex: 1; }
+    .appbar .t { font-size: 17px; font-weight: 650; letter-spacing: -.015em; display: block; }
+    .appbar .s { font-size: 11.5px; opacity: .6; display: block; margin-top: 1px; }
+
+    .iconbtn {
+        width: 34px; height: 34px;
+        display: grid; place-items: center;
+        border-radius: 10px;
+        border: 0; background: transparent;
+        color: #fff; font-size: 17px;
+        cursor: pointer; flex-shrink: 0;
+        font-family: inherit;
+    }
+
+    .iconbtn:hover { background: rgba(255, 255, 255, .12); }
+    .iconbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+    .iconbtn.text { width: auto; padding: 0 10px; font-size: 14px; font-weight: 650; color: var(--accent); }
+
+    .bell { position: relative; }
+
+    .bell .dot {
+        position: absolute; top: 6px; right: 6px;
+        min-width: 15px; height: 15px; padding: 0 4px;
+        border-radius: 9px; background: var(--critical);
+        color: #fff; font-size: 9.5px; font-weight: 700;
+        display: grid; place-items: center; line-height: 1;
+    }
+
+    /* ------------------------------------------------------------- screens */
+
+    .stage { position: relative; flex: 1; overflow: hidden; }
+
+    .screen {
+        position: absolute;
+        inset: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+        padding: 14px 14px 20px;
+        display: none;
+        flex-direction: column;
+        gap: 11px;
+    }
+
+    .screen.on { display: flex; animation: slide .22s cubic-bezier(.2, .7, .3, 1); }
+    .screen.plain { background: var(--surface); }
+
+    @keyframes slide {
+        from { opacity: 0; transform: translateX(14px); }
+        to { opacity: 1; transform: none; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .screen.on { animation: none; }
+    }
+
+    /* -------------------------------------------------------------- tabbar */
+
+    .tabbar {
+        display: flex;
+        background: var(--surface);
+        border-top: 1px solid var(--line);
+        padding: 7px 4px 10px;
+        flex-shrink: 0;
+    }
+
+    .tabbar button {
+        flex: 1; border: 0; background: transparent; cursor: pointer;
+        display: grid; gap: 3px; justify-items: center;
+        font-size: 10px; color: var(--ink-3); font-family: inherit;
+        padding: 2px 0;
+    }
+
+    .tabbar button.on { color: var(--action); font-weight: 650; }
+    .tabbar button:focus-visible { outline: 2px solid var(--action); outline-offset: 2px; border-radius: 8px; }
+    .tabbar svg { width: 21px; height: 21px; fill: currentColor; }
+    .tabbar.hide { display: none; }
+
+    /* ---------------------------------------------------------- components */
+
+    .card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 13px;
+        padding: 13px;
+    }
+
+    .card.flat { padding: 0; overflow: hidden; }
+    .card.pad0 { padding: 0; }
+
+    .kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+
+    .kpi {
+        background: var(--surface); border: 1px solid var(--line);
+        border-radius: 13px; padding: 11px 12px;
+    }
+
+    .kpi .k {
+        font-size: 9.5px; text-transform: uppercase; letter-spacing: .07em;
+        color: var(--ink-3); font-weight: 700;
+    }
+
+    .kpi .v {
+        font-size: 21px; font-weight: 750; letter-spacing: -.025em;
+        font-variant-numeric: tabular-nums; margin-top: 2px;
+    }
+
+    .kpi .d { font-size: 10px; color: var(--ink-3); margin-top: 1px; }
+
+    .sect {
+        font-size: 10px; text-transform: uppercase; letter-spacing: .08em;
+        color: var(--ink-3); font-weight: 700; padding: 4px 2px 0;
+        display: flex; justify-content: space-between; align-items: baseline;
+    }
+
+    .sect a { color: var(--action); text-transform: none; letter-spacing: 0; font-size: 11.5px; font-weight: 600; text-decoration: none; cursor: pointer; }
+
+    .row {
+        display: flex; align-items: center; gap: 10px;
+        padding: 11px 12px;
+        border-bottom: 1px solid var(--line-soft);
+        background: var(--surface);
+        width: 100%; border-left: 0; border-right: 0; border-top: 0;
+        text-align: left; font-family: inherit; color: inherit;
+        cursor: pointer;
+    }
+
+    .row:last-child { border-bottom: 0; }
+    .row:active { background: var(--surface-2); }
+    .row:focus-visible { outline: 2px solid var(--action); outline-offset: -2px; }
+    .row.static { cursor: default; }
+    .row .grow { flex: 1; min-width: 0; }
+    .row .t { font-size: 13.5px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+    .row .t span.txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .row .s { font-size: 11.5px; color: var(--ink-3); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .row .amt { font-size: 13.5px; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .row .chev { color: var(--ink-3); font-size: 17px; }
+
+    .thumb {
+        width: 40px; height: 40px; border-radius: 9px;
+        background: linear-gradient(135deg, var(--line) 0%, var(--surface-2) 100%);
+        border: 1px solid var(--line); flex-shrink: 0;
+        display: grid; place-items: center; font-size: 17px;
+    }
+
+    .pill {
+        display: inline-block; font-size: 9.5px; font-weight: 700;
+        padding: 2px 7px; border-radius: 20px; white-space: nowrap;
+    }
+
+    .pill.ok { background: var(--ok-bg); color: var(--ok-ink); }
+    .pill.warn { background: var(--warn-bg); color: var(--warn-ink); }
+    .pill.crit { background: var(--crit-bg); color: var(--crit-ink); }
+    .pill.info { background: var(--info-bg); color: var(--info-ink); }
+    .pill.mute { background: var(--line); color: var(--ink-2); }
+
+    .chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+    .chips::-webkit-scrollbar { display: none; }
+
+    .chip {
+        font-size: 11.5px; padding: 6px 12px; border-radius: 20px;
+        background: var(--surface); border: 1px solid var(--line);
+        color: var(--ink-2); white-space: nowrap; cursor: pointer;
+        font-family: inherit;
+    }
+
+    .chip.on { background: var(--ink); border-color: var(--ink); color: var(--surface); font-weight: 600; }
+    .chip:focus-visible { outline: 2px solid var(--action); outline-offset: 2px; }
+
+    .btn {
+        display: block; width: 100%; text-align: center;
+        font-size: 14px; font-weight: 650; padding: 13px;
+        border-radius: 11px; background: var(--action); color: #fff;
+        border: 0; cursor: pointer; font-family: inherit;
+    }
+
+    .btn:active { filter: brightness(.92); }
+    .btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+    .btn.ghost { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
+    .btn.dark { background: var(--ink); color: var(--surface); }
+    .btn.danger { background: transparent; color: var(--critical); }
+    .btn[disabled] { opacity: .45; cursor: not-allowed; }
+
+    .field {
+        background: var(--surface); border: 1px solid var(--line);
+        border-radius: 11px; padding: 9px 12px; width: 100%;
+        text-align: left; font-family: inherit; cursor: text;
+    }
+
+    .field .lbl {
+        font-size: 9.5px; text-transform: uppercase; letter-spacing: .06em;
+        color: var(--ink-3); font-weight: 700;
+    }
+
+    .field input, .field .val {
+        font-size: 14px; margin-top: 2px; width: 100%;
+        border: 0; background: transparent; color: var(--ink);
+        font-family: inherit; padding: 0; outline: none;
+    }
+
+    .field input::placeholder { color: var(--ink-3); }
+    .field:focus-within { border-color: var(--action); box-shadow: 0 0 0 3px rgba(0, 91, 211, .14); }
+    .field.tap { cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .field.tap .chev { color: var(--ink-3); }
+
+    .two { display: flex; gap: 9px; }
+    .two > * { flex: 1; min-width: 0; }
+
+    .money { display: flex; justify-content: space-between; font-size: 12.5px; padding: 5px 0; border-bottom: 1px dashed var(--line-soft); }
+    .money:last-child { border-bottom: 0; }
+    .money span:last-child { font-variant-numeric: tabular-nums; font-weight: 600; }
+    .money.total { border-top: 1px solid var(--line); border-bottom: 0; margin-top: 4px; padding-top: 9px; font-size: 15px; font-weight: 700; }
+    .money.total span:last-child { font-weight: 750; }
+
+    .empty { text-align: center; padding: 44px 16px; color: var(--ink-3); font-size: 12.5px; }
+    .empty .big { font-size: 30px; display: block; margin-bottom: 8px; opacity: .5; }
+
+    .bignum { font-size: 34px; font-weight: 780; letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+
+    .spark { display: flex; align-items: flex-end; gap: 4px; height: 54px; }
+    .spark i { flex: 1; background: var(--action); border-radius: 3px 3px 0 0; opacity: .3; }
+    .spark i.hi { opacity: 1; }
+
+    .note { font-size: 11.5px; color: var(--ink-3); padding: 0 3px; line-height: 1.5; }
+
+    .banner {
+        background: var(--info-bg); color: var(--info-ink);
+        border-radius: 11px; padding: 10px 12px; font-size: 11.5px; line-height: 1.5;
+    }
+
+    .banner.warn { background: var(--warn-bg); color: var(--warn-ink); }
+
+    .hero-lock { display: grid; place-items: center; gap: 14px; text-align: center; padding: 30px 18px; }
+
+    .lock-badge {
+        width: 62px; height: 62px; border-radius: 19px;
+        background: var(--warn-bg); color: var(--warn-ink);
+        display: grid; place-items: center; font-size: 27px;
+    }
+
+    .brandmark {
+        width: 46px; height: 46px; border-radius: 14px;
+        background: var(--accent); color: var(--accent-ink);
+        display: grid; place-items: center;
+        font-weight: 800; font-size: 19px; margin: 0 auto;
+    }
+
+    .spacer { flex: 1; min-height: 6px; }
+
+    .stepdots { display: flex; gap: 5px; justify-content: center; }
+    .stepdots i { width: 6px; height: 6px; border-radius: 50%; background: var(--line); }
+    .stepdots i.on { background: var(--action); width: 18px; border-radius: 3px; }
+
+    .qty {
+        display: flex; align-items: center; gap: 0;
+        border: 1px solid var(--line); border-radius: 9px; overflow: hidden;
+    }
+
+    .qty button {
+        width: 30px; height: 30px; border: 0; background: var(--surface-2);
+        color: var(--ink); font-size: 15px; cursor: pointer; font-family: inherit;
+    }
+
+    .qty span { width: 32px; text-align: center; font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; }
+
+    .toast {
+        position: absolute; left: 14px; right: 14px; bottom: 82px;
+        background: var(--ink); color: var(--surface);
+        padding: 12px 14px; border-radius: 11px;
+        font-size: 13px; font-weight: 550;
+        opacity: 0; transform: translateY(8px);
+        transition: opacity .2s, transform .2s;
+        pointer-events: none; z-index: 20;
+        text-align: center;
+    }
+
+    .toast.on { opacity: 1; transform: none; }
+
+    .notif { display: flex; gap: 10px; align-items: flex-start; }
+    .notif .dotmark { width: 7px; height: 7px; border-radius: 50%; background: var(--action); margin-top: 6px; flex-shrink: 0; }
+    .notif .dotmark.read { background: transparent; }
+
+    /* ---------------------------------------------------------- desk label */
+
+    .deskhint {
+        position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%);
+        font-size: 11.5px; color: var(--ink-2); background: var(--surface);
+        border: 1px solid var(--line); border-radius: 20px; padding: 6px 14px;
+        font-family: var(--sans); white-space: nowrap;
+    }
+
+    @media (max-width: 460px), (max-height: 700px) { .deskhint { display: none; } }
+</style>
+
+<div class="device">
+    <div class="app">
+        <div class="statusbar"><span>9:41</span><span>5G ▮▮▮</span></div>
+
+        <div class="appbar">
+            <button class="iconbtn" id="backBtn" hidden aria-label="Back">‹</button>
+            <span class="titles">
+                <span class="t" id="barTitle">Sign in</span>
+                <span class="s" id="barSub" hidden></span>
+            </span>
+            <button class="iconbtn bell" id="bellBtn" hidden aria-label="Notifications">
+                <svg viewBox="0 0 20 20" width="19" height="19" fill="currentColor"><path d="M10 2a5 5 0 00-5 5v3.2l-1.3 2.3A1 1 0 004.6 14h10.8a1 1 0 00.9-1.5L15 10.2V7a5 5 0 00-5-5zm0 15a2.5 2.5 0 002.4-2h-4.8A2.5 2.5 0 0010 17z"/></svg>
+                <span class="dot" id="bellDot">3</span>
+            </button>
+            <button class="iconbtn" id="acctBtn" hidden aria-label="Account">☰</button>
+            <button class="iconbtn text" id="saveBtn" hidden>Save</button>
+        </div>
+
+        <div class="stage" id="stage"></div>
+
+        <nav class="tabbar hide" id="tabbar">
+            <button data-tab="home" class="on">
+                <svg viewBox="0 0 20 20"><path d="M10 2.5l7 6V17a1 1 0 01-1 1h-4v-5H8v5H4a1 1 0 01-1-1V8.5l7-6z"/></svg>Home
+            </button>
+            <button data-tab="orders">
+                <svg viewBox="0 0 20 20"><path d="M4 3h12a1 1 0 011 1v3H3V4a1 1 0 011-1zm-1 6h14v7a1 1 0 01-1 1H4a1 1 0 01-1-1V9zm4 2v2h6v-2H7z"/></svg>Orders
+            </button>
+            <button data-tab="products">
+                <svg viewBox="0 0 20 20"><path d="M10 1.8l7 3.5v9.4l-7 3.5-7-3.5V5.3l7-3.5zm0 2.2L5.3 6.3 10 8.6l4.7-2.3L10 4zM4.5 7.8v6.1l4.8 2.4v-6.1L4.5 7.8zm6.7 8.5l4.8-2.4V7.8l-4.8 2.4v6.1z"/></svg>Products
+            </button>
+            <button data-tab="money">
+                <svg viewBox="0 0 20 20"><path d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm2 1v2h12V6H4zm0 4v5h12v-5H4zm2 2h4v1.5H6V12z"/></svg>Money
+            </button>
+        </nav>
+
+        <div class="toast" id="toast"></div>
+    </div>
+</div>
+
+<div class="deskhint">Tap through it — sign in, pack an order, add a product</div>
+
+<script>
+(function () {
+    'use strict';
+
+    /* ------------------------------------------------------------- data */
+
+    const store = { name: 'Meera Textiles', email: 'meera@store.test', status: 'approved', commission: 10 };
+
+    const money = n => '₹' + n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const short = n => '₹' + n.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+
+    let orders = [
+        { id: 338908, buyer: 'Priya Nair', phone: '98765 43210', date: '4 Aug', pay: 'UPI', ff: 'unfulfilled',
+          addr: '42 Beach Road, Besant Nagar<br>Chennai, Tamil Nadu 600090',
+          items: [{ id: 376, name: 'Kanchipuram silk saree', sku: 'MINE-1', qty: 2, packed: 0, total: 9998, emoji: '🥻' }],
+          shared: true },
+        { id: 338902, buyer: 'Rahul Sharma', phone: '99887 76655', date: '4 Aug', pay: 'Cash on Delivery', ff: 'unfulfilled',
+          addr: '7 Nehru Nagar<br>Pune, Maharashtra 411014',
+          items: [{ id: 380, name: 'Cotton kurta set', sku: 'KUR-22', qty: 1, packed: 0, total: 1999, emoji: '👕' }],
+          shared: false },
+        { id: 338877, buyer: 'Anita Kulkarni', phone: '90000 11223', date: '3 Aug', pay: 'UPI', ff: 'partial',
+          addr: '12 MG Road<br>Bengaluru, Karnataka 560001',
+          items: [
+            { id: 384, name: 'Linen dupatta', sku: 'DUP-05', qty: 2, packed: 2, total: 1798, emoji: '🧣' },
+            { id: 385, name: 'Wool shawl', sku: 'SHL-11', qty: 1, packed: 0, total: 3499, emoji: '🧶' }],
+          shared: false },
+        { id: 338840, buyer: 'Vikram Thakur', phone: '98111 22334', date: '2 Aug', pay: 'Net Banking', ff: 'fulfilled',
+          addr: '5 Sector 21<br>Gurugram, Haryana 122016',
+          items: [{ id: 390, name: 'Kanchipuram silk saree', sku: 'MINE-1', qty: 1, packed: 1, total: 4999, emoji: '🥻' }],
+          shared: false, tracking: 'TRK-88213', carrier: 'Delhivery' }
+    ];
+
+    let products = [
+        { id: 47, name: 'Kanchipuram silk saree', sku: 'MINE-1', price: 4999, was: 6499, stock: 40, low: 5, status: 'active', emoji: '🥻', type: 'simple', cat: 'Sarees' },
+        { id: 48, name: 'Cotton kurta set', sku: 'KUR-22', price: 1999, was: null, stock: 2, low: 5, status: 'active', emoji: '👕', type: 'variable', cat: 'Ethnic wear' },
+        { id: 49, name: 'Wool shawl', sku: 'SHL-11', price: 3499, was: null, stock: 18, low: 5, status: 'draft', emoji: '🧶', type: 'simple', cat: 'Winter wear' },
+        { id: 50, name: 'Linen dupatta', sku: 'DUP-05', price: 899, was: 1199, stock: 60, low: 10, status: 'active', emoji: '🧣', type: 'simple', cat: 'Ethnic wear' },
+        { id: 51, name: 'Block print stole', sku: 'STL-03', price: 1299, was: null, stock: 0, low: 5, status: 'active', emoji: '🧵', type: 'simple', cat: 'Ethnic wear' }
+    ];
+
+    const payouts = [
+        { id: 42, num: 'PAY-00042', status: 'paid', from: '1 Jul', to: '15 Jul', orders: 24, gross: 47000, comm: 4700, refunded: 0, net: 42300 },
+        { id: 41, num: 'PAY-00041', status: 'processing', from: '16 Jun', to: '30 Jun', orders: 18, gross: 14200, comm: 1420, refunded: 480, net: 12300 },
+        { id: 40, num: 'PAY-00040', status: 'paid', from: '1 Jun', to: '15 Jun', orders: 21, gross: 38000, comm: 3800, refunded: 900, net: 33300 }
+    ];
+
+    const requests = [
+        { id: 17, num: 'CAN-00017', kind: 'Cancellation', status: 'pending', order: 338908, date: '5 Aug',
+          reason: 'Customer changed their mind', by: 'customer',
+          note: 'Ordered the wrong colour, please cancel before it ships.',
+          items: [{ name: 'Kanchipuram silk saree', qty: '1 of 2', amount: 4999, emoji: '🥻' }],
+          refundReq: true, restock: true, amount: 4999 },
+        { id: 9, num: 'REF-00009', kind: 'Refund', status: 'approved', order: 338840, date: '3 Aug',
+          reason: 'Item arrived damaged', by: 'customer',
+          note: 'Pallu had a tear near the border.',
+          items: [{ name: 'Kanchipuram silk saree', qty: '1 of 1', amount: 4999, emoji: '🥻' }],
+          refundReq: true, restock: false, amount: 4999, breakdown: { items: 4999, shipping: 79, tax: 0, adj: 0, total: 5078 } }
+    ];
+
+    const notifications = [
+        { t: 'New order #338908', b: '₹9,998 from Priya Nair', w: '12m ago', read: false },
+        { t: 'Cancellation CAN-00017 needs your response', b: 'Order #338908', w: '1h ago', read: false },
+        { t: 'Payout PAY-00042 was paid', b: '₹42,300 into HDFC ••••4821', w: 'Yesterday', read: false },
+        { t: 'Cotton kurta set is running low', b: '2 left, threshold is 5', w: '2d ago', read: true }
+    ];
+
+    /* --------------------------------------------------------- app state */
+
+    let stack = ['login'];
+    let ordersFilter = 'unfulfilled';
+    let productsFilter = 'all';
+    let signedIn = false;
+
+    const $ = id => document.getElementById(id);
+    const stage = $('stage'), tabbar = $('tabbar'), toastEl = $('toast');
+
+    const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+    const ffPill = ff => ff === 'fulfilled' ? '<span class="pill ok">Shipped</span>'
+        : ff === 'partial' ? '<span class="pill info">Partly packed</span>'
+        : '<span class="pill warn">To pack</span>';
+
+    const orderTotal = o => o.items.reduce((s, i) => s + i.total, 0);
+    const orderEarn = o => Math.round(orderTotal(o) * (1 - store.commission / 100) * 100) / 100;
+    const toPack = () => orders.filter(o => o.ff !== 'fulfilled').length;
+    const lowStock = () => products.filter(p => p.stock <= p.low).length;
+    const unread = () => notifications.filter(n => !n.read).length;
+
+    function toast(msg) {
+        toastEl.textContent = msg;
+        toastEl.classList.add('on');
+        clearTimeout(toast._t);
+        toast._t = setTimeout(() => toastEl.classList.remove('on'), 2200);
+    }
+
+    /* ----------------------------------------------------------- screens */
+
+    const screens = {
+
+        /* ------------------------------------------------------ getting in */
+
+        login: () => ({
+            bar: { title: 'Sign in' }, chrome: 'bare', plain: true,
+            html: `
+                <div class="spacer"></div>
+                <div style="text-align:center">
+                    <div class="brandmark">C</div>
+                    <div style="font-size:19px;font-weight:750;margin-top:12px;letter-spacing:-.02em">Seller Centre</div>
+                    <div style="font-size:12.5px;color:var(--ink-3);margin-top:2px">Manage your store on the go</div>
+                </div>
+                <div style="height:10px"></div>
+                <label class="field"><span class="lbl">Email</span>
+                    <input type="email" value="meera@store.test" autocomplete="username"></label>
+                <label class="field"><span class="lbl">Password</span>
+                    <input type="password" value="a-good-password" autocomplete="current-password"></label>
+                <button class="btn" data-act="signin">Sign in</button>
+                <div style="text-align:center;font-size:12.5px;color:var(--action);font-weight:600">Forgot your password?</div>
+                <div class="spacer"></div>
+                <div style="text-align:center;font-size:12.5px;color:var(--ink-3)">
+                    New here? <button class="chip" style="border:0;background:transparent;color:var(--action);font-weight:650;padding:0;font-size:12.5px" data-go="register">Open a store</button>
+                </div>`
+        }),
+
+        register: () => ({
+            bar: { title: 'Open a store', sub: 'Step 2 of 2 · Your store' }, chrome: 'back', plain: true,
+            html: `
+                <div class="stepdots"><i></i><i class="on"></i></div>
+                <label class="field"><span class="lbl">Store name</span><input value="Meera Textiles"></label>
+                <label class="field"><span class="lbl">Store email</span><input value="hello@meeratextiles.in"></label>
+                <label class="field"><span class="lbl">Phone</span><input value="98765 43210"></label>
+                <label class="field"><span class="lbl">GST number (optional)</span><input placeholder="27AAPFU0939F1ZV"></label>
+                <p class="note">An admin reviews new stores before you can list
+                    products or take orders. You can fill in your details while
+                    you wait.</p>
+                <div class="spacer"></div>
+                <button class="btn" data-act="register">Create my store</button>`
+        }),
+
+        pending: () => ({
+            bar: { title: store.name, sub: 'Awaiting approval' }, chrome: 'none',
+            html: `
+                <div class="card hero-lock">
+                    <div class="lock-badge">⏳</div>
+                    <div>
+                        <div style="font-size:16px;font-weight:700">We're reviewing your store</div>
+                        <div style="font-size:12.5px;color:var(--ink-2);margin-top:6px;line-height:1.55">
+                            You'll be able to add products and take orders as soon as
+                            an admin approves ${esc(store.name)}.
+                        </div>
+                    </div>
+                </div>
+                <div class="sect">Get ready</div>
+                <div class="card flat">
+                    <button class="row" data-go="storeDetails"><span class="grow"><span class="t"><span class="txt">Store details</span></span><span class="s">Address, logo, description</span></span><span class="chev">›</span></button>
+                    <button class="row" data-go="payoutAccount"><span class="grow"><span class="t"><span class="txt">Payout account</span></span><span class="s">Where we send your money</span></span><span class="pill warn">Add</span></button>
+                    <button class="row" data-go="profile"><span class="grow"><span class="t"><span class="txt">Your profile</span></span><span class="s">Name, phone, password</span></span><span class="chev">›</span></button>
+                </div>
+                <div class="spacer"></div>
+                <button class="btn ghost" data-act="approve">Simulate: admin approves</button>
+                <button class="btn danger" data-act="signout">Sign out</button>`
+        }),
+
+        /* ------------------------------------------------------------ home */
+
+        home: () => {
+            const bars = [22, 38, 30, 61, 45, 72, 55, 88, 100];
+            const top = [...products].slice(0, 2);
+            return {
+                bar: { title: store.name, sub: 'Last 30 days' }, chrome: 'main', tab: 'home',
+                html: `
+                <div class="kpis">
+                    <div class="kpi"><div class="k">Sales</div><div class="v">${short(99980)}</div><div class="d">10 orders</div></div>
+                    <div class="kpi"><div class="k">You earned</div><div class="v">${short(89982)}</div><div class="d">after ${store.commission}% fee</div></div>
+                </div>
+                <div class="card">
+                    <div class="sect" style="padding:0 0 9px">Sales this month</div>
+                    <div class="spark">${bars.map((h, i) => `<i class="${i === bars.length - 1 ? 'hi' : ''}" style="height:${h}%"></i>`).join('')}</div>
+                </div>
+                <div class="sect">Needs attention</div>
+                <div class="card flat">
+                    <button class="row" data-act="goPack"><span class="grow"><span class="t"><span class="txt">Orders to pack</span></span></span><span class="pill warn">${toPack()}</span><span class="chev">›</span></button>
+                    <button class="row" data-go="requests"><span class="grow"><span class="t"><span class="txt">Cancellation &amp; refund requests</span></span></span><span class="pill crit">${requests.filter(r => r.status === 'pending').length}</span><span class="chev">›</span></button>
+                    <button class="row" data-act="goLow"><span class="grow"><span class="t"><span class="txt">Products running low</span></span></span><span class="pill warn">${lowStock()}</span><span class="chev">›</span></button>
+                </div>
+                <div class="sect">Best sellers <a data-go="products">All products</a></div>
+                <div class="card flat">
+                    ${top.map(p => `<button class="row" data-go="product:${p.id}">
+                        <span class="thumb">${p.emoji}</span>
+                        <span class="grow"><span class="t"><span class="txt">${esc(p.name)}</span></span><span class="s">${p.stock} in stock</span></span>
+                        <span class="amt">${short(p.price)}</span></button>`).join('')}
+                </div>`
+            };
+        },
+
+        /* ---------------------------------------------------------- orders */
+
+        orders: () => {
+            const f = ordersFilter;
+            const list = orders.filter(o => f === 'all' ? true : f === 'unfulfilled' ? o.ff !== 'fulfilled' : o.ff === f);
+            return {
+                bar: { title: 'Orders', sub: `${toPack()} to pack` }, chrome: 'main', tab: 'orders',
+                html: `
+                <div class="chips">
+                    <button class="chip ${f === 'unfulfilled' ? 'on' : ''}" data-filter="orders:unfulfilled">To pack ${toPack()}</button>
+                    <button class="chip ${f === 'fulfilled' ? 'on' : ''}" data-filter="orders:fulfilled">Shipped ${orders.filter(o => o.ff === 'fulfilled').length}</button>
+                    <button class="chip ${f === 'all' ? 'on' : ''}" data-filter="orders:all">All ${orders.length}</button>
+                </div>
+                ${list.length ? `<div class="card flat">${list.map(o => `
+                    <button class="row" data-go="order:${o.id}">
+                        <span class="grow">
+                            <span class="t"><span class="txt">#${o.id}</span> ${ffPill(o.ff)}</span>
+                            <span class="s">${o.items.length} item${o.items.length > 1 ? 's' : ''} · ${esc(o.buyer)} · ${o.date}</span>
+                        </span>
+                        <span class="amt">${short(orderTotal(o))}</span>
+                    </button>`).join('')}</div>`
+                : `<div class="empty"><span class="big">📦</span>Nothing here.<br>New orders land in this tab.</div>`}`
+            };
+        },
+
+        order: id => {
+            const o = orders.find(x => x.id === +id);
+            const total = orderTotal(o), comm = Math.round(total * store.commission) / 100;
+            return {
+                bar: { title: '#' + o.id, sub: `${o.date} · Paid by ${o.pay}` }, chrome: 'back',
+                html: `
+                ${o.shared ? `<div class="banner">This basket is shared with another seller. You only see and pack your own items.</div>` : ''}
+                <div class="sect">Your items</div>
+                <div class="card flat">
+                    ${o.items.map(i => `<div class="row static">
+                        <span class="thumb">${i.emoji}</span>
+                        <span class="grow"><span class="t"><span class="txt">${esc(i.name)}</span></span>
+                            <span class="s">${i.sku} · Qty ${i.qty}${i.packed ? ` · ${i.packed} packed` : ''}</span></span>
+                        <span class="amt">${short(i.total)}</span></div>`).join('')}
+                </div>
+                <div class="card">
+                    <div class="money"><span>Items</span><span>${money(total)}</span></div>
+                    <div class="money"><span>Commission (${store.commission}%)</span><span>−${money(comm)}</span></div>
+                    <div class="money total"><span>You earn</span><span>${money(total - comm)}</span></div>
+                </div>
+                ${o.tracking ? `<div class="sect">Shipment</div>
+                <div class="card"><div class="money"><span>Carrier</span><span>${o.carrier}</span></div>
+                <div class="money"><span>Tracking</span><span>${o.tracking}</span></div></div>` : ''}
+                <div class="sect">Deliver to</div>
+                <div class="card">
+                    <div style="font-size:13.5px;font-weight:650">${esc(o.buyer)}</div>
+                    <div style="font-size:12px;color:var(--ink-2);line-height:1.55;margin-top:3px">${o.addr}<br>${o.phone}</div>
+                </div>
+                <p class="note">The buyer's email and order history aren't shared with sellers.</p>
+                <div class="spacer"></div>
+                ${o.ff !== 'fulfilled'
+                    ? `<button class="btn" data-go="fulfil:${o.id}">Pack &amp; ship</button>`
+                    : `<button class="btn ghost" disabled>Shipped ${o.date}</button>`}
+                <button class="btn ghost" data-act="note">Add a note</button>`
+            };
+        },
+
+        fulfil: id => {
+            const o = orders.find(x => x.id === +id);
+            return {
+                bar: { title: 'Pack & ship', sub: '#' + o.id }, chrome: 'back',
+                html: `
+                <p class="note">Set how many of each you're sending. Leave one at
+                    zero to ship it later.</p>
+                <div class="card flat">
+                    ${o.items.map(i => `<div class="row static">
+                        <span class="thumb">${i.emoji}</span>
+                        <span class="grow"><span class="t"><span class="txt">${esc(i.name)}</span></span>
+                            <span class="s">Ordered ${i.qty}</span></span>
+                        <span class="qty">
+                            <button data-qty="${i.id}:-1" aria-label="Less">−</button>
+                            <span id="q${i.id}">${i.packed || i.qty}</span>
+                            <button data-qty="${i.id}:1" aria-label="More">+</button>
+                        </span></div>`).join('')}
+                </div>
+                <div class="sect">Shipment</div>
+                <label class="field"><span class="lbl">Carrier</span><input value="Delhivery"></label>
+                <label class="field"><span class="lbl">Tracking number</span><input placeholder="TRK-00000" value="TRK-99120"></label>
+                <div class="spacer"></div>
+                <button class="btn" data-act="fulfil:${o.id}">Mark as shipped</button>`
+            };
+        },
+
+        /* -------------------------------------------------------- products */
+
+        products: () => {
+            const f = productsFilter;
+            const list = products.filter(p => f === 'all' ? true : f === 'low' ? p.stock <= p.low : p.status === f);
+            return {
+                bar: { title: 'Products', sub: `${products.length} listed` }, chrome: 'main', tab: 'products',
+                html: `
+                <div class="chips">
+                    <button class="chip ${f === 'all' ? 'on' : ''}" data-filter="products:all">All ${products.length}</button>
+                    <button class="chip ${f === 'active' ? 'on' : ''}" data-filter="products:active">Active ${products.filter(p => p.status === 'active').length}</button>
+                    <button class="chip ${f === 'draft' ? 'on' : ''}" data-filter="products:draft">Draft ${products.filter(p => p.status === 'draft').length}</button>
+                    <button class="chip ${f === 'low' ? 'on' : ''}" data-filter="products:low">Low stock ${lowStock()}</button>
+                </div>
+                ${list.length ? `<div class="card flat">${list.map(p => `
+                    <button class="row" data-go="product:${p.id}">
+                        <span class="thumb">${p.emoji}</span>
+                        <span class="grow"><span class="t"><span class="txt">${esc(p.name)}</span></span>
+                            <span class="s">${short(p.price)} · ${p.stock === 0 ? 'Out of stock' : p.stock + ' in stock'}</span></span>
+                        ${p.status === 'draft' ? '<span class="pill mute">Draft</span>'
+                            : p.stock === 0 ? '<span class="pill crit">Out</span>'
+                            : p.stock <= p.low ? '<span class="pill warn">Low</span>'
+                            : '<span class="pill ok">Active</span>'}
+                    </button>`).join('')}</div>`
+                : `<div class="empty"><span class="big">🏷️</span>Nothing matches that filter.</div>`}
+                <button class="btn" data-go="newProduct">Add a product</button>`
+            };
+        },
+
+        product: id => {
+            const p = products.find(x => x.id === +id);
+            return {
+                bar: { title: p.name, sub: p.sku }, chrome: 'back-save',
+                html: `
+                <div class="card" style="display:flex;gap:9px;align-items:center">
+                    <span class="thumb" style="width:62px;height:62px;font-size:26px">${p.emoji}</span>
+                    <span class="thumb" style="width:62px;height:62px;background:var(--surface-2);color:var(--ink-3);font-size:22px">+</span>
+                </div>
+                <label class="field"><span class="lbl">Name</span><input value="${esc(p.name)}"></label>
+                <div class="two">
+                    <label class="field"><span class="lbl">Price</span><input value="${p.price}"></label>
+                    <label class="field"><span class="lbl">Compare at</span><input value="${p.was || ''}" placeholder="—"></label>
+                </div>
+                ${p.type === 'variable'
+                    ? `<div class="banner warn">Stock for a variable product is the sum of its variants. Edit the variants to change it.</div>
+                       <button class="row card" style="border-radius:11px" data-act="soon"><span class="grow"><span class="t"><span class="txt">3 variants</span></span><span class="s">S · M · L</span></span><span class="chev">›</span></button>`
+                    : `<div class="two">
+                        <label class="field"><span class="lbl">Stock</span><input value="${p.stock}" id="stockIn"></label>
+                        <label class="field"><span class="lbl">Low at</span><input value="${p.low}"></label>
+                       </div>`}
+                <button class="field tap" data-act="soon"><span><span class="lbl">Category</span><span class="val">${p.cat}</span></span><span class="chev">›</span></button>
+                <button class="field tap" data-act="soon"><span><span class="lbl">Type</span><span class="val" style="text-transform:capitalize">${p.type}</span></span><span class="chev">›</span></button>
+                <button class="field tap" data-act="toggleStatus:${p.id}"><span><span class="lbl">Status</span><span class="val" style="text-transform:capitalize">${p.status}</span></span><span class="chev">›</span></button>
+                <div class="spacer"></div>
+                <button class="btn danger" data-act="delete:${p.id}">Delete this product</button>`
+            };
+        },
+
+        newProduct: () => ({
+            bar: { title: 'New product' }, chrome: 'close-save',
+            html: `
+                <div class="card" style="display:flex;gap:9px;align-items:center">
+                    <span class="thumb" style="width:62px;height:62px;background:var(--surface-2);color:var(--ink-3);font-size:22px">+</span>
+                    <span class="note" style="flex:1">Add up to 10 photos. First one is the cover.</span>
+                </div>
+                <label class="field"><span class="lbl">Name</span><input placeholder="e.g. Chanderi cotton saree"></label>
+                <div class="two">
+                    <label class="field"><span class="lbl">Price</span><input placeholder="0"></label>
+                    <label class="field"><span class="lbl">Compare at</span><input placeholder="—"></label>
+                </div>
+                <div class="two">
+                    <label class="field"><span class="lbl">Stock</span><input placeholder="0"></label>
+                    <label class="field"><span class="lbl">Low at</span><input value="5"></label>
+                </div>
+                <button class="field tap" data-act="soon"><span><span class="lbl">Category</span><span class="val" style="color:var(--ink-3)">Choose</span></span><span class="chev">›</span></button>
+                <button class="field tap" data-act="soon"><span><span class="lbl">Type</span><span class="val">Simple</span></span><span class="chev">›</span></button>
+                <div class="spacer"></div>
+                <button class="btn" data-act="createProduct">Publish product</button>
+                <button class="btn ghost" data-act="createDraft">Save as draft</button>`
+        }),
+
+        /* ----------------------------------------------------------- money */
+
+        money: () => {
+            const paid = payouts.filter(p => p.status === 'paid').reduce((s, p) => s + p.net, 0);
+            const prog = payouts.filter(p => p.status !== 'paid').reduce((s, p) => s + p.net, 0);
+            return {
+                bar: { title: 'Money' }, chrome: 'main', tab: 'money',
+                html: `
+                <div class="card" style="text-align:center;padding:20px">
+                    <div style="font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-3);font-weight:700">Not yet paid out</div>
+                    <div class="bignum" style="margin:5px 0">${money(8998.20)}</div>
+                    <div style="font-size:11.5px;color:var(--ink-3)">Earned, but not on a payout yet</div>
+                </div>
+                <div class="kpis">
+                    <div class="kpi"><div class="k">Paid out</div><div class="v" style="font-size:17px">${short(paid)}</div></div>
+                    <div class="kpi"><div class="k">In progress</div><div class="v" style="font-size:17px">${short(prog)}</div></div>
+                </div>
+                <div class="card">
+                    <div class="money"><span>Lifetime sales</span><span>${money(145798)}</span></div>
+                    <div class="money"><span>Commission (${store.commission}%)</span><span>−${money(14580)}</span></div>
+                    <div class="money total"><span>Lifetime earnings</span><span>${money(131218)}</span></div>
+                </div>
+                <div class="sect">Payouts</div>
+                <div class="card flat">
+                    ${payouts.map(p => `<button class="row" data-go="payout:${p.id}">
+                        <span class="grow"><span class="t"><span class="txt">${p.num}</span>
+                            ${p.status === 'paid' ? '<span class="pill ok">Paid</span>' : '<span class="pill warn">Processing</span>'}</span>
+                            <span class="s">${p.from}–${p.to} · ${p.orders} orders</span></span>
+                        <span class="amt">${short(p.net)}</span></button>`).join('')}
+                </div>
+                <p class="note">Payouts are raised by the marketplace on a fortnightly
+                    cycle. There's nothing to request.</p>`
+            };
+        },
+
+        payout: id => {
+            const p = payouts.find(x => x.id === +id);
+            return {
+                bar: { title: p.num, sub: `${p.from} – ${p.to}` }, chrome: 'back',
+                html: `
+                <div class="card" style="text-align:center;padding:20px">
+                    <div style="font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-3);font-weight:700">Net payout</div>
+                    <div class="bignum" style="margin:5px 0">${money(p.net)}</div>
+                    ${p.status === 'paid' ? '<span class="pill ok">Paid into HDFC ••••4821</span>' : '<span class="pill warn">Processing</span>'}
+                </div>
+                <div class="card">
+                    <div class="money"><span>Gross sales</span><span>${money(p.gross)}</span></div>
+                    <div class="money"><span>Commission (${store.commission}%)</span><span>−${money(p.comm)}</span></div>
+                    <div class="money"><span>Refunded to buyers</span><span>−${money(p.refunded)}</span></div>
+                    <div class="money"><span>Adjustments</span><span>${money(0)}</span></div>
+                    <div class="money total"><span>Net</span><span>${money(p.net)}</span></div>
+                </div>
+                <div class="sect">Covered</div>
+                <div class="card"><div class="money"><span>Orders in this period</span><span>${p.orders}</span></div>
+                    <div class="money"><span>Period</span><span>${p.from} – ${p.to}</span></div></div>`
+            };
+        },
+
+        /* -------------------------------------------------------- requests */
+
+        requests: () => ({
+            bar: { title: 'Requests', sub: 'Cancellations & refunds' }, chrome: 'back',
+            html: `
+                <p class="note">Marketplace staff approve or reject these. You can add
+                    your side of the story.</p>
+                <div class="card flat">
+                    ${requests.map(r => `<button class="row" data-go="request:${r.id}">
+                        <span class="grow"><span class="t"><span class="txt">${r.num}</span>
+                            ${r.status === 'pending' ? '<span class="pill warn">Needs reply</span>' : '<span class="pill ok">Approved</span>'}</span>
+                            <span class="s">${r.kind} · #${r.order} · ${r.date}</span></span>
+                        <span class="amt">${short(r.amount)}</span></button>`).join('')}
+                </div>`
+        }),
+
+        request: id => {
+            const r = requests.find(x => x.id === +id);
+            return {
+                bar: { title: r.num, sub: `${r.kind} · ${r.status === 'pending' ? 'Pending review' : 'Approved'}` }, chrome: 'back',
+                html: `
+                <div class="card" style="border-left:3px solid var(--warn-ink)">
+                    <div style="font-size:13.5px;font-weight:650">${esc(r.reason)}</div>
+                    <div style="font-size:12px;color:var(--ink-2);margin-top:5px;line-height:1.55">"${esc(r.note)}"</div>
+                    <div style="font-size:11px;color:var(--ink-3);margin-top:8px">Requested by ${r.by} · Order #${r.order} · ${r.date}</div>
+                </div>
+                <div class="sect">Items affected</div>
+                <div class="card flat">
+                    ${r.items.map(i => `<div class="row static"><span class="thumb">${i.emoji}</span>
+                        <span class="grow"><span class="t"><span class="txt">${esc(i.name)}</span></span><span class="s">Qty ${i.qty}</span></span>
+                        <span class="amt">${short(i.amount)}</span></div>`).join('')}
+                </div>
+                <div class="card">
+                    ${r.breakdown ? `
+                        <div class="money"><span>Items</span><span>${money(r.breakdown.items)}</span></div>
+                        <div class="money"><span>Shipping</span><span>${money(r.breakdown.shipping)}</span></div>
+                        <div class="money total"><span>Refund total</span><span>${money(r.breakdown.total)}</span></div>`
+                    : `<div class="money"><span>Refund requested</span><span>${r.refundReq ? 'Yes' : 'No'}</span></div>
+                       <div class="money"><span>Restock</span><span>${r.restock ? 'Yes' : 'No'}</span></div>
+                       <div class="money total"><span>Amount</span><span>${money(r.amount)}</span></div>`}
+                </div>
+                <div class="spacer"></div>
+                ${r.status === 'pending' ? `
+                    <label class="field"><span class="lbl">Your response</span>
+                        <input placeholder="Already packed — can we ship instead?"></label>
+                    <button class="btn" data-act="respond">Send response</button>`
+                : `<div class="banner">Staff approved this on 4 Aug. The amount is deducted from your next payout.</div>`}`
+            };
+        },
+
+        /* --------------------------------------------------------- account */
+
+        account: () => ({
+            bar: { title: 'Account' }, chrome: 'back',
+            html: `
+                <div class="card" style="display:flex;gap:11px;align-items:center">
+                    <span class="thumb" style="width:48px;height:48px;border-radius:13px;font-size:20px">🧵</span>
+                    <span class="grow">
+                        <span style="display:block;font-size:15px;font-weight:700">${esc(store.name)}</span>
+                        <span style="display:block;font-size:11.5px;color:var(--ink-3)">${esc(store.email)}</span>
+                    </span>
+                    <span class="pill ok">Approved</span>
+                </div>
+                <div class="sect">Store</div>
+                <div class="card flat">
+                    <button class="row" data-go="storeDetails"><span class="grow"><span class="t"><span class="txt">Store details</span></span></span><span class="chev">›</span></button>
+                    <button class="row" data-go="payoutAccount"><span class="grow"><span class="t"><span class="txt">Payout account</span></span><span class="s">HDFC ••••4821</span></span><span class="chev">›</span></button>
+                    <div class="row static"><span class="grow"><span class="t"><span class="txt">Commission</span></span><span class="s">Set by the marketplace</span></span><span class="amt">${store.commission}%</span></div>
+                </div>
+                <div class="sect">You</div>
+                <div class="card flat">
+                    <button class="row" data-go="profile"><span class="grow"><span class="t"><span class="txt">Name, phone, email</span></span></span><span class="chev">›</span></button>
+                    <button class="row" data-go="password"><span class="grow"><span class="t"><span class="txt">Change password</span></span></span><span class="chev">›</span></button>
+                    <button class="row" data-go="devices"><span class="grow"><span class="t"><span class="txt">Signed-in devices</span></span><span class="s">iPhone 15 · iPad</span></span><span class="pill mute">2</span></button>
+                </div>
+                <div class="spacer"></div>
+                <button class="btn ghost" data-act="signout">Sign out</button>`
+        }),
+
+        storeDetails: () => ({
+            bar: { title: 'Store details' }, chrome: 'back-save',
+            html: `
+                <div class="card" style="display:flex;gap:11px;align-items:center">
+                    <span class="thumb" style="width:56px;height:56px;border-radius:15px;font-size:23px">🧵</span>
+                    <span class="grow"><span class="t" style="font-size:13.5px;font-weight:600">Store logo</span>
+                        <span class="s" style="font-size:11.5px;color:var(--ink-3)">Square, at least 400×400</span></span>
+                    <span class="pill info">Change</span>
+                </div>
+                <label class="field"><span class="lbl">Store name</span><input value="${esc(store.name)}"></label>
+                <label class="field"><span class="lbl">Description</span><input value="Handloom textiles from Kanchipuram."></label>
+                <label class="field"><span class="lbl">Store email</span><input value="hello@meeratextiles.in"></label>
+                <label class="field"><span class="lbl">Phone</span><input value="98765 43210"></label>
+                <div class="sect">Pickup address</div>
+                <label class="field"><span class="lbl">Address line 1</span><input value="18 Weavers Street"></label>
+                <div class="two">
+                    <label class="field"><span class="lbl">City</span><input value="Kanchipuram"></label>
+                    <label class="field"><span class="lbl">Postcode</span><input value="631502"></label>
+                </div>
+                <label class="field"><span class="lbl">GST number</span><input value="33AAPFU0939F1ZV"></label>`
+        }),
+
+        payoutAccount: () => ({
+            bar: { title: 'Payout account' }, chrome: 'back-save',
+            html: `
+                <div class="banner">This is where the marketplace sends your earnings. Double-check it — a wrong IFSC delays payment by days.</div>
+                <button class="field tap" data-act="soon"><span><span class="lbl">Method</span><span class="val">Bank transfer</span></span><span class="chev">›</span></button>
+                <label class="field"><span class="lbl">Account holder</span><input value="Meera Shah"></label>
+                <label class="field"><span class="lbl">Account number</span><input value="50100234814821"></label>
+                <label class="field"><span class="lbl">IFSC</span><input value="HDFC0001234"></label>`
+        }),
+
+        profile: () => ({
+            bar: { title: 'Your profile' }, chrome: 'back-save',
+            html: `
+                <label class="field"><span class="lbl">Name</span><input value="Meera Shah"></label>
+                <label class="field"><span class="lbl">Email</span><input value="${esc(store.email)}"></label>
+                <label class="field"><span class="lbl">Phone</span><input value="98765 43210"></label>
+                <p class="note">This email is what you sign in with.</p>`
+        }),
+
+        password: () => ({
+            bar: { title: 'Change password' }, chrome: 'back',
+            html: `
+                <label class="field"><span class="lbl">Current password</span><input type="password" placeholder="••••••••"></label>
+                <label class="field"><span class="lbl">New password</span><input type="password" placeholder="At least 8 characters"></label>
+                <label class="field"><span class="lbl">Confirm new password</span><input type="password"></label>
+                <div class="banner warn">Changing your password signs you out on every other device. This one stays signed in.</div>
+                <div class="spacer"></div>
+                <button class="btn" data-act="changePw">Change password</button>`
+        }),
+
+        devices: () => ({
+            bar: { title: 'Signed-in devices' }, chrome: 'back',
+            html: `
+                <div class="card flat">
+                    <div class="row static"><span class="grow"><span class="t"><span class="txt">iPhone 15</span> <span class="pill ok">This device</span></span><span class="s">Last used just now</span></span></div>
+                    <div class="row static"><span class="grow"><span class="t"><span class="txt">iPad</span></span><span class="s">Last used 2 days ago</span></span><button class="chip" data-act="revoke">Sign out</button></div>
+                </div>
+                <div class="spacer"></div>
+                <button class="btn ghost" data-act="signoutAll">Sign out everywhere</button>`
+        }),
+
+        notifications: () => ({
+            bar: { title: 'Notifications' }, chrome: 'back',
+            html: `
+                <div class="banner warn">Mock-up only — the API for this isn't built yet. See the handoff notes.</div>
+                <div class="card flat">
+                    ${notifications.map(n => `<div class="row static">
+                        <span class="notif grow">
+                            <span class="dotmark ${n.read ? 'read' : ''}"></span>
+                            <span class="grow"><span class="t" style="font-weight:${n.read ? 500 : 650}"><span class="txt">${esc(n.t)}</span></span>
+                            <span class="s">${esc(n.b)}</span></span>
+                        </span>
+                        <span class="s" style="color:var(--ink-3)">${n.w}</span></div>`).join('')}
+                </div>
+                <div class="spacer"></div>
+                <button class="btn ghost" data-act="readAll">Mark all read</button>`
+        })
+    };
+
+    /* --------------------------------------------------------- rendering */
+
+    function render() {
+        const key = stack[stack.length - 1];
+        const [name, arg] = key.split(':');
+        const s = screens[name](arg);
+
+        $('barTitle').textContent = s.bar.title;
+        const sub = $('barSub');
+        sub.textContent = s.bar.sub || '';
+        sub.hidden = !s.bar.sub;
+
+        const c = s.chrome;
+        $('backBtn').hidden = !(c === 'back' || c === 'back-save' || c === 'close-save');
+        $('backBtn').textContent = c === 'close-save' ? '✕' : '‹';
+        $('saveBtn').hidden = !(c === 'back-save' || c === 'close-save');
+        $('bellBtn').hidden = c !== 'main';
+        $('acctBtn').hidden = c !== 'main';
+        $('bellDot').textContent = unread();
+        $('bellDot').hidden = unread() === 0;
+
+        tabbar.classList.toggle('hide', c !== 'main');
+        tabbar.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.tab === s.tab));
+
+        stage.innerHTML = `<div class="screen on ${s.plain ? 'plain' : ''}">${s.html}</div>`;
+    }
+
+    function go(key) { stack.push(key); render(); }
+    function back() { if (stack.length > 1) { stack.pop(); render(); } }
+    function root(key) { stack = [key]; render(); }
+
+    /* ----------------------------------------------------------- actions */
+
+    const actions = {
+        signin() { signedIn = true; root('home'); toast('Signed in as ' + store.name); },
+        register() { store.status = 'pending'; signedIn = true; root('pending'); toast('Store created — waiting for approval'); },
+        approve() { store.status = 'approved'; root('home'); toast('Your store was approved'); },
+        signout() { signedIn = false; store.status = 'approved'; root('login'); },
+        signoutAll() { signedIn = false; root('login'); },
+        revoke() { toast('iPad signed out'); },
+        changePw() { back(); toast('Password changed. Other devices signed out.'); },
+        note() { toast('Note added to the order'); },
+        respond() { back(); toast('Response sent to the marketplace'); },
+        readAll() { notifications.forEach(n => n.read = true); render(); },
+        goPack() { ordersFilter = 'unfulfilled'; root('orders'); },
+        goLow() { productsFilter = 'low'; root('products'); },
+        soon() { toast('Not part of this prototype'); },
+        createProduct() { back(); toast('Product published'); },
+        createDraft() { back(); toast('Saved as a draft'); },
+
+        'toggleStatus': id => {
+            const p = products.find(x => x.id === +id);
+            p.status = p.status === 'active' ? 'draft' : 'active';
+            render();
+            toast(p.status === 'active' ? 'Product is live' : 'Moved to draft');
+        },
+
+        'delete': id => {
+            products = products.filter(x => x.id !== +id);
+            back();
+            toast('Product deleted');
+        },
+
+        'fulfil': id => {
+            const o = orders.find(x => x.id === +id);
+            o.items.forEach(i => {
+                const el = document.getElementById('q' + i.id);
+                i.packed = el ? +el.textContent : i.qty;
+            });
+            const done = o.items.every(i => i.packed >= i.qty);
+            o.ff = done ? 'fulfilled' : 'partial';
+            o.carrier = 'Delhivery';
+            o.tracking = 'TRK-99120';
+            stack.pop();
+            render();
+            toast(done ? 'Marked as shipped' : 'Part of the order is on its way');
+        }
+    };
+
+    /* ---------------------------------------------------------- wiring */
+
+    document.addEventListener('click', e => {
+        const t = e.target.closest('[data-go],[data-act],[data-filter],[data-qty]');
+        if (!t) return;
+
+        if (t.dataset.go) { go(t.dataset.go); return; }
+
+        if (t.dataset.filter) {
+            const [which, val] = t.dataset.filter.split(':');
+            if (which === 'orders') ordersFilter = val; else productsFilter = val;
+            render();
+            return;
+        }
+
+        if (t.dataset.qty) {
+            const [id, delta] = t.dataset.qty.split(':');
+            const el = document.getElementById('q' + id);
+            const o = orders.find(x => x.items.some(i => i.id === +id));
+            const item = o.items.find(i => i.id === +id);
+            el.textContent = Math.max(0, Math.min(item.qty, +el.textContent + +delta));
+            return;
+        }
+
+        const [name, arg] = t.dataset.act.split(':');
+        if (actions[name]) actions[name](arg);
+    });
+
+    $('backBtn').addEventListener('click', back);
+    $('saveBtn').addEventListener('click', () => { back(); toast('Saved'); });
+    $('bellBtn').addEventListener('click', () => go('notifications'));
+    $('acctBtn').addEventListener('click', () => go('account'));
+
+    tabbar.querySelectorAll('button').forEach(b =>
+        b.addEventListener('click', () => root(b.dataset.tab)));
+
+    render();
+})();
+</script>
+
+</body>
+</html>

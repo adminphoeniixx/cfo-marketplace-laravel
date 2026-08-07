@@ -1,14 +1,18 @@
 <?php
 
+use App\Http\Controllers\Api\Seller\AnalyticsController;
 use App\Http\Controllers\Api\Seller\AuthController;
 use App\Http\Controllers\Api\Seller\CancellationController;
 use App\Http\Controllers\Api\Seller\CatalogController;
 use App\Http\Controllers\Api\Seller\DashboardController;
+use App\Http\Controllers\Api\Seller\NotificationController;
 use App\Http\Controllers\Api\Seller\OrderController;
 use App\Http\Controllers\Api\Seller\PayoutController;
 use App\Http\Controllers\Api\Seller\ProductController;
 use App\Http\Controllers\Api\Seller\ProfileController;
 use App\Http\Controllers\Api\Seller\RefundController;
+use App\Http\Controllers\Api\Seller\ShippingController;
+use App\Http\Controllers\Api\Seller\TeamController;
 use App\Http\Controllers\Api\Seller\UploadController;
 use Illuminate\Support\Facades\Route;
 
@@ -58,6 +62,18 @@ Route::prefix('seller')->name('api.seller.')->group(function () {
 
             Route::get('store', [ProfileController::class, 'store'])->name('store');
             Route::put('store', [ProfileController::class, 'updateStore'])->name('store.update');
+
+            // Personal, not the store's — a pending seller still gets told
+            // when their store is approved.
+            Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
+            Route::get('notifications/unread-count', [NotificationController::class, 'unreadCount'])->name('notifications.unread');
+            Route::post('notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.read-all');
+            Route::post('notifications/{notification}/read', [NotificationController::class, 'read'])->name('notifications.read');
+            Route::delete('notifications/{notification}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
+
+            Route::get('push', [NotificationController::class, 'pushSettings'])->name('push.settings');
+            Route::post('push', [NotificationController::class, 'subscribe'])->name('push.subscribe');
+            Route::delete('push', [NotificationController::class, 'unsubscribe'])->name('push.unsubscribe');
         });
 
         /*
@@ -76,6 +92,21 @@ Route::prefix('seller')->name('api.seller.')->group(function () {
             Route::get('catalog/attributes', [CatalogController::class, 'attributes'])->name('catalog.attributes');
             Route::get('catalog/tax-classes', [CatalogController::class, 'taxClasses'])->name('catalog.tax-classes');
 
+            Route::get('analytics/sales', [AnalyticsController::class, 'sales'])->name('analytics.sales');
+
+            Route::get('team', [TeamController::class, 'index'])->name('team.index');
+            Route::post('team', [TeamController::class, 'store'])->name('team.store');
+            Route::put('team/{member}', [TeamController::class, 'update'])->name('team.update');
+            Route::patch('team/{member}/toggle', [TeamController::class, 'toggle'])->name('team.toggle');
+            Route::delete('team/{member}', [TeamController::class, 'destroy'])->name('team.destroy');
+
+            Route::get('shipping/zones', [ShippingController::class, 'zones'])->name('shipping.zones');
+            Route::get('shipping/rates', [ShippingController::class, 'index'])->name('shipping.rates.index');
+            Route::post('shipping/rates', [ShippingController::class, 'store'])->name('shipping.rates.store');
+            Route::put('shipping/rates/{rate}', [ShippingController::class, 'update'])->name('shipping.rates.update');
+            Route::delete('shipping/rates/{rate}', [ShippingController::class, 'destroy'])->name('shipping.rates.destroy');
+
+            Route::post('products/bulk', [ProductController::class, 'bulk'])->name('products.bulk');
             Route::get('products', [ProductController::class, 'index'])->name('products.index');
             Route::post('products', [ProductController::class, 'store'])->name('products.store');
             Route::get('products/{product}', [ProductController::class, 'show'])->name('products.show');

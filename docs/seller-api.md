@@ -73,6 +73,39 @@ On an order shared with another seller you see **only your own lines**, and the
 | GET | `/devices` | Tokens currently issued, with `current: true` on the one making the call. |
 | DELETE | `/devices/{id}` | Revoke one device. |
 
+### Notifications (pending-ok)
+
+Notifications belong to the **person**, not the store. Two people signing in to
+the same store each get their own pile, and a store still waiting for approval
+can read them — which is how the seller hears that they were approved.
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/notifications` | `?filter=unread &kind= &per_page=`. Paginated, plus a top-level `unread_count`. |
+| GET | `/notifications/unread-count` | Just the badge number. Cheap enough to call on every app resume. |
+| POST | `/notifications/read-all` | |
+| POST | `/notifications/{id}/read` | `404` if it isn't yours. |
+| DELETE | `/notifications/{id}` | |
+
+Each row carries `title`, `body`, `url`, `tone` and `kind`. Route on `url` when
+the seller taps it; `kind` is the stable machine name for icons and filtering
+(`order-placed`, `low-stock-reached`, `payout-recorded`, …).
+
+Which notifications a seller receives is decided by the marketplace's role
+matrix, not by the app. Today a vendor login hears about orders, products,
+payouts and analytics — scoped to their own store.
+
+### Browser push (pending-ok)
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/push` | `{ enabled, public_key, devices }`. If `enabled` is false the marketplace has no VAPID keys configured — hide the toggle. |
+| POST | `/push` | `endpoint`, `keys.p256dh`, `keys.auth`, optional `content_encoding`. Re-posting the same endpoint updates rather than duplicates. |
+| DELETE | `/push` | `endpoint`. |
+
+Subscriptions are per device. Deliveries that a push service rejects as gone
+are dropped server-side, so a reinstalled app does not need cleaning up.
+
 ### Dashboard and money (approved)
 
 | Method | Path | Notes |
@@ -81,6 +114,11 @@ On an order shared with another seller you see **only your own lines**, and the
 | GET | `/payouts` | `?status=` |
 | GET | `/payouts/{id}` | |
 | GET | `/payouts/earnings` | Lifetime gross/commission/earning, plus paid, in-progress and unsettled. |
+| GET | `/analytics/sales` | `?days=30` (1–365). One point per day for the chart. |
+
+`/analytics/sales` returns `series[]` with `date`, `sales`, `earning`, `orders`
+and `units`. Days with no sales are included as zeroes — the series is always
+exactly `days` long, so the chart keeps its true shape.
 
 ### Catalog reference (approved)
 
@@ -105,6 +143,12 @@ round trip — the product form only needs this one call.
 | DELETE | `/products/{id}` | |
 | PATCH | `/products/{id}/status` | `status` only. |
 | PATCH | `/products/{id}/stock` | `stock_quantity`, optional `low_stock_threshold`. `422` on a variable product — change its variants instead. |
+| POST | `/products/bulk` | `action` (`activate`/`draft`/`archive`/`delete`) + `ids[]`, max 200. |
+
+`/products/bulk` answers `{ action, changed, skipped }`. Ids belonging to
+another store are counted in `skipped` rather than failing the call, so a stale
+multi-select still applies to everything that is genuinely yours. If **nothing**
+in the list is yours the call is a `404`.
 
 Minimum to create a product:
 
@@ -151,6 +195,51 @@ other seller ships too.
 
 Customer data is deliberately thin: a name, a phone and the shipping address —
 enough to pack and deliver, nothing that identifies the buyer beyond this order.
+
+### Team (approved)
+
+A **vendor** is the store; a **seller** is a person's login. One store can have
+several logins — an owner, someone who packs, someone who answers customers.
+They all see identical store data; what stays private to each person is their
+password, their devices and their notifications.
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/team` | Every login on this store. `is_you: true` marks the caller. |
+| POST | `/team` | `name, email, password, password_confirmation`, optional `phone`. |
+| PUT | `/team/{id}` | `name, email`, optional `phone`. |
+| PATCH | `/team/{id}/toggle` | Switch a colleague's access off or on. Revokes their tokens. |
+| DELETE | `/team/{id}` | |
+
+There is no owner/staff distinction inside a store yet — every login here can
+manage the others. Two guards stop that going wrong: you cannot deactivate or
+remove **yourself** (`422`), and you cannot leave the store with no active login
+(`422`). A login on another store is a `404` like anything else.
+
+`role` and the store are taken from the token, never the payload, so this
+endpoint cannot mint a login for someone else's store.
+
+### Shipping (approved)
+
+Zones are the marketplace's and read-only. Rates inside a zone belong to a
+store, so each seller prices their own delivery.
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/shipping/zones` | Active zones, with their countries and states. |
+| GET | `/shipping/rates` | `?zone=`. Your rates **plus** the marketplace's fallbacks. |
+| POST | `/shipping/rates` | `shipping_zone_id, name, type, rate` + the optional bounds. |
+| PUT | `/shipping/rates/{id}` | |
+| DELETE | `/shipping/rates/{id}` | |
+
+Every rate carries two flags worth reading before drawing the row:
+
+- `is_marketplace` — a fallback the marketplace set, shown so the seller
+  understands what applies when they have configured nothing.
+- `editable` — false on those fallbacks and on anything not yours. Writing to
+  one is a `404`.
+
+`type` is one of `flat`, `free`, `weight_based`, `price_based`, `item_based`.
 
 ### Cancellations and refunds (approved)
 
