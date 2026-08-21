@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Seller;
 
+use App\Models\DeliveryPartner;
 use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -34,6 +35,9 @@ class OrderResource extends JsonResource
             'shipping_method' => $this->shipping_method,
             'carrier' => $this->carrier,
             'tracking_number' => $this->tracking_number,
+            // Built from the courier's own URL template, so the app can offer
+            // a "track this" link without knowing anything about couriers.
+            'tracking_url' => DeliveryPartner::trackingUrlFrom($this->carrier, $this->tracking_number),
             'customer' => [
                 // Enough to pack and deliver, and no more: no email, no
                 // customer id, nothing that identifies them off this order.

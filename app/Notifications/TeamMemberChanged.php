@@ -15,6 +15,7 @@ class TeamMemberChanged extends AdminNotification
         private readonly string $action,
         private readonly string $role,
         private readonly string $actorName,
+        private readonly ?int $storeId = null,
     ) {}
 
     /**
@@ -22,7 +23,7 @@ class TeamMemberChanged extends AdminNotification
      */
     public static function for(User $member, string $action, User $actor): self
     {
-        return new self($member->name, $action, $member->role, $actor->name);
+        return new self($member->name, $action, $member->role, $actor->name, $member->vendor_id);
     }
 
     public static function section(): string
@@ -53,5 +54,18 @@ class TeamMemberChanged extends AdminNotification
     public function tone(): string
     {
         return $this->action === 'added' ? 'success' : 'neutral';
+    }
+
+    /**
+     * A change to a store's own logins is that store's news.
+     *
+     * Without this the notification carried no store, and `Notifier` leaves
+     * vendors out of an audience it cannot place — so the store whose team had
+     * just changed was the one group never told about it. Marketplace staff
+     * have no store, so their changes stay staff-only.
+     */
+    public function vendorId(): ?int
+    {
+        return $this->storeId;
     }
 }

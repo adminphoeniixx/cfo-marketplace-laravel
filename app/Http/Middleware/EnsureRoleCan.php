@@ -26,7 +26,9 @@ class EnsureRoleCan
             return redirect()->route('login')->with('error', 'Your account has been deactivated.');
         }
 
-        abort_unless(Roles::allows($user, $section), 403, 'Your role does not have access to this section.');
+        // The panel's own view of the grant: a vendor's matrix row also governs
+        // the seller app, which reaches further than the panel can scope.
+        abort_unless(Roles::allowsInPanel($user, $section), 403, 'Your role does not have access to this section.');
 
         return $next($request);
     }

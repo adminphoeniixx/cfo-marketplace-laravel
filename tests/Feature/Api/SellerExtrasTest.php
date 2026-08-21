@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\DeliveryPartner;
 use App\Models\Product;
 use App\Models\PushSubscription;
 use App\Models\ShippingRate;
@@ -376,4 +377,84 @@ test('a cancelled order is never something to pack', function () {
 
     $this->getJson(route('api.seller.orders.summary'))
         ->assertOk()->assertJsonPath('unfulfilled', 0);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Delivery partners
+|--------------------------------------------------------------------------
+*/
+
+test('the carrier picker lists the marketplace\'s active partners in order', function () {
+    actingAsSeller();
+
+    // The migration ships a default courier list; this test owns the ordering.
+    DeliveryPartner::query()->delete();
+
+    DeliveryPartner::factory()->create(['name' => 'Delhivery', 'code' => 'dl', 'position' => 2, 'is_active' => true, 'tracking_url' => 'https://delhivery.test/{tracking}']);
+    DeliveryPartner::factory()->create(['name' => 'Blue Dart', 'code' => 'bd', 'position' => 1, 'is_active' => true, 'tracking_url' => null]);
+    DeliveryPartner::factory()->create(['name' => 'Retired courier', 'code' => 'rc', 'position' => 3, 'is_active' => false]);
+
+    $this->getJson(route('api.seller.delivery-partners'))
+        ->assertOk()
+        ->assertJsonCount(2, 'data')
+        // Admin's ordering, not alphabetical.
+        ->assertJsonPath('data.0.name', 'Blue Dart')
+        ->assertJsonPath('data.0.has_tracking', false)
+        ->assertJsonPath('data.1.name', 'Delhivery')
+        ->assertJsonPath('data.1.has_tracking', true);
+});
+
+test('an order carries a finished tracking link once it ships', function () {
+    [$me, $store] = actingAsSeller();
+
+    DeliveryPartner::query()->delete();
+    DeliveryPartner::factory()->create([
+        'name' => 'Delhivery',
+        'code' => 'dl',
+        'is_active' => true,
+        'tracking_url' => 'https://delhivery.test/track?id={tracking}',
+    ]);
+
+    $order = orderForStore($store);
+
+    $this->postJson(route('api.seller.orders.fulfill', $order->id), [
+        'items' => [['id' => $order->items->first()->id, 'quantity' => 2]],
+        'carrier' => 'Delhivery',
+        'tracking_number' => 'TRK-88213',
+    ])
+        ->assertOk()
+        ->assertJsonPath('data.carrier', 'Delhivery')
+        ->assertJsonPath('data.tracking_url', 'https://delhivery.test/track?id=TRK-88213');
+});
+
+test('an unknown courier simply has no tracking link', function () {
+    [$me, $store] = actingAsSeller();
+
+    // Same name as the previous test, different template: proves the memoised
+    // lookup is per request and does not survive into the next one.
+    DeliveryPartner::query()->delete();
+    DeliveryPartner::factory()->create([
+        'name' => 'Delhivery',
+        'code' => 'dl',
+        'is_active' => true,
+        'tracking_url' => 'https://second.test/{tracking}',
+    ]);
+
+    $known = orderForStore($store);
+    $this->postJson(route('api.seller.orders.fulfill', $known->id), [
+        'items' => [['id' => $known->items->first()->id, 'quantity' => 2]],
+        'carrier' => 'Delhivery',
+        'tracking_number' => 'TRK-2',
+    ])->assertJsonPath('data.tracking_url', 'https://second.test/TRK-2');
+
+    $order = orderForStore($store);
+
+    $this->postJson(route('api.seller.orders.fulfill', $order->id), [
+        'items' => [['id' => $order->items->first()->id, 'quantity' => 2]],
+        'carrier' => 'Typed by hand',
+        'tracking_number' => 'TRK-1',
+    ])
+        ->assertOk()
+        ->assertJsonPath('data.tracking_url', null);
 });

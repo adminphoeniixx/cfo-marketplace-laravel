@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Seller;
 
 use App\Http\Controllers\Controller;
+use App\Models\DeliveryPartner;
 use App\Models\ShippingRate;
 use App\Models\ShippingZone;
 use Illuminate\Http\JsonResponse;
@@ -26,6 +27,29 @@ class ShippingController extends Controller
             'data' => ShippingZone::where('is_active', true)
                 ->orderBy('position')->orderBy('name')
                 ->get(['id', 'name', 'description', 'countries', 'states']),
+        ]);
+    }
+
+    /**
+     * Couriers the marketplace has approved, in the order the admin arranged
+     * them. The fulfil endpoint records the courier by name, so this is the
+     * list the app's carrier picker has to offer — typing one in free-hand
+     * produces an order whose tracking link cannot be built.
+     */
+    public function deliveryPartners(): JsonResponse
+    {
+        return response()->json([
+            'data' => DeliveryPartner::active()
+                ->orderBy('position')->orderBy('name')
+                ->get(['id', 'name', 'tracking_url'])
+                ->map(fn (DeliveryPartner $partner) => [
+                    'id' => $partner->id,
+                    'name' => $partner->name,
+                    // The template itself is of no use to the app — the order
+                    // carries the finished link — but knowing whether one
+                    // exists tells it whether to ask for a tracking number.
+                    'has_tracking' => ! empty($partner->tracking_url),
+                ]),
         ]);
     }
 

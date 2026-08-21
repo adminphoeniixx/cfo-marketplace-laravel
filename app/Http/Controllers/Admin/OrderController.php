@@ -12,6 +12,7 @@ use App\Models\Product;
 use App\Models\Vendor;
 use App\Notifications\LowStockReached;
 use App\Notifications\OrderPlaced;
+use App\Notifications\OrderStatusChanged;
 use App\Services\Notifier;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
@@ -301,7 +302,15 @@ class OrderController extends Controller
 
         $actor = $request->user();
 
-        Notifier::send(new OrderPlaced($order->load('items', 'customer')), $actor);
+        // One copy per store, because the body quotes money: a seller on a
+        // shared basket must see their own share, not the buyer's total.
+        $order->load('items', 'customer');
+
+        Notifier::sendPerStore(
+            (new OrderPlaced($order))->vendorIds(),
+            fn (?int $storeId) => new OrderPlaced($order, $storeId),
+            $actor,
+        );
 
         // Selling the last few of something is worth hearing about, but only
         // once it actually crosses the line this order pushed it over.
@@ -372,6 +381,12 @@ class OrderController extends Controller
             $data['note'] ?? null,
             ['from' => $from, 'to' => $data['status']],
         );
+
+        // A seller who has already packed an order needs to hear that it was
+        // cancelled or held; the rest of the ladder is noise to them.
+        if (OrderStatusChanged::worthTelling($from, $data['status'])) {
+            Notifier::send(new OrderStatusChanged($order->fresh('items')), $request->user());
+        }
 
         return back()->with('success', "Order marked as {$data['status']}.");
     }

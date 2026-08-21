@@ -7,6 +7,7 @@ use App\Models\Cancellation;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Notifications\CancellationDecided;
 use App\Notifications\CancellationRequested;
 use App\Services\Notifier;
 use Illuminate\Http\RedirectResponse;
@@ -194,6 +195,10 @@ class CancellationController extends Controller
             $order->recordEvent('cancellation', "Cancellation {$cancellation->number} approved", $data['review_note'] ?? null);
         });
 
+        // The seller has a Requests screen and no other way to learn what was
+        // decided; whoever made the call is left out of their own news.
+        Notifier::send(new CancellationDecided($cancellation->fresh(['items.orderItem', 'order'])), $request->user());
+
         return back()->with('success', "Cancellation {$cancellation->number} approved.");
     }
 
@@ -213,6 +218,8 @@ class CancellationController extends Controller
         ]);
 
         $cancellation->order->recordEvent('cancellation', "Cancellation {$cancellation->number} rejected", $data['review_note']);
+
+        Notifier::send(new CancellationDecided($cancellation->fresh(['items.orderItem', 'order'])), $request->user());
 
         return back()->with('success', "Cancellation {$cancellation->number} rejected.");
     }

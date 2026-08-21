@@ -39,7 +39,7 @@ class Roles
         ],
         'vendor' => [
             'label' => 'Vendor',
-            'description' => 'Seller login. Everything they open is scoped to their own store.',
+            'description' => 'Seller login. Drives the seller app, where everything is scoped to their own store. In this panel a vendor only reaches Analytics and Orders, the two screens that scope that way.',
         ],
     ];
 
@@ -78,7 +78,13 @@ class Roles
             'products', 'categories', 'attributes', 'vendors', 'payouts',
         ],
         'staff' => ['orders', 'cancellations', 'refunds', 'customers'],
-        'vendor' => ['analytics', 'orders', 'products', 'payouts'],
+        // Everything the seller app offers. The API enforces this list too, so
+        // narrowing it here closes the matching screen in the app as well as
+        // the section in the panel.
+        'vendor' => [
+            'analytics', 'orders', 'cancellations', 'refunds',
+            'products', 'shipping', 'payouts', 'team',
+        ],
     ];
 
     /**
@@ -146,11 +152,51 @@ class Roles
     }
 
     /**
+     * Sections a vendor login may open **in the admin panel**.
+     *
+     * Their matrix row is wider than this because it also governs the seller
+     * app, where every query is scoped to the store by `ScopesToStore`. The
+     * panel only scopes some of its screens that way, so a vendor is held to
+     * the ones that do until the rest catch up. Widening this list without
+     * first scoping the screen behind it hands one seller another's data.
+     *
+     * @var list<string>
+     */
+    public const VENDOR_PANEL_SECTIONS = ['analytics', 'orders'];
+
+    /**
      * @return list<string>
      */
     public static function forRole(?string $role): array
     {
         return self::permissions()[$role] ?? [];
+    }
+
+    /**
+     * The grant as the admin panel sees it — the role's sections, narrowed for
+     * a vendor to those the panel can safely show.
+     *
+     * @return list<string>
+     */
+    public static function forPanel(?User $user): array
+    {
+        if (! $user instanceof User || ! $user->is_active) {
+            return [];
+        }
+
+        $sections = self::forRole($user->role);
+
+        return $user->isVendor()
+            ? array_values(array_intersect($sections, self::VENDOR_PANEL_SECTIONS))
+            : $sections;
+    }
+
+    /**
+     * Whether the user may open the given section in the admin panel.
+     */
+    public static function allowsInPanel(?User $user, string $section): bool
+    {
+        return in_array($section, self::forPanel($user), true);
     }
 
     /**
@@ -168,7 +214,11 @@ class Roles
     }
 
     /**
-     * Whether the user may open the given admin section.
+     * Whether the user's role holds the given section at all.
+     *
+     * This is the grant itself, which the seller API enforces directly. The
+     * admin panel asks `allowsInPanel()` instead, because a vendor's grant
+     * reaches further than the panel can currently scope.
      */
     public static function allows(?User $user, string $section): bool
     {

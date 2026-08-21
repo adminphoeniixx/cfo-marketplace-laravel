@@ -27,12 +27,44 @@ A `401` means the token is missing, expired or revoked — sign in again.
 A brand-new sign-up lands in `pending` and holds a working token immediately, so
 the app can show a "waiting for approval" screen rather than a login wall.
 
+### Sections
+
+On top of the tiers, every trading endpoint is gated by the marketplace's role
+matrix — the same one that decides what a vendor login may open in the admin
+panel. Turning "Payouts" off for the vendor role closes the panel section and
+`/payouts` together, so the app is never a way around it.
+
+`GET /me` returns the list as `sections`. Hide a screen the seller does not
+hold rather than letting them open it and collect a `403`:
+
+```json
+{ "sections": ["analytics", "orders", "cancellations", "refunds",
+               "products", "shipping", "payouts", "team"] }
+```
+
+A withheld section answers `403` with the key that was missing:
+
+```json
+{ "message": "The marketplace has turned this off for sellers.", "section": "payouts" }
+```
+
+Account-level endpoints are never gated: `/me`, `/store`, `/notifications`,
+`/push`, `/devices`, `/refresh`, `/dashboard` and `/uploads` keep working
+whatever the matrix says. They belong to the person, not to a section.
+
+The same row is read more narrowly by the admin panel. Every query in this API
+is scoped to the store, so the whole grant applies here; the panel only scopes
+some of its screens that way, so a vendor login there is held to
+`Roles::VENDOR_PANEL_SECTIONS`. Granting a seller "Refunds" therefore opens the
+app's Requests screen without handing them every other seller's refunds in the
+panel.
+
 ## Errors
 
 | Code | Meaning |
 |---|---|
 | 401 | No valid token. |
-| 403 | Token is fine, but the store cannot do this yet (see `store_status`). |
+| 403 | Token is fine, but the store cannot do this yet (see `store_status`), or the marketplace has withheld this section (see `section`). |
 | 404 | The record does not exist **or** belongs to another store — the API does not distinguish, on purpose. |
 | 422 | Validation failed. Laravel's standard `{ "message": ..., "errors": { field: [...] } }`. |
 | 429 | Rate limited. Auth endpoints allow 10/min, uploads 60/min. |
@@ -68,10 +100,18 @@ On an order shared with another seller you see **only your own lines**, and the
 | PUT | `/me/password` | `current_password, password, password_confirmation`. Signs other devices out, keeps this one. |
 | GET | `/store` | Store details. |
 | PUT | `/store` | Shopfront and payout details. `commission_rate`, `status` and `rating` are read-only and ignored if sent. |
+| POST | `/refresh` | Trades a working token for a fresh one and revokes the old. Optional `device_name` renames the device. |
 | POST | `/logout` | Revokes this device's token. |
 | POST | `/logout-all` | Revokes every token. |
 | GET | `/devices` | Tokens currently issued, with `current: true` on the one making the call. |
 | DELETE | `/devices/{id}` | Revoke one device. |
+
+Tokens expire on wall-clock age (`SANCTUM_TOKEN_MINUTES`, 30 days), not on
+idleness, so an app used daily is still thrown out once a month unless it
+refreshes. Call `POST /refresh` on resume, well before the token ages out — an
+expired token cannot reach the endpoint, and the only way back is a fresh login.
+The old token dies the moment the new one is issued, so a stolen copy stops
+working as soon as the real device refreshes. Other devices are untouched.
 
 ### Notifications (pending-ok)
 
@@ -88,23 +128,81 @@ can read them — which is how the seller hears that they were approved.
 | DELETE | `/notifications/{id}` | |
 
 Each row carries `title`, `body`, `url`, `tone` and `kind`. Route on `url` when
-the seller taps it; `kind` is the stable machine name for icons and filtering
-(`order-placed`, `low-stock-reached`, `payout-recorded`, …).
+the seller taps it; `kind` is the stable machine name for icons and filtering.
+
+| `kind` | Sent when |
+|---|---|
+| `store-status-changed` | The store is approved, rejected or suspended. `url` is `/store` — the app's own store screen, not an admin path. |
+| `order-placed` | An order lands with one of your lines on it. |
+| `order-status-changed` | The marketplace cancels, holds, or marks delivered an order of yours. Shipping is not announced — that is normally your own doing. |
+| `low-stock-reached` | An order pushes a tracked product to its low-stock threshold. |
+| `cancellation-requested` | A cancellation is raised on one of your orders. |
+| `cancellation-decided` | The marketplace approves or rejects one. |
+| `refund-requested` | A refund is raised on one of your orders. |
+| `refund-decided` | It is approved, rejected, or actually paid out. |
+| `payout-recorded` | A payout is raised for your store. |
+| `payout-status-changed` | It is paid, fails, or goes for processing. |
+| `team-member-changed` | A login on your store is added, deactivated or removed. |
+
+On an order shared with another seller, **both** stores are told, and each is
+told only about itself: `order-placed` quotes your own share of the basket, and
+a `cancellation-*` or `refund-*` on the other seller's lines never reaches you.
 
 Which notifications a seller receives is decided by the marketplace's role
-matrix, not by the app. Today a vendor login hears about orders, products,
-payouts and analytics — scoped to their own store.
+matrix, not by the app — `cancellation-*` needs `cancellations`, `payout-*`
+needs `payouts`, and so on — and every one is scoped to your own store.
+`store-status-changed` is the exception: it is addressed to the store rather
+than to a section, so it arrives whatever the matrix says. That is what makes
+the "waiting for approval" screen work — a pending store keeps a working token
+precisely so it can be told the answer.
 
 ### Browser push (pending-ok)
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/push` | `{ enabled, public_key, devices }`. If `enabled` is false the marketplace has no VAPID keys configured — hide the toggle. |
+| GET | `/push` | `{ enabled, public_key, devices, firebase: { enabled, project_id, devices } }`. Check the block for your transport: `enabled` false means no VAPID keys, `firebase.enabled` false means no service account — hide the toggle either way. |
 | POST | `/push` | `endpoint`, `keys.p256dh`, `keys.auth`, optional `content_encoding`. Re-posting the same endpoint updates rather than duplicates. |
 | DELETE | `/push` | `endpoint`. |
 
 Subscriptions are per device. Deliveries that a push service rejects as gone
 are dropped server-side, so a reinstalled app does not need cleaning up.
+
+### Firebase push (pending-ok)
+
+The phone app uses FCM rather than VAPID. Firebase project `cfo-hub-5e4fb`.
+
+| Method | Path | Notes |
+|---|---|---|
+| POST | `/push/device` | `token` (the FCM registration token), optional `platform` (`android`, `ios`, `web` — defaults to `android`) and `device_name`. Returns `201`. |
+| DELETE | `/push/device` | `token`. |
+
+Call `POST /push/device` after every sign-in **and** from the token-refresh
+listener — Firebase rotates tokens on its own and a stale one silently stops
+being delivered to. Registering the same token twice updates the row rather
+than duplicating it, and a token registered by a second seller on a shared
+phone moves across, so nobody receives the previous seller's orders.
+
+Pass the token to `POST /logout` as `device_token` to stop that phone being
+pushed to on sign-out. `POST /logout-all` and a password reset drop them all.
+
+Each message arrives as:
+
+```json
+{
+  "notification": { "title": "New order CFO-1042", "body": "₹4,500.00 from Meera." },
+  "data": {
+    "url": "/admin/orders/91",
+    "kind": "order-placed",
+    "tone": "success",
+    "click_action": "FLUTTER_NOTIFICATION_CLICK"
+  }
+}
+```
+
+`data.url` is the screen to open on tap, `data.kind` matches the notification
+centre's filter tabs, and `data.tone` matches the badge colours. Android
+notifications carry the channel id `cfo_alerts` — the app has to create that
+channel or Android 8+ drops them silently.
 
 ### Dashboard and money (approved)
 
@@ -189,6 +287,14 @@ signed and time-limited.
 | POST | `/orders/{id}/fulfill` | `items[].id`, `items[].quantity`, optional `tracking_number`, `carrier`. |
 | POST | `/orders/{id}/notes` | `note`. Lands on the order timeline the admin panel shows. |
 
+`carrier` is the courier's **name**, and it has to come from
+`GET /delivery-partners` — the marketplace matches on that name to build the
+tracking link. A name typed in free-hand is accepted but produces an order whose
+`tracking_url` is `null`, so show a picker, not a text box.
+
+Every order carries `carrier`, `tracking_number` and a ready-made
+`tracking_url` (null until both a known courier and a tracking number exist).
+
 Fulfilment only moves your own lines. The order-level status is recomputed from
 **every** line, so a two-vendor order stays `partially_fulfilled` until the
 other seller ships too.
@@ -237,6 +343,7 @@ store, so each seller prices their own delivery.
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/shipping/zones` | Active zones, with their countries and states. |
+| GET | `/delivery-partners` | Couriers the marketplace approved, in the admin's own order: `id`, `name`, `has_tracking`. Feeds the carrier picker on the pack-and-ship screen. |
 | GET | `/shipping/rates` | `?zone=`. Your rates **plus** the marketplace's fallbacks. |
 | POST | `/shipping/rates` | `shipping_zone_id, name, type, rate` + the optional bounds. |
 | PUT | `/shipping/rates/{id}` | |
@@ -256,14 +363,38 @@ Every rate carries two flags worth reading before drawing the row:
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/cancellations` | `?status=` |
+| POST | `/cancellations` | Raise one. `order_id`, `reason`, `items[].order_item_id`, `items[].quantity` + optional `note`, `restock`, `refund_requested`. Returns `201`. |
 | GET | `/cancellations/{id}` | |
 | POST | `/cancellations/{id}/respond` | `note` — your side of the story, onto the order timeline. |
 | GET | `/refunds` | `?status=` |
 | GET | `/refunds/{id}` | |
 | POST | `/refunds/{id}/respond` | `note` |
 
-Approving or rejecting is the marketplace's call, not the seller's. These
-endpoints are read-plus-comment by design.
+Approving or rejecting is the marketplace's call, not the seller's. A seller
+states their case; staff decide.
+
+**Raising a cancellation** is for stock that turned out not to exist. It lands
+as `pending` with `requested_by` fixed to `vendor` — sending either field
+yourself changes nothing. `reason` must be one of the marketplace's keys; ask
+for the list from an existing cancellation's `reason`/`reason_label` pair.
+
+What may be cancelled is capped per line, and asking for more is a `422` on
+`items.{i}.quantity`:
+
+- quantity already cancelled or refunded is gone,
+- quantity already **shipped** cannot be cancelled — that is a return,
+- quantity sitting in another cancellation still awaiting review is spoken for,
+  which is what stops the same line being raised twice.
+
+A line belonging to another seller on a shared order is a `422`, and another
+store's order is a `404`.
+
+Two defaults follow from the situation, and the app may override either:
+
+| Field | Default |
+|---|---|
+| `restock` | `false` when the reason is `out_of_stock` — stock that never existed must not be handed back — otherwise `true`. |
+| `refund_requested` | `true` when the order is already paid. |
 
 ---
 

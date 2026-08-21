@@ -95,20 +95,21 @@ class User extends Authenticatable implements PasskeyUser
     }
 
     /**
-     * Whether this user's role may open the given admin section.
+     * Whether this user may open the given section of the admin panel.
      */
     public function canAccess(string $section): bool
     {
-        return Roles::allows($this, $section);
+        return Roles::allowsInPanel($this, $section);
     }
 
     /**
-     * Sections this user's role may open.
+     * Sections this user may open in the admin panel — what the sidebar is
+     * drawn from, so a vendor is never shown a link they would be refused.
      *
      * @return list<string>
      */
     public function sections(): array
     {
-        return $this->is_active ? Roles::forRole($this->role) : [];
+        return Roles::forPanel($this);
     }
 }

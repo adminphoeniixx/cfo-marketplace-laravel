@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Vendor;
 use App\Models\VendorPayout;
 use App\Notifications\PayoutRecorded;
+use App\Notifications\PayoutStatusChanged;
 use App\Services\Notifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -98,11 +99,19 @@ class PayoutController extends Controller
             'transaction_reference' => ['nullable', 'string', 'max:120'],
         ]);
 
+        $was = $payout->status;
+
         $payout->update([
             'status' => $data['status'],
             'transaction_reference' => $data['transaction_reference'] ?? $payout->transaction_reference,
             'paid_at' => $data['status'] === 'paid' ? now() : null,
         ]);
+
+        // `PayoutRecorded` said money was coming; this says whether it
+        // arrived. Re-saving the same status is not news.
+        if ($was !== $data['status']) {
+            Notifier::send(new PayoutStatusChanged($payout->fresh()), $request->user());
+        }
 
         return back()->with('success', "Payout marked as {$data['status']}.");
     }

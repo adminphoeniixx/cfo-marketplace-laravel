@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api\Seller;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Notifications\TeamMemberChanged;
+use App\Services\Notifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -58,6 +60,10 @@ class TeamController extends Controller
             'email_verified_at' => now(),
         ])->save();
 
+        // The panel announces every team change; the app was doing it
+        // silently, so a colleague never heard that a new login existed.
+        Notifier::send(TeamMemberChanged::for($member, 'added', $request->user()), $request->user());
+
         return response()->json(['data' => $this->shape($member, $request)], 201);
     }
 
@@ -95,6 +101,12 @@ class TeamController extends Controller
         $user->forceFill(['is_active' => ! $user->is_active])->save();
         $user->tokens()->delete();
 
+        // Only switching someone off is news; switching them back on is not
+        // something the rest of the store needs an alert for.
+        if (! $user->is_active) {
+            Notifier::send(TeamMemberChanged::for($user, 'deactivated', $request->user()), $request->user());
+        }
+
         return response()->json(['data' => $this->shape($user, $request)]);
     }
 
@@ -110,7 +122,12 @@ class TeamController extends Controller
             return response()->json(['message' => 'This is the store\'s last active login.'], 422);
         }
 
+        // Built before the row goes, or there is nothing left to name.
+        $removed = TeamMemberChanged::for($user, 'removed', $request->user());
+
         $user->delete();
+
+        Notifier::send($removed, $request->user());
 
         return response()->json(['deleted' => true]);
     }

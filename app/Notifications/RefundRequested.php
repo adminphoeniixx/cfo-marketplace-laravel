@@ -36,8 +36,18 @@ class RefundRequested extends AdminNotification
         return 'critical';
     }
 
-    public function vendorId(): ?int
+    /**
+     * The stores whose lines this concerns — read off the request's own items,
+     * not the order's first line, which on a shared basket is often somebody
+     * else entirely.
+     *
+     * @return list<int>
+     */
+    public function vendorIds(): array
     {
-        return $this->refund->order->items->first()?->vendor_id;
+        return array_values($this->refund->items
+            ->map(fn ($line) => $line->orderItem?->vendor_id)
+            ->filter()->unique()
+            ->map(fn ($id) => (int) $id)->all());
     }
 }

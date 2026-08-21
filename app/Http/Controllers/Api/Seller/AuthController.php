@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Seller;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Seller\ProfileResource;
+use App\Models\DeviceToken;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Notifications\VendorRegistered;
@@ -123,7 +124,48 @@ class AuthController extends Controller
         // and would hand back a transient stand-in.
         PersonalAccessToken::findToken((string) $request->bearerToken())?->delete();
 
+        // The app passes its Firebase token so this phone stops receiving the
+        // seller's orders the moment they sign out of it.
+        if ($push = $request->string('device_token')->toString()) {
+            DeviceToken::where('user_id', $request->user()?->id)
+                ->where('token_hash', DeviceToken::hashFor($push))
+                ->delete();
+        }
+
         return response()->json(['message' => 'Signed out.']);
+    }
+
+    /**
+     * Trade a working token for a fresh one.
+     *
+     * Tokens expire on wall-clock age (`SANCTUM_TOKEN_MINUTES`), so without
+     * this an app that is used every day still throws the seller back to the
+     * login screen once a month. Calling this on resume keeps a device signed
+     * in for as long as it keeps being used.
+     *
+     * The old token is revoked, so a stolen copy stops working the moment the
+     * real device refreshes — but only after the new one exists, or a failure
+     * mid-way would sign the seller out.
+     */
+    public function refresh(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $current = PersonalAccessToken::findToken((string) $request->bearerToken());
+
+        // Keep the device's own name, so `/devices` does not fill up with
+        // "unknown" rows as tokens roll over.
+        // `??` already tolerates a null $current, so no nullsafe operator here.
+        $name = $request->string('device_name')->toString()
+            ?: ($current->name ?? 'seller app');
+
+        $token = $user->createToken($name)->plainTextToken;
+
+        $current?->delete();
+
+        return response()->json([
+            'token' => $token,
+            'seller' => new ProfileResource($user->load('vendor')),
+        ]);
     }
 
     /**
@@ -132,6 +174,9 @@ class AuthController extends Controller
     public function logoutAll(Request $request): JsonResponse
     {
         $request->user()->tokens()->delete();
+
+        // Nothing is signed in any more, so nothing should be pushed to.
+        DeviceToken::where('user_id', $request->user()->id)->delete();
 
         return response()->json(['message' => 'Signed out on every device.']);
     }
@@ -196,8 +241,10 @@ class AuthController extends Controller
             ])->save();
 
             // A reset is how someone recovers a stolen account, so every
-            // existing token has to stop working.
+            // existing token has to stop working — including the push tokens
+            // of whatever phone the thief was holding.
             $user->tokens()->delete();
+            DeviceToken::where('user_id', $user->id)->delete();
         });
 
         if ($status !== Password::PASSWORD_RESET) {

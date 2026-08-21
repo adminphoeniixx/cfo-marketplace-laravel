@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Refund;
+use App\Notifications\RefundDecided;
 use App\Notifications\RefundRequested;
 use App\Services\Notifier;
 use Illuminate\Http\RedirectResponse;
@@ -176,6 +177,8 @@ class RefundController extends Controller
 
         $refund->order->recordEvent('refund', "Refund {$refund->number} approved", $data['review_note'] ?? null);
 
+        Notifier::send(new RefundDecided($refund->fresh(['items.orderItem'])), $request->user());
+
         return back()->with('success', "Refund {$refund->number} approved. Process it to release the money.");
     }
 
@@ -195,6 +198,8 @@ class RefundController extends Controller
         ]);
 
         $refund->order->recordEvent('refund', "Refund {$refund->number} rejected", $data['review_note']);
+
+        Notifier::send(new RefundDecided($refund->fresh(['items.orderItem'])), $request->user());
 
         return back()->with('success', "Refund {$refund->number} rejected.");
     }
@@ -252,6 +257,10 @@ class RefundController extends Controller
                 ['reference' => $data['transaction_reference'] ?? null],
             );
         });
+
+        // Money actually moving changes what the seller is owed, so this is
+        // the one refund event that must never be silent.
+        Notifier::send(new RefundDecided($refund->fresh(['items.orderItem'])), $request->user());
 
         return back()->with('success', "Refund {$refund->number} processed.");
     }

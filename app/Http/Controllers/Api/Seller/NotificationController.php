@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Api\Seller;
 
 use App\Http\Controllers\Controller;
+use App\Models\DeviceToken;
 use App\Models\PushSubscription;
+use App\Services\Firebase\FcmClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Notifications\DatabaseNotification;
+use Illuminate\Validation\Rule;
 
 /**
  * Notifications belong to the person, not the store, so nothing here goes
@@ -72,16 +75,68 @@ class NotificationController extends Controller
     }
 
     /**
-     * Everything the app needs to decide whether to offer push at all: the
-     * public key to subscribe with, and whether this device already did.
+     * Everything the app needs to decide whether to offer push at all.
+     *
+     * Two transports live side by side: a browser subscribes over VAPID, the
+     * phone app registers a Firebase token. The app looks at whichever block
+     * applies to it and ignores the other.
      */
-    public function pushSettings(Request $request): JsonResponse
+    public function pushSettings(Request $request, FcmClient $fcm): JsonResponse
     {
+        $userId = $request->user()->id;
+
         return response()->json([
             'enabled' => (bool) config('webpush.enabled'),
             'public_key' => config('webpush.public_key'),
-            'devices' => PushSubscription::where('user_id', $request->user()->id)->count(),
+            'devices' => PushSubscription::where('user_id', $userId)->count(),
+            'firebase' => [
+                'enabled' => $fcm->enabled(),
+                'project_id' => $fcm->projectId(),
+                'devices' => DeviceToken::where('user_id', $userId)->count(),
+            ],
         ]);
+    }
+
+    /**
+     * Remember the Firebase token for this install.
+     *
+     * The app should call this after every sign-in and again whenever Firebase
+     * hands it a refreshed token — they rotate on their own, and a stale one
+     * simply stops being delivered to.
+     */
+    public function registerDevice(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'token' => ['required', 'string', 'max:4096'],
+            'platform' => ['nullable', 'string', Rule::in(DeviceToken::PLATFORMS)],
+            'device_name' => ['nullable', 'string', 'max:120'],
+        ]);
+
+        DeviceToken::remember(
+            $request->user(),
+            $data['token'],
+            $data['platform'] ?? 'android',
+            $data['device_name'] ?? null,
+        );
+
+        return response()->json(['registered' => true], 201);
+    }
+
+    /**
+     * Forget one install — called on sign-out, so the next person to use the
+     * phone does not receive the last seller's orders.
+     */
+    public function forgetDevice(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'token' => ['required', 'string', 'max:4096'],
+        ]);
+
+        DeviceToken::where('user_id', $request->user()->id)
+            ->where('token_hash', DeviceToken::hashFor($data['token']))
+            ->delete();
+
+        return response()->json(['registered' => false]);
     }
 
     public function subscribe(Request $request): JsonResponse

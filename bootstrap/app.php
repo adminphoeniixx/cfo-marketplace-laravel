@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\EnsureRoleCan;
 use App\Http\Middleware\EnsureSeller;
+use App\Http\Middleware\EnsureSellerSection;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\ShareFlashToast;
@@ -33,6 +34,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role.can' => EnsureRoleCan::class,
             'admin.only' => EnsureAdmin::class,
             'seller' => EnsureSeller::class,
+            'seller.section' => EnsureSellerSection::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

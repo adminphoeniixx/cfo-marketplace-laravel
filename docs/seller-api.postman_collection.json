@@ -112,6 +112,11 @@
     {
       "key": "device_id",
       "value": ""
+    },
+    {
+      "key": "fcm_token",
+      "value": "",
+      "type": "string"
     }
   ],
   "item": [
@@ -651,6 +656,56 @@
           ]
         },
         {
+          "name": "Refresh token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/seller/refresh",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "refresh"
+              ]
+            },
+            "description": "Trades a working token for a fresh one and revokes the old. Call on resume, before the 30-day expiry — an expired token cannot reach this.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"device_name\": \"{{device_name}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"token\", pm.response.json().token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Logout (this device)",
           "request": {
             "method": "POST",
@@ -923,8 +978,8 @@
       ]
     },
     {
-      "name": "4 · Browser push",
-      "description": "Off unless the marketplace has VAPID keys configured — check `enabled` before showing a toggle.",
+      "name": "4 · Push",
+      "description": "Two transports side by side: a browser subscribes over VAPID, the phone app registers a Firebase token. Check the matching flag in `Push settings` before showing a toggle.",
       "item": [
         {
           "name": "Push settings",
@@ -947,7 +1002,7 @@
                 "push"
               ]
             },
-            "description": "`{ enabled, public_key, devices }`."
+            "description": "`{ enabled, public_key, devices, firebase: { enabled, project_id, devices } }`."
           },
           "response": [],
           "event": [
@@ -1039,6 +1094,106 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"endpoint\": \"https://fcm.googleapis.com/fcm/send/EXAMPLE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register this phone (Firebase)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/seller/push/device",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "push",
+                "device"
+              ]
+            },
+            "description": "Call after every sign-in and again from the token-refresh listener. Registering the same token twice updates the row rather than duplicating it.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{fcm_token}}\",\n  \"platform\": \"android\",\n  \"device_name\": \"Meera's phone\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Forget this phone (Firebase)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/seller/push/device",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "push",
+                "device"
+              ]
+            },
+            "description": "Call on sign-out so the next person to use the phone gets nothing.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{fcm_token}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2240,6 +2395,55 @@
           ]
         },
         {
+          "name": "Raise a cancellation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/seller/cancellations",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "cancellations"
+              ]
+            },
+            "description": "For stock that turned out not to exist. Lands as pending with requested_by=vendor. Only your own lines, and only quantity that is neither shipped nor already in a pending request.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": \"{{order_id}}\",\n  \"reason\": \"out_of_stock\",\n  \"note\": \"The last one was damaged in storage.\",\n  \"items\": [\n    {\n      \"order_item_id\": \"{{order_item_id}}\",\n      \"quantity\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Show",
           "request": {
             "method": "GET",
@@ -2470,6 +2674,42 @@
       "name": "12 · Shipping",
       "description": "Zones are the marketplace's and read-only. Rates inside them are yours.",
       "item": [
+        {
+          "name": "Delivery partners",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/seller/delivery-partners",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "delivery-partners"
+              ]
+            },
+            "description": "Couriers the marketplace approved. Use the `name` as the `carrier` when fulfilling — the tracking link is built from it."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
         {
           "name": "Zones",
           "request": {

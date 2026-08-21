@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Notifications\Channels\FcmChannel;
 use App\Notifications\Channels\WebPushChannel;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Str;
@@ -21,7 +22,7 @@ abstract class AdminNotification extends Notification
      */
     public function via(object $notifiable): array
     {
-        return ['database', WebPushChannel::class];
+        return ['database', WebPushChannel::class, FcmChannel::class];
     }
 
     abstract public function title(): string;
@@ -47,6 +48,22 @@ abstract class AdminNotification extends Notification
     public function vendorId(): ?int
     {
         return null;
+    }
+
+    /**
+     * Every store this concerns.
+     *
+     * A basket can carry lines from two sellers, and both have to be told —
+     * reading one store off the first line quietly left the second out. Most
+     * notifications concern a single store and inherit this.
+     *
+     * @return list<int>
+     */
+    public function vendorIds(): array
+    {
+        $id = $this->vendorId();
+
+        return $id === null ? [] : [$id];
     }
 
     /** Short slug used for the icon and the filter tabs. */
@@ -81,5 +98,82 @@ abstract class AdminNotification extends Notification
             'url' => $this->url(),
             'tag' => static::kind(),
         ];
+    }
+
+    /**
+     * The Firebase message for the seller app, minus the device token — the
+     * channel fills that in per device.
+     *
+     * `notification` is what the phone draws while the app is in the
+     * background; `data` is what the app itself reads to route the tap. Every
+     * data value has to be a string, which is why nothing here is cast.
+     *
+     * @return array<string, mixed>
+     */
+    public function toFcm(object $notifiable): array
+    {
+        $ttl = (int) config('firebase.ttl');
+
+        $message = [
+            'notification' => [
+                'title' => $this->title(),
+                'body' => $this->body(),
+            ],
+            'data' => [
+                'url' => $this->url(),
+                'kind' => static::kind(),
+                'tone' => $this->tone(),
+                // Older Flutter and Cordova wrappers only surface a tap when
+                // this is present. Harmless everywhere else.
+                'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
+            ],
+            'android' => [
+                'priority' => 'high',
+                'ttl' => $ttl.'s',
+                'notification' => [
+                    // Android 8+ drops anything whose channel it does not
+                    // know, so this has to match the channel the app creates.
+                    'channel_id' => (string) config('firebase.android_channel'),
+                    'sound' => 'default',
+                    // Same tag replaces the previous alert of that kind rather
+                    // than stacking twenty "new order" bubbles.
+                    'tag' => static::kind(),
+                ],
+            ],
+            'apns' => [
+                'headers' => [
+                    'apns-priority' => '10',
+                    'apns-expiration' => (string) (time() + $ttl),
+                ],
+                'payload' => [
+                    'aps' => [
+                        'sound' => 'default',
+                        'thread-id' => static::kind(),
+                    ],
+                ],
+            ],
+        ];
+
+        $link = $this->absoluteUrl();
+
+        // FCM rejects a web link that is not https, so a plain http://
+        // deployment simply delivers without one.
+        if (str_starts_with($link, 'https://')) {
+            $message['webpush'] = [
+                'fcm_options' => ['link' => $link],
+                'notification' => ['tag' => static::kind()],
+            ];
+        }
+
+        return $message;
+    }
+
+    private function absoluteUrl(): string
+    {
+        $url = $this->url();
+
+        return str_starts_with($url, 'http')
+            ? $url
+            : rtrim((string) config('app.url'), '/').'/'.ltrim($url, '/');
     }
 }

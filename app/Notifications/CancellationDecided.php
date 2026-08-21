@@ -4,7 +4,11 @@ namespace App\Notifications;
 
 use App\Models\Cancellation;
 
-class CancellationRequested extends AdminNotification
+/**
+ * The outcome of a cancellation request. The seller has a Requests screen and
+ * no other way to learn what was decided short of polling it.
+ */
+class CancellationDecided extends AdminNotification
 {
     public function __construct(private readonly Cancellation $cancellation) {}
 
@@ -15,14 +19,19 @@ class CancellationRequested extends AdminNotification
 
     public function title(): string
     {
-        return "Cancellation {$this->cancellation->number} needs review";
+        $verb = $this->cancellation->status === 'approved' ? 'approved' : 'rejected';
+
+        return "Cancellation {$this->cancellation->number} {$verb}";
     }
 
     public function body(): string
     {
-        $order = $this->cancellation->order->number;
+        $order = $this->cancellation->order?->number;
 
-        return "Requested by {$this->cancellation->requested_by} on {$order}.";
+        return $this->cancellation->review_note
+            ?: ($this->cancellation->status === 'approved'
+                ? "The items on {$order} have been cancelled."
+                : "The request on {$order} was turned down.");
     }
 
     public function url(): string
@@ -32,7 +41,7 @@ class CancellationRequested extends AdminNotification
 
     public function tone(): string
     {
-        return 'warning';
+        return $this->cancellation->status === 'approved' ? 'success' : 'neutral';
     }
 
     /**

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Vendor;
+use App\Notifications\StoreStatusChanged;
 use App\Notifications\VendorRegistered;
 use App\Services\Notifier;
 use Illuminate\Http\RedirectResponse;
@@ -126,6 +127,8 @@ class VendorController extends Controller
             'rejection_reason' => ['required_if:status,rejected', 'nullable', 'string', 'max:500'],
         ]);
 
+        $was = $vendor->status;
+
         $vendor->update([
             'status' => $data['status'],
             'rejection_reason' => $data['status'] === 'rejected' ? $data['rejection_reason'] : null,
@@ -134,6 +137,13 @@ class VendorController extends Controller
 
         if ($data['status'] === 'suspended') {
             $vendor->products()->update(['status' => 'draft']);
+        }
+
+        // The seller's whole "waiting for approval" screen hangs off this: a
+        // pending store keeps a working token precisely so it can be told.
+        // Addressed to the store, so it does not go through the role matrix.
+        if ($was !== $data['status']) {
+            Notifier::toStore($vendor->fresh(), new StoreStatusChanged($vendor->fresh()), $request->user());
         }
 
         return back()->with('success', "Vendor {$data['status']}.");
