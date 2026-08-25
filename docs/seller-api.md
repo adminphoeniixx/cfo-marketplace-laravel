@@ -3,6 +3,8 @@
 Token-authenticated REST API for the seller app. Everything lives under
 `/api/seller` and every response is JSON.
 
+What changed and when: [`seller-api-changelog.md`](seller-api-changelog.md).
+
 ## Authentication
 
 Sanctum personal access tokens. Sign in once per device, then send the token on

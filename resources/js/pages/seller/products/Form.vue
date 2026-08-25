@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { Head, useForm } from '@inertiajs/vue3';
-import { computed, ref, watch } from 'vue';
+import { Head, router, useForm } from '@inertiajs/vue3';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import PBadge from '@/components/admin/PBadge.vue';
 import PButton from '@/components/admin/PButton.vue';
 import PCard from '@/components/admin/PCard.vue';
 import PCheckbox from '@/components/admin/PCheckbox.vue';
+import PCombobox from '@/components/admin/PCombobox.vue';
+import PModal from '@/components/admin/PModal.vue';
 import PRichText from '@/components/admin/PRichText.vue';
 import PSelect from '@/components/admin/PSelect.vue';
+import PToggle from '@/components/admin/PToggle.vue';
 import PTextarea from '@/components/admin/PTextarea.vue';
 import PTextField from '@/components/admin/PTextField.vue';
 import { currency, number, statusTone, titleCase } from '@/lib/format';
@@ -175,7 +178,9 @@ const form = useForm<{
 /* ---------------------------------------------------------- disclosures */
 // Shopify keeps the rarely-touched fields behind a chip row you click to open.
 const open = ref({
-    pricing: false,
+    // Open on arrival when the product already has one of the fields inside,
+    // so nothing a seller has set is hidden behind a click.
+    pricing: !!props.product?.compare_at_price || !!props.product?.cost_price,
     inventory: false,
     shipping: false,
     seo: false,
@@ -458,13 +463,12 @@ const profit = computed(() => {
     return price && cost ? price - cost : null;
 });
 
-const categoryOptions = computed(() => [
-    { value: '', label: 'Choose a product category' },
-    ...props.categories.map((category) => ({
+const categoryOptions = computed(() =>
+    props.categories.map((category) => ({
         value: category.id,
         label: category.parent_id ? `— ${category.name}` : category.name,
     })),
-]);
+);
 
 const taxOptions = computed(() => [
     { value: '', label: 'No tax class' },
@@ -495,6 +499,64 @@ const discard = () => {
     form.reset();
     form.clearErrors();
 };
+
+/* ----------------------------------------------------------- leave guard */
+// A product form is long enough that losing it to a stray click on the sidebar
+// is a real loss. Shopify stops you; so does this. The browser's own dialog
+// covers a closed tab or a refresh, which no app code can intercept; an Inertia
+// visit gets the nicer in-page version.
+const pending = ref<string | null>(null);
+const leaving = ref(false);
+
+const guarded = computed(
+    () => form.isDirty && !form.processing && !leaving.value,
+);
+
+const onBeforeUnload = (event: BeforeUnloadEvent) => {
+    if (guarded.value) {
+        event.preventDefault();
+    }
+};
+
+const stay = () => {
+    pending.value = null;
+};
+
+const leave = () => {
+    leaving.value = true;
+
+    const url = pending.value;
+    pending.value = null;
+
+    if (url) {
+        router.visit(url);
+    }
+};
+
+let stopGuard: (() => void) | null = null;
+
+onMounted(() => {
+    window.addEventListener('beforeunload', onBeforeUnload);
+
+    stopGuard = router.on('before', (event) => {
+        const visit = event.detail.visit;
+
+        // Only ordinary navigations away are worth stopping: the form's own
+        // POST/PUT is how the work gets saved, and Inertia's partial reloads
+        // are the page talking to itself.
+        if (!guarded.value || visit.method !== 'get' || !!visit.only?.length) {
+            return;
+        }
+
+        pending.value = visit.url.toString();
+        event.preventDefault();
+    });
+});
+
+onBeforeUnmount(() => {
+    window.removeEventListener('beforeunload', onBeforeUnload);
+    stopGuard?.();
+});
 </script>
 
 <template>
@@ -503,7 +565,7 @@ const discard = () => {
     <form @submit.prevent="submit">
         <!-- Contextual save bar: Shopify's, minus the animation. -->
         <div
-            v-if="form.isDirty"
+            v-if="form.isDirty || !isEdit"
             class="sticky top-14 z-30 -mx-4 mb-4 flex items-center gap-3 rounded-b-xl bg-[#1a1a1a] px-4 py-2.5 text-white shadow-lg sm:-mx-6 sm:px-6"
         >
             <svg
@@ -515,7 +577,9 @@ const discard = () => {
                     d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 4a1 1 0 011 1v3a1 1 0 11-2 0V7a1 1 0 011-1zm0 8.5a1.2 1.2 0 110-2.4 1.2 1.2 0 010 2.4z"
                 />
             </svg>
-            <span class="text-[13px] font-medium">Unsaved changes</span>
+            <span class="text-[13px] font-medium">{{
+                isEdit ? 'Unsaved changes' : 'Unsaved product'
+            }}</span>
             <div class="ml-auto flex items-center gap-2">
                 <button
                     type="button"
@@ -698,40 +762,29 @@ const discard = () => {
 
                 <!-- Category -->
                 <PCard title="Category">
-                    <PSelect
+                    <PCombobox
                         v-model="form.category_id"
                         :options="categoryOptions"
                         :error="form.errors.category_id"
+                        placeholder="Choose a product category"
                         help-text="Sets the tax rate and where the product shows up in browse."
                     />
                 </PCard>
 
                 <!-- Pricing -->
                 <PCard title="Pricing" padding>
-                    <div class="grid gap-4 sm:grid-cols-2">
-                        <PTextField
-                            v-model="form.price"
-                            label="Price"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            prefix="₹"
-                            placeholder="0.00"
-                            :error="form.errors.price"
-                            required
-                        />
-                        <PTextField
-                            v-model="form.compare_at_price"
-                            label="Compare-at price"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            prefix="₹"
-                            placeholder="0.00"
-                            :error="form.errors.compare_at_price"
-                            help-text="Shown struck through next to the price."
-                        />
-                    </div>
+                    <PTextField
+                        v-model="form.price"
+                        label="Price"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        prefix="₹"
+                        placeholder="0.00"
+                        :error="form.errors.price"
+                        required
+                        class="sm:max-w-xs"
+                    />
 
                     <button
                         type="button"
@@ -740,6 +793,7 @@ const discard = () => {
                     >
                         <span
                             v-for="chip in [
+                                'Compare-at',
                                 'Cost per item',
                                 'Tax class',
                                 'Margin',
@@ -756,6 +810,17 @@ const discard = () => {
 
                     <div v-if="open.pricing" class="mt-3 space-y-3">
                         <div class="grid gap-4 sm:grid-cols-2">
+                            <PTextField
+                                v-model="form.compare_at_price"
+                                label="Compare-at price"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                prefix="₹"
+                                placeholder="0.00"
+                                :error="form.errors.compare_at_price"
+                                help-text="Shown struck through next to the price."
+                            />
                             <PTextField
                                 v-model="form.cost_price"
                                 label="Cost per item"
@@ -794,7 +859,7 @@ const discard = () => {
                 <!-- Inventory -->
                 <PCard title="Inventory">
                     <template #actions>
-                        <PCheckbox
+                        <PToggle
                             v-model="form.track_inventory"
                             label="Track quantity"
                         />
@@ -871,7 +936,7 @@ const discard = () => {
                 <!-- Shipping -->
                 <PCard title="Shipping">
                     <template #actions>
-                        <PCheckbox
+                        <PToggle
                             v-model="form.requires_shipping"
                             label="Physical product"
                         />
@@ -1344,5 +1409,20 @@ const discard = () => {
                 </div>
             </div>
         </div>
+
+        <PModal
+            :open="pending !== null"
+            title="Leave page with unsaved changes?"
+            size="small"
+            @close="stay"
+        >
+            <p class="text-[13px] text-[#616161] dark:text-[#b5b5b5]">
+                Leaving this page will delete all unsaved changes.
+            </p>
+            <template #footer>
+                <PButton @click="stay">Stay</PButton>
+                <PButton variant="critical" @click="leave">Leave page</PButton>
+            </template>
+        </PModal>
     </form>
 </template>
