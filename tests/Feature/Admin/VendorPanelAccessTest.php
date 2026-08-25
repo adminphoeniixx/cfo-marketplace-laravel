@@ -1,17 +1,23 @@
 <?php
 
+use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\Product;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Support\Roles;
-use Inertia\Testing\AssertableInertia as Assert;
 
 /**
- * A vendor's matrix row governs two very different surfaces.
+ * A vendor's matrix row governs the seller API and the seller panel, both of
+ * which scope every query to the signed-in user's own store. This admin panel
+ * scopes to the marketplace, so a vendor reaches none of it.
  *
- * The seller API scopes every query to the store, so the whole row applies
- * there. The admin panel only scopes some of its screens that way, so a vendor
- * login is held to those — otherwise granting "Refunds" for the app would also
- * hand one seller every other seller's refunds in the panel.
+ * That was not always true. Analytics and Orders used to be open to vendors
+ * here on the grounds that both scoped by store. Analytics did.
+ * `OrderController::index()` did not — it read a vendor id only as an optional
+ * filter — so a signed-in vendor was served every marketplace order and, on
+ * `show()`, another store's commission and earnings. The tests below hold the
+ * door shut on both.
  */
 function vendorInPanel(): User
 {
@@ -29,97 +35,72 @@ function vendorInPanel(): User
     return $user;
 }
 
-test('the panel view of a vendor grant is narrower than the grant itself', function () {
+test('the panel view of a vendor grant is empty, however wide the grant is', function () {
     $user = vendorInPanel();
 
-    expect(Roles::forRole('vendor'))->toContain('refunds', 'team', 'shipping', 'products')
-        ->and(Roles::forPanel($user))->toBe(['analytics', 'orders']);
+    expect(Roles::forRole('vendor'))->toContain('refunds', 'team', 'shipping', 'products', 'orders', 'analytics')
+        ->and(Roles::forPanel($user))->toBe([]);
 });
 
-test('a vendor only reaches the panel screens the panel actually scopes', function () {
-    vendorInPanel();
-
-    $this->get(route('admin.analytics.index'))->assertOk();
-    $this->get(route('admin.orders.index'))->assertOk();
-});
-
-test('the wider half of the grant stays shut in the panel', function () {
+test('every admin screen is shut to a vendor', function () {
     vendorInPanel();
 
     foreach ([
+        'admin.analytics.index',
+        'admin.orders.index',
         'admin.cancellations.index',
         'admin.refunds.index',
         'admin.team.index',
         'admin.shipping.index',
         'admin.products.index',
         'admin.payouts.index',
+        'admin.customers.index',
+        'admin.vendors.index',
     ] as $route) {
-        $this->get(route($route))->assertForbidden();
+        $this->get(route($route))->assertRedirect('/seller');
     }
 });
 
-test('the sidebar is drawn from the panel view, so no link leads to a 403', function () {
+test('the ungated admin routes are shut to a vendor too', function () {
     vendorInPanel();
 
-    $this->get(route('admin.dashboard'))
-        ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page->where('auth.sections', ['analytics', 'orders']));
+    // Neither carries a section gate, and neither scopes by store: the
+    // dashboard shows marketplace sales and a vendor leaderboard, and search
+    // returns every store's orders, products and customers.
+    $this->get(route('admin.dashboard'))->assertRedirect('/seller');
+    $this->get(route('admin.search', ['q' => 'a']))->assertRedirect('/seller');
 });
 
-test('narrowing the matrix still closes a panel section', function () {
-    vendorInPanel();
+test('a vendor cannot read the marketplace order book through the admin panel', function () {
+    $user = vendorInPanel();
+    $theirs = Vendor::factory()->create(['status' => 'approved']);
 
-    Roles::save('vendor', ['analytics']);
-
-    $this->get(route('admin.analytics.index'))->assertOk();
-    $this->get(route('admin.orders.index'))->assertForbidden();
-});
-
-test('a section the panel could scope is still refused unless the matrix grants it', function () {
-    vendorInPanel();
-
-    Roles::save('vendor', []);
-
-    $this->get(route('admin.analytics.index'))->assertForbidden();
-    $this->get(route('admin.orders.index'))->assertForbidden();
-});
-
-test('marketplace staff are not narrowed at all', function () {
-    $manager = User::factory()->create([
-        'role' => 'manager',
-        'is_active' => true,
-        'email_verified_at' => now(),
+    $foreign = Order::factory()->create();
+    OrderItem::factory()->create([
+        'order_id' => $foreign->id,
+        'vendor_id' => $theirs->id,
+        'product_id' => Product::factory()->create(['vendor_id' => $theirs->id])->id,
+        'commission_amount' => 111.11,
+        'vendor_earning' => 888.88,
     ]);
 
-    expect(Roles::forPanel($manager))->toBe(Roles::forRole('manager'))
-        ->and(Roles::forPanel($manager))->toContain('refunds', 'cancellations');
+    // The index leaked the whole book plus a marketplace-wide revenue figure.
+    $this->get(route('admin.orders.index'))->assertRedirect('/seller');
 
-    $this->actingAs($manager)->get(route('admin.refunds.index'))->assertOk();
+    // `show()` leaked another store's commission through `vendorBreakdown`.
+    $this->get(route('admin.orders.show', $foreign))->assertRedirect('/seller');
+
+    expect(Roles::allowsInPanel($user, 'orders'))->toBeFalse();
 });
 
-test('an admin still holds everything', function () {
-    $admin = adminUser();
+test('staff keep the panel access their own role grants', function () {
+    $this->actingAs(User::factory()->create([
+        'role' => 'staff',
+        'is_active' => true,
+        'email_verified_at' => now(),
+    ]));
 
-    expect(Roles::forPanel($admin))->toBe(Roles::sectionKeys());
-});
-
-test('a deactivated user holds nothing in either view', function () {
-    $user = vendorInPanel();
-    $user->forceFill(['is_active' => false])->save();
-
-    expect(Roles::forPanel($user))->toBe([])
-        ->and(Roles::allowsInPanel($user, 'orders'))->toBeFalse()
-        ->and(Roles::allows($user, 'orders'))->toBeFalse();
-});
-
-test('the seller API is unaffected by the panel narrowing', function () {
-    // The same grant that is narrowed in the panel is honoured in full here.
-    [$me, $store] = actingAsSeller();
-
-    $this->getJson(route('api.seller.refunds.index'))->assertOk();
-    $this->getJson(route('api.seller.team.index'))->assertOk();
-    $this->getJson(route('api.seller.shipping.zones'))->assertOk();
-    $this->getJson(route('api.seller.cancellations.index'))->assertOk();
-    $this->getJson(route('api.seller.products.index'))->assertOk();
-    $this->getJson(route('api.seller.payouts.index'))->assertOk();
+    $this->get(route('admin.orders.index'))->assertOk();
+    $this->get(route('admin.refunds.index'))->assertOk();
+    $this->get(route('admin.products.index'))->assertForbidden();
 });

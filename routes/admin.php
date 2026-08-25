@@ -24,7 +24,10 @@ use App\Http\Controllers\Admin\UploadController;
 use App\Http\Controllers\Admin\VendorController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(function () {
+// `deny.vendor` closes the whole panel to sellers, including the handful of
+// routes below that carry no section gate — the dashboard and global search
+// both read across the marketplace. Sellers get /seller instead.
+Route::middleware(['auth', 'verified', 'deny.vendor'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', DashboardController::class)->name('dashboard');
     Route::get('search', SearchController::class)->name('search');
     Route::post('uploads', [UploadController::class, 'store'])->name('uploads.store');

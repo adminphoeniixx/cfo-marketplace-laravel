@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Seller;
 
 use App\Models\Cancellation;
 use App\Models\Order;
+use App\Models\OrderEvent;
 use App\Models\Product;
 use App\Models\Refund;
 use App\Models\VendorPayout;
@@ -113,6 +114,38 @@ trait ScopesToStore
     protected function storePayouts(Request $request): Builder
     {
         return VendorPayout::query()->where('vendor_id', $this->storeId($request));
+    }
+
+    /**
+     * An order's timeline as this store may read it.
+     *
+     * Two things are held back. Events another seller wrote — recognised by
+     * their `meta.vendor_id` — are dropped outright, because on a shared
+     * basket they are none of this store's business. And the actor is
+     * flattened to "store" or "marketplace" rather than a staff name: a seller
+     * needs to know whether the marketplace moved something, not who.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    protected function storeTimeline(Order $order, int $storeId): array
+    {
+        return $order->events
+            ->filter(function (OrderEvent $event) use ($storeId) {
+                $eventStore = $event->meta['vendor_id'] ?? null;
+
+                return $eventStore === null || (int) $eventStore === $storeId;
+            })
+            ->sortByDesc('created_at')
+            ->values()
+            ->map(fn (OrderEvent $event) => [
+                'id' => $event->id,
+                'type' => $event->type,
+                'title' => $event->title,
+                'body' => $event->body,
+                'by' => ($event->meta['vendor_id'] ?? null) !== null ? 'store' : 'marketplace',
+                'created_at' => $event->created_at?->toIso8601String(),
+            ])
+            ->all();
     }
 
     protected function findOwned(Request $request, int $id): Product

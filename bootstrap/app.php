@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Middleware\DenyVendorAdminPanel;
 use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\EnsureRoleCan;
 use App\Http\Middleware\EnsureSeller;
+use App\Http\Middleware\EnsureSellerPanel;
 use App\Http\Middleware\EnsureSellerSection;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -33,7 +35,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role.can' => EnsureRoleCan::class,
             'admin.only' => EnsureAdmin::class,
+            'deny.vendor' => DenyVendorAdminPanel::class,
             'seller' => EnsureSeller::class,
+            'seller.panel' => EnsureSellerPanel::class,
             'seller.section' => EnsureSellerSection::class,
         ]);
     })

@@ -108,20 +108,25 @@ test('analytics can be filtered to a single vendor', function () {
 });
 
 test('a vendor user only ever sees their own numbers', function () {
-    $vendor = Vendor::factory()->create();
+    $vendor = Vendor::factory()->create(['status' => 'approved']);
     $other = Vendor::factory()->create();
 
     $this->actingAs(User::factory()->create([
         'role' => 'vendor',
         'vendor_id' => $vendor->id,
+        'is_active' => true,
         'email_verified_at' => now(),
     ]));
 
     soldItem($vendor);
     soldItem($other);
 
+    // The marketplace panel is shut to vendors entirely; these numbers are
+    // served from the seller panel, which renders the same screen.
+    $this->get(route('admin.analytics.index'))->assertRedirect('/seller');
+
     // Asking for another vendor's figures still returns their own.
-    $this->get(route('admin.analytics.index', ['vendor' => $other->id]))
+    $this->get(route('seller.analytics.index', ['vendor' => $other->id]))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->where('lockedToVendor', true)

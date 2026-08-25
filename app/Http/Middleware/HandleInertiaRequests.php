@@ -4,8 +4,10 @@ namespace App\Http\Middleware;
 
 use App\Models\Cancellation;
 use App\Models\Order;
+use App\Models\Product;
 use App\Models\Refund;
 use App\Models\Vendor;
+use App\Support\Roles;
 use Illuminate\Http\Request;
 use Illuminate\Notifications\DatabaseNotification;
 use Inertia\Middleware;
@@ -48,15 +50,28 @@ class HandleInertiaRequests extends Middleware
                 // Drives which sidebar entries render. The routes are gated
                 // independently, so this is presentation only.
                 'sections' => $request->user()?->sections() ?? [],
+                // The seller panel draws from the role's real grant, not the
+                // narrowed panel view: its screens scope to the seller's own
+                // store, which is the thing `sections` is narrowed for.
+                'sellerSections' => $request->user()?->isVendor()
+                    ? Roles::forRole($request->user()->role)
+                    : [],
             ],
+            // The seller's own store, for the panel header. Null for staff.
+            'store' => $request->user()?->isVendor()
+                ? $request->user()->vendor?->only(['id', 'name', 'status'])
+                : null,
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'adminCounts' => fn () => $request->user() && $request->is('admin*')
                 ? $this->adminCounts()
                 : null,
+            'sellerCounts' => fn () => $request->user()?->isVendor() && $request->is('seller*')
+                ? $this->sellerCounts($request)
+                : null,
             // Named for the topbar bell rather than "notifications", which the
             // notification centre already uses for its own paginator — a page
             // prop of the same name would shadow this one and blank the badge.
-            'bell' => fn () => $request->user() && $request->is('admin*')
+            'bell' => fn () => $request->user() && $request->is('admin*', 'seller*')
                 ? $this->bell($request)
                 : null,
         ];
@@ -87,6 +102,39 @@ class HandleInertiaRequests extends Middleware
                     )),
                 ])
                 ->all(),
+        ];
+    }
+
+    /**
+     * Badge counts for the seller sidebar — this store's numbers only.
+     *
+     * Deliberately not `adminCounts()`: those are marketplace-wide totals, and
+     * showing a seller the whole marketplace's open-order count would both
+     * mislead them and leak the platform's volume.
+     *
+     * @return array<string, int>
+     */
+    protected function sellerCounts(Request $request): array
+    {
+        $storeId = (int) $request->user()->vendor_id;
+
+        return [
+            'products' => Product::where('vendor_id', $storeId)->count(),
+            'low_stock' => Product::where('vendor_id', $storeId)
+                ->where('track_inventory', true)
+                ->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
+                ->count(),
+            // Counted from this store's own lines, not the order's
+            // `fulfillment_status`: on a basket shared with another seller that
+            // stays partial until *they* ship, which would nag this seller
+            // about an order they have already finished.
+            'to_pack' => Order::query()
+                ->whereNot('status', 'cancelled')
+                ->whereHas('items', fn ($query) => $query
+                    ->where('vendor_id', $storeId)
+                    ->whereRaw('order_items.quantity_fulfilled < order_items.quantity - order_items.quantity_cancelled'))
+                ->count(),
+            'unread' => $request->user()->unreadNotifications()->count(),
         ];
     }
 

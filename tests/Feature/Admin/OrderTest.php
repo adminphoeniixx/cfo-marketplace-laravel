@@ -264,6 +264,45 @@ test('the create form only offers the selected vendor\'s active products', funct
         );
 });
 
+test('an admin can raise an order for any vendor on the marketplace', function () {
+    actingAsAdmin();
+
+    // Every store, whatever its status — the admin picker is not narrowed the
+    // way a seller's is, and this is the "just in case" path for support.
+    $approved = Vendor::factory()->create(['name' => 'Alpha Looms', 'status' => 'approved']);
+    $pending = Vendor::factory()->create(['name' => 'Beta Crafts', 'status' => 'pending']);
+    $suspended = Vendor::factory()->create(['name' => 'Gamma Goods', 'status' => 'suspended']);
+
+    $this->get(route('admin.orders.create'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('lockedToVendor', false)
+            ->has('vendors', 3)
+        );
+
+    // ...and the picker actually switches between them.
+    foreach ([$approved, $pending, $suspended] as $vendor) {
+        $product = Product::factory()->for($vendor)->create(['status' => 'active']);
+
+        $this->get(route('admin.orders.create', ['vendor' => $vendor->id]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('selectedVendor', $vendor->id)
+                ->where('products.0.id', $product->id)
+            );
+
+        $this->post(route('admin.orders.store'), [
+            'vendor_id' => $vendor->id,
+            'email' => 'buyer@example.test',
+            'status' => 'pending',
+            'payment_status' => 'pending',
+            'items' => [['product_id' => $product->id, 'quantity' => 1]],
+        ])->assertSessionHas('success');
+
+        expect(Order::latest('id')->first()->items->first()->vendor_id)->toBe($vendor->id);
+    }
+});
+
 test('an admin creates an order on behalf of a vendor', function () {
     $admin = actingAsAdmin();
 
@@ -323,28 +362,34 @@ test('an admin creates an order on behalf of a vendor', function () {
 });
 
 test('a vendor user can only raise orders for their own store', function () {
-    $vendor = Vendor::factory()->create(['commission_rate' => 10]);
+    $vendor = Vendor::factory()->create(['commission_rate' => 10, 'status' => 'approved']);
     $other = Vendor::factory()->create();
 
     $this->actingAs(User::factory()->create([
         'role' => 'vendor',
         'vendor_id' => $vendor->id,
+        'is_active' => true,
         'email_verified_at' => now(),
     ]));
 
     $product = Product::factory()->for($vendor)->create(['status' => 'active', 'price' => 500]);
 
+    // Manual entry moved to the seller panel when the marketplace panel was
+    // closed to vendors; the flow itself is the same controller.
+    $this->get(route('admin.orders.create'))->assertRedirect('/seller');
+
     // The form is locked to their own store...
-    $this->get(route('admin.orders.create'))
+    $this->get(route('seller.orders.create'))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
+            ->component('seller/orders/Create')
             ->where('lockedToVendor', true)
             ->has('vendors', 1)
             ->where('vendors.0.id', $vendor->id)
         );
 
     // ...and a forged vendor_id in the request is ignored.
-    $this->post(route('admin.orders.store'), [
+    $this->post(route('seller.orders.store'), [
         'vendor_id' => $other->id,
         'email' => 'buyer@example.test',
         'status' => 'pending',

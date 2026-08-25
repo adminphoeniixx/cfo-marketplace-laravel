@@ -18,6 +18,26 @@ use Illuminate\Http\Resources\Json\JsonResource;
 class OrderResource extends JsonResource
 {
     /**
+     * The order's timeline, already filtered to what this store may read.
+     *
+     * Carried on the resource rather than smuggled onto the model as a fake
+     * attribute, so it is obvious this is a view concern and not a column.
+     *
+     * @var array<int, array<string, mixed>>|null
+     */
+    public ?array $timeline = null;
+
+    /**
+     * @param  array<int, array<string, mixed>>  $timeline
+     */
+    public function withTimeline(array $timeline): static
+    {
+        $this->timeline = $timeline;
+
+        return $this;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function toArray(Request $request): array
@@ -47,6 +67,29 @@ class OrderResource extends JsonResource
             'shipping_address' => $this->shipping_address,
             'customer_note' => $this->customer_note,
             'items' => OrderItemResource::collection($items),
+            // Units still ours to pack. Deliberately not derived from
+            // `fulfillment_status`: on a basket shared with another seller
+            // that stays partial until *they* ship, which would nag this
+            // seller about an order they have already finished.
+            'to_pack' => (int) $mine->sum(fn ($item) => max(
+                0,
+                $item->quantity - $item->quantity_cancelled - $item->quantity_fulfilled,
+            )),
+            // True when the buyer's basket also holds another seller's goods,
+            // so the app can say why `totals` is not the order total.
+            'shared_basket' => $this->when(
+                $this->relationLoaded('items'),
+                // `items_count` is the whole basket — the controllers load it
+                // alongside our own lines. Falling back to a query keeps any
+                // other caller correct rather than quietly wrong.
+                fn () => ($this->items_count ?? $this->items()->count()) > $mine->count(),
+            ),
+            // Filled by `withTimeline()` on the detail endpoint only; list
+            // endpoints leave it out rather than loading events per row.
+            'timeline' => $this->when(
+                $this->timeline !== null,
+                fn () => $this->timeline,
+            ),
             'totals' => [
                 'items' => round((float) $mine->sum('total'), 2),
                 'tax' => round((float) $mine->sum('tax_amount'), 2),

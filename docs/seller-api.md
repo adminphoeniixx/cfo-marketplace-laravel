@@ -213,10 +213,31 @@ channel or Android 8+ drops them silently.
 | GET | `/payouts/{id}` | |
 | GET | `/payouts/earnings` | Lifetime gross/commission/earning, plus paid, in-progress and unsettled. |
 | GET | `/analytics/sales` | `?days=30` (1–365). One point per day for the chart. |
+| GET | `/analytics/report` | `?preset=7\|30\|90\|365`, or `?from=&to=`. The full report screen in one call. |
+| GET | `/analytics/export/{report}` | `products\|categories\|customers\|orders`, same filters. Streams CSV. |
 
 `/analytics/sales` returns `series[]` with `date`, `sales`, `earning`, `orders`
 and `units`. Days with no sales are included as zeroes — the series is always
 exactly `days` long, so the chart keeps its true shape.
+
+`/analytics/report` is the heavier one, and it is the same code the marketplace
+runs, narrowed to your store: `metrics` (each one a `{ value, change }` pair,
+`change` being the percentage move against the immediately preceding window of
+the same length, or `null` when there is nothing to compare against), `series`,
+`by_category`, `top_products`, `top_customers`, `by_payment_method` and the
+three breakdowns — `status_breakdown`, `payment_breakdown`,
+`fulfillment_breakdown`. `window` echoes back the range that was used, so the
+app can label the screen with what it actually got.
+
+An explicit `from`/`to` pair wins over `preset`, and a reversed pair is swapped
+rather than rejected. An unknown `preset` falls back to 30 days. `window.preset`
+is `null` whenever an explicit range was used.
+
+`exports` lists the report names `/analytics/export/{report}` will accept — use
+it to build the download menu rather than hard-coding names. There is no vendor
+leaderboard on either endpoint: for one store that is a single row of numbers
+already on the screen, and the marketplace-wide version is not a seller's to
+read. `/analytics/export/vendors` is a 404.
 
 ### Catalog reference (approved)
 
@@ -283,7 +304,10 @@ signed and time-limited.
 |---|---|---|
 | GET | `/orders` | `?search= &status= &fulfillment_status= &needs_packing=1 &from= &to= &per_page=` |
 | GET | `/orders/summary` | Counts per status plus `unfulfilled`. |
-| GET | `/orders/{id}` | |
+| GET | `/orders/{id}` | Adds `timeline` to everything the list already returns. |
+| POST | `/orders` | Raise an order by hand. Payload below. |
+| GET | `/orders/sellable` | Products this store can be billed for, priced, with variants and stock. |
+| GET | `/orders/customers` | `?search=`. People who have already bought from this store. |
 | POST | `/orders/{id}/fulfill` | `items[].id`, `items[].quantity`, optional `tracking_number`, `carrier`. |
 | POST | `/orders/{id}/notes` | `note`. Lands on the order timeline the admin panel shows. |
 
@@ -311,6 +335,69 @@ genuinely what you want.
 
 Customer data is deliberately thin: a name, a phone and the shipping address —
 enough to pack and deliver, nothing that identifies the buyer beyond this order.
+
+Every order also carries `to_pack` — units on this order still yours to pack —
+and `shared_basket`, true when the buyer's basket holds another seller's goods
+as well. That flag is why `totals` may not match what the buyer paid, and it is
+worth saying so on the screen rather than leaving the seller to wonder.
+
+`/orders/{id}` adds `timeline`, newest first: `type`, `title`, `body`, `by` and
+`created_at`. `by` is `store` for something your own store did and `marketplace`
+for something the marketplace did — never a staff name. Events written by
+another seller on a shared basket are not in the list at all.
+
+#### Raising an order by hand
+
+`POST /orders` covers a phone order, a repeat customer, or a fix for a checkout
+that went wrong. It is the same code the panels use, so pricing, tax,
+commission, stock and notifications all come out identical whichever door the
+order came in through.
+
+```json
+{
+  "customer_id": 12,
+  "email": "buyer@example.com",
+  "phone": "9876543210",
+  "status": "processing",
+  "payment_status": "paid",
+  "payment_method": "upi",
+  "shipping_method": "Standard Delivery",
+  "shipping_total": 79,
+  "discount_total": 0,
+  "coupon_code": null,
+  "customer_note": null,
+  "admin_note": "Phoned in.",
+  "items": [
+    { "product_id": 41, "product_variant_id": null, "quantity": 2, "unit_price": 499 }
+  ]
+}
+```
+
+Only `email`, `status`, `payment_status` and at least one item are required.
+`unit_price` is optional — leave it out and the product's own price is used;
+send it to agree a different price for this one order. `status` and
+`payment_status` take the same values the order list filters on.
+
+There is no `vendor_id`. The store comes from the token, and a `vendor_id` in
+the payload is ignored, exactly as it is on products.
+
+Two things are refused with a `422`: a `product_id` that is not one of **your**
+active products (`items.N.product_id`), and a quantity beyond what is in stock
+on a product that tracks inventory and does not allow backorders
+(`items.N.quantity`). Nothing is written when either fires — no half-order, no
+stock movement. Build the picker from `/orders/sellable`, which lists exactly
+what will be accepted, with `price`, `stock_quantity`, `track_inventory`,
+`allow_backorder`, `tax_rate` and `variants` already worked out.
+
+`/orders/customers` is the other half of that form. It holds only people who
+have bought from you before — the marketplace's wider customer book is not
+yours to browse — capped at 100 and filterable with `?search=` on name or
+email. Passing a `customer_id` from it attaches the order to that customer and
+copies their saved address onto it; leave it out and the order stands on the
+`email` and `phone` you send.
+
+A successful call returns `201` with the created order in the same shape as
+`/orders/{id}`, so nothing needs re-fetching to show it.
 
 ### Team (approved)
 

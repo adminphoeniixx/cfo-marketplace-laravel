@@ -12,14 +12,27 @@ export function useSections() {
     const auth = computed(
         () =>
             page.props.auth as
-                { sections?: string[]; user?: { role?: string } } | undefined,
+                | {
+                      sections?: string[];
+                      sellerSections?: string[];
+                      user?: { role?: string };
+                  }
+                | undefined,
     );
 
     const sections = computed<string[]>(() => auth.value?.sections ?? []);
 
+    // The seller panel's own grant, which reaches further than `sections`
+    // because its screens scope to the seller's store. See `Roles::forPanel`.
+    const sellerSections = computed<string[]>(
+        () => auth.value?.sellerSections ?? [],
+    );
+
     return {
         sections,
+        sellerSections,
         isAdmin: computed(() => auth.value?.user?.role === 'admin'),
         can: (section: string) => sections.value.includes(section),
+        canSell: (section: string) => sellerSections.value.includes(section),
     };
 }

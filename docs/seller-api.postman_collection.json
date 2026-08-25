@@ -82,6 +82,14 @@
       "value": ""
     },
     {
+      "key": "sellable_product_id",
+      "value": ""
+    },
+    {
+      "key": "manual_customer_id",
+      "value": ""
+    },
+    {
       "key": "payout_id",
       "value": ""
     },
@@ -1306,6 +1314,114 @@
           ]
         },
         {
+          "name": "Full report",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/seller/analytics/report?preset=30",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "analytics",
+                "report"
+              ],
+              "query": [
+                {
+                  "key": "preset",
+                  "value": "30"
+                },
+                {
+                  "key": "from",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "to",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "The whole analytics screen in one call: metrics with period-over-period `change`, the series, categories, top products and customers, payment methods and the three status breakdowns. An explicit `from`/`to` pair wins over `preset`. `exports` names the reports the CSV endpoint will accept — build the download menu from it. No vendor leaderboard: that is a marketplace view."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"scoped to one store\", () => pm.expect(pm.response.json()).to.not.have.property(\"by_vendor\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Export a report (CSV)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/seller/analytics/export/orders?preset=30",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "analytics",
+                "export",
+                "orders"
+              ],
+              "query": [
+                {
+                  "key": "preset",
+                  "value": "30"
+                },
+                {
+                  "key": "from",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "to",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Streams a CSV of the same window. Swap the last path segment for `products`, `categories` or `customers`. `vendors` is the marketplace leaderboard and answers `404` here."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Earnings",
           "request": {
             "method": "GET",
@@ -2088,7 +2204,7 @@
     },
     {
       "name": "9 · Orders",
-      "description": "Only orders holding at least one of your lines. On a basket shared with another seller you receive **only your own items**, and the totals are your share.",
+      "description": "Only orders holding at least one of your lines. On a basket shared with another seller you receive **only your own items**, and the totals are your share. Raising an order by hand lives here too — run **Sellable products** before **Create by hand**.",
       "item": [
         {
           "name": "List",
@@ -2336,6 +2452,153 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"status is 201\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sellable products (for the order form)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/seller/orders/sellable",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "orders",
+                "sellable"
+              ]
+            },
+            "description": "Exactly what `POST /orders` will accept, priced, with variants, stock and tax rate already worked out. Build the picker from this rather than from the product list."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "    const b = pm.response.json();",
+                  "    const v = b.data.length ? b.data[0].id : null;",
+                  "    if (v !== undefined && v !== null) pm.collectionVariables.set(\"sellable_product_id\", v);",
+                  "    console.log(\"sellable_product_id =\", v);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Customers (for the order form)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/seller/orders/customers?search=",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "orders",
+                "customers"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "People who have already bought from you — the marketplace's wider customer book is not yours to browse. Capped at 100, `search` matches name or email."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "    const b = pm.response.json();",
+                  "    const v = b.data.length ? b.data[0].id : null;",
+                  "    if (v !== undefined && v !== null) pm.collectionVariables.set(\"manual_customer_id\", v);",
+                  "    console.log(\"manual_customer_id =\", v);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create by hand",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/seller/orders",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "orders"
+              ]
+            },
+            "description": "A phone order, a repeat customer, or a fix for a checkout that went wrong — the same code the panels use, so pricing, tax, commission and stock come out identical. Run **Sellable products** first to fill `sellable_product_id`. There is no `vendor_id`: the token decides whose order this is. Omit `unit_price` to charge the product's own price. A product that is not yours is a `422` on `items.0.product_id`, and a quantity beyond stock a `422` on `items.0.quantity` — nothing is written either way. Add `customer_id` (see **Customers**) to attach it to a customer and copy their saved address.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"qa-buyer@cfomarketplace.test\",\n  \"phone\": \"9876543210\",\n  \"status\": \"processing\",\n  \"payment_status\": \"paid\",\n  \"payment_method\": \"upi\",\n  \"shipping_method\": \"Standard Delivery\",\n  \"shipping_total\": 79,\n  \"discount_total\": 0,\n  \"admin_note\": \"Phoned in.\",\n  \"items\": [\n    {\n      \"product_id\": \"{{sellable_product_id}}\",\n      \"quantity\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) {",
+                  "    const o = pm.response.json().data;",
+                  "    pm.collectionVariables.set(\"order_id\", o.id);",
+                  "    if (o.items && o.items.length) pm.collectionVariables.set(\"order_item_id\", o.items[0].id);",
+                  "    console.log(\"order_id =\", o.id);",
+                  "}"
                 ]
               }
             }

@@ -22,6 +22,8 @@ type Row = {
 };
 
 const props = defineProps<{
+    /** Panel prefix. The seller panel renders this same page under /seller. */
+    base?: string;
     notifications: {
         data: Row[];
         links: { url: string | null; label: string; active: boolean }[];
@@ -33,6 +35,9 @@ const props = defineProps<{
     counts: { all: number; unread: number };
     push: { enabled: boolean; publicKey: string | null; devices: number };
 }>();
+
+// Fixed for the life of the page, so a plain const rather than a computed.
+const base = props.base ?? '/admin';
 
 const {
     supported,
@@ -47,7 +52,7 @@ const {
 const activeFilter = computed(() => props.filters.filter ?? '');
 
 const setFilter = (filter: string) =>
-    router.get('/admin/notifications', filter ? { filter } : {}, {
+    router.get(`${base}/notifications`, filter ? { filter } : {}, {
         preserveScroll: true,
         preserveState: true,
         replace: true,
@@ -56,7 +61,7 @@ const setFilter = (filter: string) =>
 const open = (row: Row) => {
     if (!row.read) {
         router.post(
-            `/admin/notifications/${row.id}/read`,
+            `${base}/notifications/${row.id}/read`,
             {},
             { preserveScroll: true, preserveState: true },
         );
@@ -67,19 +72,19 @@ const open = (row: Row) => {
 
 const markRead = (row: Row) =>
     router.post(
-        `/admin/notifications/${row.id}/read`,
+        `${base}/notifications/${row.id}/read`,
         {},
         { preserveScroll: true },
     );
 
 const markAllRead = () =>
-    router.post('/admin/notifications/read-all', {}, { preserveScroll: true });
+    router.post(`${base}/notifications/read-all`, {}, { preserveScroll: true });
 
 const destroy = (row: Row) =>
-    router.delete(`/admin/notifications/${row.id}`, { preserveScroll: true });
+    router.delete(`${base}/notifications/${row.id}`, { preserveScroll: true });
 
 const clearRead = () =>
-    router.delete('/admin/notifications/read', { preserveScroll: true });
+    router.delete(`${base}/notifications/read`, { preserveScroll: true });
 
 const when = (iso: string) => {
     const then = new Date(iso).getTime();

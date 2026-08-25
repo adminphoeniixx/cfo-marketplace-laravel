@@ -32,6 +32,8 @@ type VendorRow = {
 };
 
 const props = defineProps<{
+    /** Panel prefix. The seller panel renders this same page under /seller. */
+    base?: string;
     filters: {
         preset: number | null;
         from: string;
@@ -94,7 +96,7 @@ const query = computed(() => ({
 }));
 
 const reload = (params: Record<string, string | number | undefined>) =>
-    router.get('/admin/analytics', params, {
+    router.get(`${props.base ?? '/admin'}/analytics`, params, {
         preserveState: true,
         preserveScroll: true,
     });
@@ -120,7 +122,7 @@ const exportUrl = (report: string) => {
         Object.entries(query.value).map(([key, value]) => [key, String(value)]),
     );
 
-    return `/admin/analytics/export/${report}?${params.toString()}`;
+    return `${props.base ?? '/admin'}/analytics/export/${report}?${params.toString()}`;
 };
 
 // The chart is the busiest thing on the page, so it gets the sales figure and

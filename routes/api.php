@@ -114,6 +114,11 @@ Route::prefix('seller')->name('api.seller.')->group(function () {
 
             Route::middleware('seller.section:analytics')->group(function () {
                 Route::get('analytics/sales', [AnalyticsController::class, 'sales'])->name('analytics.sales');
+
+                // The full report the seller panel renders, and the same CSV
+                // exports — both narrowed to this store by `resolveVendor()`.
+                Route::get('analytics/report', [AnalyticsController::class, 'report'])->name('analytics.report');
+                Route::get('analytics/export/{report}', [AnalyticsController::class, 'export'])->name('analytics.export');
             });
 
             Route::middleware('seller.section:team')->group(function () {
@@ -152,6 +157,17 @@ Route::prefix('seller')->name('api.seller.')->group(function () {
             Route::middleware('seller.section:orders')->group(function () {
                 Route::get('orders', [OrderController::class, 'index'])->name('orders.index');
                 Route::get('orders/summary', [OrderController::class, 'summary'])->name('orders.summary');
+
+                /*
+                | Manual order entry — a phone order, a repeat customer, a fix
+                | for a checkout that went wrong. The store comes from the
+                | token, never the payload. These three sit above the {order}
+                | route so their paths are not read as ids.
+                */
+                Route::post('orders', [OrderController::class, 'store'])->name('orders.store');
+                Route::get('orders/sellable', [OrderController::class, 'sellable'])->name('orders.sellable');
+                Route::get('orders/customers', [OrderController::class, 'customers'])->name('orders.customers');
+
                 Route::get('orders/{order}', [OrderController::class, 'show'])->name('orders.show');
                 Route::post('orders/{order}/fulfill', [OrderController::class, 'fulfill'])->name('orders.fulfill');
                 Route::post('orders/{order}/notes', [OrderController::class, 'addNote'])->name('orders.notes');

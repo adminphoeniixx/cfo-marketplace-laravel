@@ -12,6 +12,26 @@ type NotificationRow = {
     created_at: string;
 };
 
+// The seller panel reuses this bar, so anything panel-specific is a prop.
+const props = withDefaults(
+    defineProps<{
+        /** Panel prefix the notification endpoints hang off. */
+        base?: string;
+        /** Where the logo links to. */
+        homeHref?: string;
+        /** Omit to hide the global search box. */
+        searchHref?: string | null;
+        /** Omit to hide the "Store settings" item in the user menu. */
+        settingsHref?: string | null;
+    }>(),
+    {
+        base: '/admin',
+        homeHref: '/admin',
+        searchHref: '/admin/search',
+        settingsHref: '/admin/settings',
+    },
+);
+
 const emit = defineEmits<{ toggleSidebar: [] }>();
 const page = usePage();
 const menuOpen = ref(false);
@@ -47,7 +67,7 @@ const openNotification = (row: NotificationRow) => {
 
     if (!row.read) {
         router.post(
-            `/admin/notifications/${row.id}/read`,
+            `${props.base}/notifications/${row.id}/read`,
             {},
             { preserveScroll: true, preserveState: true },
         );
@@ -58,7 +78,7 @@ const openNotification = (row: NotificationRow) => {
 
 const markAllRead = () =>
     router.post(
-        '/admin/notifications/read-all',
+        `${props.base}/notifications/read-all`,
         {},
         { preserveScroll: true, onSuccess: () => (bellOpen.value = false) },
     );
@@ -66,8 +86,8 @@ const markAllRead = () =>
 const search = ref('');
 
 const submitSearch = () => {
-    if (search.value.trim()) {
-        router.get('/admin/search', { q: search.value.trim() });
+    if (props.searchHref && search.value.trim()) {
+        router.get(props.searchHref, { q: search.value.trim() });
     }
 };
 
@@ -89,7 +109,7 @@ const logout = () => router.post('/logout');
             </svg>
         </button>
 
-        <Link href="/admin" class="flex shrink-0 items-center gap-2 pr-2">
+        <Link :href="homeHref" class="flex shrink-0 items-center gap-2 pr-2">
             <AppLogo :size="28" />
             <span
                 class="hidden text-sm font-semibold tracking-wide whitespace-nowrap sm:block"
@@ -98,6 +118,7 @@ const logout = () => router.post('/logout');
         </Link>
 
         <form
+            v-if="searchHref"
             class="mx-auto hidden w-full max-w-xl md:block"
             @submit.prevent="submitSearch"
         >
@@ -209,7 +230,7 @@ const logout = () => router.post('/logout');
                 </p>
 
                 <Link
-                    href="/admin/notifications"
+                    :href="`${base}/notifications`"
                     class="block border-t border-[#e3e3e3] px-3 py-2 text-center text-[13px] font-medium hover:bg-[#f1f1f1] dark:border-[#3a3a3a] dark:hover:bg-[#303030]"
                     @click="bellOpen = false"
                 >
@@ -259,7 +280,8 @@ const logout = () => router.post('/logout');
                     Profile
                 </Link>
                 <Link
-                    href="/admin/settings"
+                    v-if="settingsHref"
+                    :href="settingsHref"
                     class="block px-3 py-1.5 text-[13px] hover:bg-[#f1f1f1] dark:hover:bg-[#303030]"
                 >
                     Store settings

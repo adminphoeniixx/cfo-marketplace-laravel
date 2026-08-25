@@ -17,6 +17,12 @@ use Inertia\Response;
  */
 class NotificationController extends Controller
 {
+    /**
+     * Which panel is rendering. Nothing here reads anything but the signed-in
+     * user's own pile, so the seller panel reuses it and only swaps the page.
+     */
+    protected string $panel = 'admin';
+
     public function index(Request $request): Response
     {
         $user = $request->user();
@@ -37,7 +43,7 @@ class NotificationController extends Controller
                 )),
             ]);
 
-        return Inertia::render('admin/notifications/Index', [
+        return Inertia::render("{$this->panel}/notifications/Index", [
             'notifications' => $notifications,
             'filters' => $request->only(['filter', 'kind']),
             'counts' => [

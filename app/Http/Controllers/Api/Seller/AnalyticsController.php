@@ -2,17 +2,26 @@
 
 namespace App\Http\Controllers\Api\Seller;
 
-use App\Http\Controllers\Controller;
+use App\Http\Controllers\Admin\AnalyticsController as MarketplaceAnalyticsController;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
- * The time series the dashboard chart needs. `/dashboard` answers "how am I
- * doing"; this answers "how did that change day by day".
+ * A seller's numbers, in two shapes.
+ *
+ * `sales()` is the light one the dashboard chart wants: a day-by-day series
+ * and nothing else. `report()` is the full picture the seller panel renders —
+ * period-over-period deltas, top products, categories and customers, status
+ * breakdowns — and `export()` is inherited whole.
+ *
+ * The reports come from the marketplace controller, whose every query is built
+ * on `resolveVendor()`. That returns the signed-in user's own store for a
+ * vendor and ignores the request, so subclassing costs nothing in scoping and
+ * saves keeping two copies of the margin maths in step.
  */
-class AnalyticsController extends Controller
+class AnalyticsController extends MarketplaceAnalyticsController
 {
     use ScopesToStore;
 
@@ -63,6 +72,49 @@ class AnalyticsController extends Controller
                 'units' => array_sum(array_column($series, 'units')),
             ],
             'series' => $series,
+        ]);
+    }
+
+    /**
+     * The full report, matching what the seller panel's analytics screen shows.
+     *
+     * Accepts the same query string as the panel — `preset`, or `from`/`to` —
+     * so an app and the panel can be pointed at the same window and agree.
+     */
+    public function report(Request $request): JsonResponse
+    {
+        [$from, $to, $preset] = $this->resolveRange($request);
+        $storeId = $this->storeId($request);
+
+        // Same-length window immediately before this one, for the deltas.
+        $span = $from->diffInDays($to) + 1;
+        $previousFrom = (clone $from)->subDays($span);
+        $previousTo = (clone $from)->subSecond();
+
+        $current = $this->totals($from, $to, $storeId);
+        $previous = $this->totals($previousFrom, $previousTo, $storeId);
+
+        return response()->json([
+            'window' => [
+                'preset' => $preset,
+                'from' => $from->toDateString(),
+                'to' => $to->toDateString(),
+            ],
+            'metrics' => collect($current)
+                ->map(fn ($value, $key) => $this->metric($value, $previous[$key] ?? 0))
+                ->all(),
+            'series' => $this->series($from, $to, $storeId),
+            'by_category' => $this->byCategory($from, $to, $storeId),
+            'top_products' => $this->topProducts($from, $to, $storeId),
+            'top_customers' => $this->topCustomers($from, $to, $storeId),
+            'by_payment_method' => $this->byPaymentMethod($from, $to, $storeId),
+            'status_breakdown' => $this->breakdown($from, $to, $storeId, 'status'),
+            'payment_breakdown' => $this->breakdown($from, $to, $storeId, 'payment_status'),
+            'fulfillment_breakdown' => $this->breakdown($from, $to, $storeId, 'fulfillment_status'),
+            // Deliberately no `by_vendor`: for a seller that is one row, their
+            // own, and the marketplace leaderboard is not theirs to read. The
+            // export list is narrowed by the same rule, in the parent.
+            'exports' => $this->exportsFor($request),
         ]);
     }
 }

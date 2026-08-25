@@ -39,6 +39,8 @@ type Customer = {
 };
 
 const props = defineProps<{
+    /** Panel prefix. The seller panel renders this same page under /seller. */
+    base?: string;
     vendors: { id: number; name: string; commission_rate: string }[];
     selectedVendor: number | null;
     lockedToVendor: boolean;
@@ -97,7 +99,7 @@ const changeVendor = (value: string) => {
     pickedProduct.value = null;
 
     router.get(
-        '/admin/orders/create',
+        `${props.base ?? '/admin'}/orders/create`,
         { vendor: value },
         {
             only: ['products', 'selectedVendor'],
@@ -198,7 +200,8 @@ watch(
     },
 );
 
-const submit = () => form.post('/admin/orders', { preserveScroll: true });
+const submit = () =>
+    form.post(`${props.base ?? '/admin'}/orders`, { preserveScroll: true });
 </script>
 
 <template>
@@ -208,10 +211,10 @@ const submit = () => form.post('/admin/orders', { preserveScroll: true });
         <PageHeader
             title="Create order"
             subtitle="Raise an order on behalf of a vendor"
-            back-href="/admin/orders"
+            :back-href="`${base ?? '/admin'}/orders`"
         >
             <template #actions>
-                <PButton href="/admin/orders">Discard</PButton>
+                <PButton :href="`${base ?? '/admin'}/orders`">Discard</PButton>
                 <PButton
                     type="submit"
                     variant="primary"

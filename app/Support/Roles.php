@@ -39,7 +39,7 @@ class Roles
         ],
         'vendor' => [
             'label' => 'Vendor',
-            'description' => 'Seller login. Drives the seller app, where everything is scoped to their own store. In this panel a vendor only reaches Analytics and Orders, the two screens that scope that way.',
+            'description' => 'Seller login. Drives the seller app and the seller panel, where everything is scoped to their own store. A vendor reaches no screen in this admin panel at all.',
         ],
     ];
 
@@ -152,17 +152,26 @@ class Roles
     }
 
     /**
-     * Sections a vendor login may open **in the admin panel**.
+     * Sections a vendor login may open **in the admin panel**: none.
      *
-     * Their matrix row is wider than this because it also governs the seller
-     * app, where every query is scoped to the store by `ScopesToStore`. The
-     * panel only scopes some of its screens that way, so a vendor is held to
-     * the ones that do until the rest catch up. Widening this list without
-     * first scoping the screen behind it hands one seller another's data.
+     * A vendor's matrix row governs two surfaces that both scope every query to
+     * their own store — the seller API and the seller panel at /seller. This
+     * admin panel scopes to the marketplace instead, so nothing here is safe to
+     * hand a vendor.
+     *
+     * It used to list Analytics and Orders. Analytics did scope, through
+     * `AnalyticsController::resolveVendor()`. Orders did not: `index()` took a
+     * vendor id only as an optional *filter*, so a signed-in vendor was served
+     * every marketplace order, a marketplace-wide revenue figure, and — on
+     * `show()` — another store's commission and earnings. Both screens now live
+     * under /seller, scoped by `ScopesToStore`, and this list is empty.
+     *
+     * Keep it empty. A screen that a seller needs belongs in the seller panel,
+     * where scoping is the default rather than something each query remembers.
      *
      * @var list<string>
      */
-    public const VENDOR_PANEL_SECTIONS = ['analytics', 'orders'];
+    public const VENDOR_PANEL_SECTIONS = [];
 
     /**
      * @return list<string>

@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers\Api\Seller;
 
+use App\Actions\CreateManualOrder;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Seller\OrderResource;
+use App\Models\Customer;
 use App\Models\Order;
+use App\Models\Vendor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -17,6 +20,9 @@ class OrderController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         $orders = $this->storeOrders($request)
+            // Every line on the basket, ours and anyone else's, so the
+            // resource can flag a shared basket without a count per row.
+            ->withCount('items')
             ->when($request->string('search')->toString(), fn ($query, $search) => $query
                 ->where('number', 'like', "%{$search}%"))
             ->when($request->string('status')->toString(), fn ($query, $status) => $query
@@ -39,7 +45,102 @@ class OrderController extends Controller
 
     public function show(Request $request, int $order): OrderResource
     {
-        return new OrderResource($this->findOwnedOrder($request, $order));
+        $model = $this->findOwnedOrder($request, $order);
+
+        // `items` is re-stated with its constraint on purpose: naming
+        // `events` alone is fine, but any nested load of `items.*` would
+        // re-load the relation unscoped and pull another seller's lines in.
+        $model->load([
+            'items' => fn ($query) => $query->where('vendor_id', $this->storeId($request)),
+            'events',
+        ])->loadCount('items');
+
+        return (new OrderResource($model))
+            ->withTimeline($this->storeTimeline($model, $this->storeId($request)));
+    }
+
+    /**
+     * Raise an order by hand — a phone order, a repeat customer, a fix for
+     * something that went wrong at checkout.
+     *
+     * The store comes from the token, so the shared action never sees a vendor
+     * id from the payload. Everything else — pricing, tax, commission, stock,
+     * notifications — is the same code path the panels use.
+     */
+    public function store(Request $request, CreateManualOrder $action): JsonResponse
+    {
+        $data = $request->validate(CreateManualOrder::rules());
+
+        $order = $action->handle(
+            $data,
+            Vendor::findOrFail($this->storeId($request)),
+            $request->user(),
+            'seller-api',
+        );
+
+        return response()->json(
+            ['data' => new OrderResource($this->findOwnedOrder($request, $order->id))],
+            201,
+        );
+    }
+
+    /**
+     * People this store may raise an order for: only those who have already
+     * bought from them. The marketplace's wider customer book is not theirs.
+     */
+    public function customers(Request $request): JsonResponse
+    {
+        $storeId = $this->storeId($request);
+
+        $customers = Customer::query()
+            ->where('status', 'active')
+            ->whereHas('orders.items', fn ($items) => $items->where('vendor_id', $storeId))
+            ->when($request->string('search')->toString(), fn ($query, $search) => $query->where(
+                fn ($q) => $q->where('first_name', 'like', "%{$search}%")
+                    ->orWhere('last_name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+            ))
+            ->orderBy('first_name')
+            ->limit(100)
+            ->get(['id', 'first_name', 'last_name', 'email', 'phone']);
+
+        return response()->json([
+            'data' => $customers->map(fn (Customer $customer) => [
+                'id' => $customer->id,
+                'name' => trim("{$customer->first_name} {$customer->last_name}"),
+                'email' => $customer->email,
+                'phone' => $customer->phone,
+            ]),
+        ]);
+    }
+
+    /**
+     * What the manual order form needs: this store's sellable products, each
+     * with its variants, price, stock and tax rate already worked out.
+     */
+    public function sellable(Request $request): JsonResponse
+    {
+        $products = CreateManualOrder::sellableProducts($this->storeId($request));
+
+        return response()->json([
+            'data' => $products->map(fn ($product) => [
+                'id' => $product->id,
+                'name' => $product->name,
+                'sku' => $product->sku,
+                'price' => (float) $product->price,
+                'stock_quantity' => (int) $product->stock_quantity,
+                'track_inventory' => (bool) $product->track_inventory,
+                'allow_backorder' => (bool) $product->allow_backorder,
+                'tax_rate' => CreateManualOrder::taxRateFor($product),
+                'variants' => $product->variants->map(fn ($variant) => [
+                    'id' => $variant->id,
+                    'name' => $variant->name,
+                    'sku' => $variant->sku,
+                    'price' => (float) $variant->price,
+                    'stock_quantity' => (int) $variant->stock_quantity,
+                ])->values()->all(),
+            ])->values()->all(),
+        ]);
     }
 
     /**

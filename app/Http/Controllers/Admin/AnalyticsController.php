@@ -26,6 +26,13 @@ class AnalyticsController extends Controller
     /** Reports that can be pulled out as CSV. */
     public const EXPORTS = ['vendors', 'products', 'categories', 'customers', 'orders'];
 
+    /**
+     * Which panel is rendering. Every report below already narrows to the
+     * signed-in vendor through `resolveVendor()`, so the seller panel reuses
+     * this controller wholesale and only swaps the page it renders.
+     */
+    protected string $panel = 'admin';
+
     public function index(Request $request): Response
     {
         [$from, $to, $preset] = $this->resolveRange($request);
@@ -41,7 +48,7 @@ class AnalyticsController extends Controller
 
         $storeWide = $vendorId === null;
 
-        return Inertia::render('admin/analytics/Index', [
+        return Inertia::render("{$this->panel}/analytics/Index", [
             'filters' => [
                 'preset' => $preset,
                 'from' => $from->toDateString(),
@@ -86,7 +93,7 @@ class AnalyticsController extends Controller
                 'cancellations_value' => (float) Cancellation::where('status', 'approved')
                     ->whereBetween('created_at', [$from, $to])->sum('total_amount'),
             ] : null,
-            'exports' => self::EXPORTS,
+            'exports' => $this->exportsFor($request),
         ]);
     }
 
@@ -96,7 +103,7 @@ class AnalyticsController extends Controller
      */
     public function export(Request $request, string $report): StreamedResponse
     {
-        abort_unless(in_array($report, self::EXPORTS, true), 404);
+        abort_unless(in_array($report, $this->exportsFor($request), true), 404);
 
         [$from, $to] = $this->resolveRange($request);
         $vendorId = $this->resolveVendor($request);
@@ -162,9 +169,26 @@ class AnalyticsController extends Controller
     }
 
     /**
+     * Reports this caller may pull as CSV.
+     *
+     * A vendor never gets `vendors`: that report is the marketplace
+     * leaderboard, and narrowed to one store it is a single row of numbers
+     * they already have on the rest of the screen. One rule here covers the
+     * marketplace panel, the seller panel and the seller API.
+     *
+     * @return list<string>
+     */
+    protected function exportsFor(Request $request): array
+    {
+        return $request->user()->isVendor()
+            ? array_values(array_diff(self::EXPORTS, ['vendors']))
+            : self::EXPORTS;
+    }
+
+    /**
      * @return array{0: Carbon, 1: Carbon, 2: int|null}
      */
-    private function resolveRange(Request $request): array
+    protected function resolveRange(Request $request): array
     {
         // An explicit from/to pair wins; otherwise fall back to a day preset.
         if ($request->filled('from') && $request->filled('to')) {
@@ -184,7 +208,7 @@ class AnalyticsController extends Controller
         return [Carbon::today()->subDays($preset - 1), Carbon::now()->endOfDay(), $preset];
     }
 
-    private function resolveVendor(Request $request): ?int
+    protected function resolveVendor(Request $request): ?int
     {
         $user = $request->user();
 
@@ -199,7 +223,7 @@ class AnalyticsController extends Controller
      * Line items in the window, excluding cancelled orders. Every report is
      * built on this so a vendor filter applies consistently everywhere.
      */
-    private function items(Carbon $from, Carbon $to, ?int $vendorId): Builder
+    protected function items(Carbon $from, Carbon $to, ?int $vendorId): Builder
     {
         return DB::table('order_items')
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
@@ -211,7 +235,7 @@ class AnalyticsController extends Controller
     /**
      * @return array{gross_sales: float, orders: int, units: int, average_order: float, commission: float, vendor_earnings: float, tax: float}
      */
-    private function totals(Carbon $from, Carbon $to, ?int $vendorId): array
+    protected function totals(Carbon $from, Carbon $to, ?int $vendorId): array
     {
         $row = $this->items($from, $to, $vendorId)
             ->selectRaw('coalesce(sum(order_items.total), 0) as gross_sales')
@@ -239,7 +263,7 @@ class AnalyticsController extends Controller
     /**
      * @return array{value: float|int, change: float|null}
      */
-    private function metric(float|int $current, float|int $previous): array
+    protected function metric(float|int $current, float|int $previous): array
     {
         return [
             'value' => $current,
@@ -255,7 +279,7 @@ class AnalyticsController extends Controller
      *
      * @return array{bucket: string, points: array<int, array{label: string, value: float}>}
      */
-    private function series(Carbon $from, Carbon $to, ?int $vendorId): array
+    protected function series(Carbon $from, Carbon $to, ?int $vendorId): array
     {
         $daily = $this->items($from, $to, $vendorId)
             ->selectRaw('date(orders.placed_at) as day')
@@ -293,7 +317,7 @@ class AnalyticsController extends Controller
     /**
      * @return Collection<int, \stdClass>
      */
-    private function byVendor(Carbon $from, Carbon $to, ?int $vendorId)
+    protected function byVendor(Carbon $from, Carbon $to, ?int $vendorId)
     {
         return $this->items($from, $to, $vendorId)
             ->join('vendors', 'vendors.id', '=', 'order_items.vendor_id')
@@ -311,7 +335,7 @@ class AnalyticsController extends Controller
     /**
      * @return Collection<int, \stdClass>
      */
-    private function byCategory(Carbon $from, Carbon $to, ?int $vendorId, ?int $limit = 8)
+    protected function byCategory(Carbon $from, Carbon $to, ?int $vendorId, ?int $limit = 8)
     {
         return $this->items($from, $to, $vendorId)
             ->join('products', 'products.id', '=', 'order_items.product_id')
@@ -328,7 +352,7 @@ class AnalyticsController extends Controller
     /**
      * @return Collection<int, \stdClass>
      */
-    private function topProducts(Carbon $from, Carbon $to, ?int $vendorId, ?int $limit = 10)
+    protected function topProducts(Carbon $from, Carbon $to, ?int $vendorId, ?int $limit = 10)
     {
         return $this->items($from, $to, $vendorId)
             ->selectRaw('order_items.name, order_items.sku')
@@ -343,7 +367,7 @@ class AnalyticsController extends Controller
     /**
      * @return Collection<int, \stdClass>
      */
-    private function topCustomers(Carbon $from, Carbon $to, ?int $vendorId, ?int $limit = 10)
+    protected function topCustomers(Carbon $from, Carbon $to, ?int $vendorId, ?int $limit = 10)
     {
         return $this->items($from, $to, $vendorId)
             ->join('customers', 'customers.id', '=', 'orders.customer_id')
@@ -363,7 +387,7 @@ class AnalyticsController extends Controller
      *
      * @return Collection<int, \stdClass>
      */
-    private function byPaymentMethod(Carbon $from, Carbon $to, ?int $vendorId)
+    protected function byPaymentMethod(Carbon $from, Carbon $to, ?int $vendorId)
     {
         return $this->items($from, $to, $vendorId)
             ->selectRaw("coalesce(orders.payment_method, 'Not specified') as name")
@@ -379,7 +403,7 @@ class AnalyticsController extends Controller
      *
      * @return array<string, int>
      */
-    private function breakdown(Carbon $from, Carbon $to, ?int $vendorId, string $column): array
+    protected function breakdown(Carbon $from, Carbon $to, ?int $vendorId, string $column): array
     {
         $select = match ($column) {
             'payment_status' => 'payment_status as bucket, count(*) as total',
@@ -403,7 +427,7 @@ class AnalyticsController extends Controller
     /**
      * @return Collection<int, \stdClass>
      */
-    private function orderRows(Carbon $from, Carbon $to, ?int $vendorId)
+    protected function orderRows(Carbon $from, Carbon $to, ?int $vendorId)
     {
         return $this->items($from, $to, $vendorId)
             ->leftJoin('customers', 'customers.id', '=', 'orders.customer_id')
