@@ -300,6 +300,17 @@ Each store writes into its own folder on the CDN, so uploads cannot collide
 between sellers. Save the returned `path` on the record — not the URL, which is
 signed and time-limited.
 
+**Resize before you send.** A phone camera file is routinely 4–12 MB, which is
+past the 5 MB ceiling and slow enough on a mobile connection to risk the
+gateway timing the request out before it ever reaches us. Scale the longest
+edge to about 2000px and re-encode at ~0.8 quality first — that is a few
+hundred KB, and no smaller on screen at any size the catalog shows. The web
+panels already do this; a native client has to do its own.
+
+A `502 {"message":"Upload failed. Please try again."}` means the CDN would not
+take the file. It is worth a retry — it says nothing about the request being
+malformed, unlike a `422`.
+
 ### Orders (approved)
 
 | Method | Path | Notes |

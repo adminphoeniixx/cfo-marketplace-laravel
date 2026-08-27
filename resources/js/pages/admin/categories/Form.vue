@@ -8,6 +8,7 @@ import PCheckbox from '@/components/admin/PCheckbox.vue';
 import PSelect from '@/components/admin/PSelect.vue';
 import PTextarea from '@/components/admin/PTextarea.vue';
 import PTextField from '@/components/admin/PTextField.vue';
+import { compressImage } from '@/lib/compressImage';
 
 type Category = {
     id: number;
@@ -66,7 +67,7 @@ const uploadImage = async (event: Event) => {
 
     try {
         const body = new FormData();
-        body.append('file', file);
+        body.append('file', await compressImage(file));
         body.append('folder', 'categories');
 
         const response = await fetch('/admin/uploads', {

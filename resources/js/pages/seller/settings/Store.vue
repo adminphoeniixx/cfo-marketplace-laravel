@@ -8,6 +8,7 @@ import PCard from '@/components/admin/PCard.vue';
 import PSelect from '@/components/admin/PSelect.vue';
 import PTextarea from '@/components/admin/PTextarea.vue';
 import PTextField from '@/components/admin/PTextField.vue';
+import { compressImage } from '@/lib/compressImage';
 import { date, statusTone, titleCase } from '@/lib/format';
 
 const props = defineProps<{
@@ -89,7 +90,7 @@ const uploadLogo = async (event: Event) => {
 
     try {
         const body = new FormData();
-        body.append('file', file);
+        body.append('file', await compressImage(file));
         body.append('folder', 'vendors');
 
         const response = await fetch('/seller/uploads', {

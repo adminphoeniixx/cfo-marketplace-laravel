@@ -2,6 +2,7 @@
 
 use App\Models\Category;
 use App\Services\BunnyCdn;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 
@@ -15,6 +16,8 @@ beforeEach(function () {
         'token_auth_key' => null,
         'url_ttl' => 604800,
         'prefix' => 'cfo',
+        'connect_timeout' => 5,
+        'timeout' => 20,
     ]);
 });
 
@@ -113,4 +116,31 @@ test('models expose a renderable url for stored images', function () {
     expect($category->image_url)->toBe('https://test-zone.b-cdn.net/cfo/categories/a.jpg');
 
     expect(Category::factory()->create(['image_path' => null])->image_url)->toBeNull();
+});
+
+test('an unreachable storage zone surfaces as our own error, not an unhandled 500', function () {
+    actingAsAdmin();
+
+    // Guzzle's ConnectionException descends from Exception, not
+    // RuntimeException — letting it through turned a blocked or slow egress
+    // into a 500, and the gateway's own 502 page once the wait outlived it.
+    Http::fake(fn () => throw new ConnectionException('cURL error 28: Operation timed out'));
+
+    $this->post(route('admin.uploads.store'), [
+        'file' => UploadedFile::fake()->image('shoe.jpg'),
+        'folder' => 'products',
+    ])->assertStatus(502);
+});
+
+test('the configured bunny timeouts stay under a typical gateway one', function () {
+    // The point of the timeout is to lose the race to the proxy, so the client
+    // gets this app's JSON rather than the gateway's "Service is not reachable".
+    expect(config('services.bunnycdn.timeout'))->toBeLessThan(60)
+        ->and(config('services.bunnycdn.connect_timeout'))->toBeLessThan(60);
+});
+
+test('deleting through an unreachable zone reports false rather than throwing', function () {
+    Http::fake(fn () => throw new ConnectionException('cURL error 7: Failed to connect'));
+
+    expect(BunnyCdn::delete('cfo/products/a.jpg'))->toBeFalse();
 });

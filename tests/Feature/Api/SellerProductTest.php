@@ -4,6 +4,7 @@ use App\Models\Attribute;
 use App\Models\AttributeValue;
 use App\Models\Category;
 use App\Models\Product;
+use Illuminate\Support\Facades\DB;
 
 test('a product can be created, read back, edited and deleted', function () {
     [, $store] = actingAsSeller();
@@ -168,4 +169,80 @@ test('the catalog reference lists are readable', function () {
         ->assertJsonStructure(['categories', 'attributes', 'tax_classes', 'statuses']);
 
     $this->getJson(route('api.seller.catalog.categories'))->assertOk()->assertJsonStructure(['data']);
+});
+
+test('a variant with no id is inserted without writing a null primary key', function () {
+    actingAsSeller();
+
+    $attribute = Attribute::factory()->create(['is_variant' => true]);
+    $small = AttributeValue::factory()->create(['attribute_id' => $attribute->id]);
+
+    // SQLite quietly hands a NULL integer primary key the next rowid, so the
+    // insert has to be inspected directly — on Postgres the same statement is
+    // what trips the not-null constraint on product_variants.id.
+    $inserts = [];
+
+    DB::listen(function ($query) use (&$inserts) {
+        if (str_contains($query->sql, 'insert into "product_variants"')
+            || str_contains($query->sql, 'insert into "product_images"')) {
+            $inserts[] = $query->sql;
+        }
+    });
+
+    $this->postJson(route('api.seller.products.store'), [
+        'name' => 'Cotton kurta',
+        'type' => 'variable',
+        'price' => 999,
+        'status' => 'active',
+        'stock_quantity' => 0,
+        'attribute_ids' => [$attribute->id],
+        'images' => [
+            ['id' => null, 'path' => 'cfo/products/1/a.jpg'],
+        ],
+        'variants' => [
+            [
+                'id' => null, 'name' => 'Small', 'price' => 999, 'stock_quantity' => 4,
+                'values' => [['attribute_id' => $attribute->id, 'attribute_value_id' => $small->id]],
+            ],
+        ],
+    ])->assertCreated();
+
+    expect($inserts)->toHaveCount(2);
+
+    foreach ($inserts as $sql) {
+        expect($sql)->not->toContain('"id"');
+    }
+});
+
+test('a variant id belonging to another product is not rewritten', function () {
+    [, $store] = actingAsSeller();
+
+    $attribute = Attribute::factory()->create(['is_variant' => true]);
+    $value = AttributeValue::factory()->create(['attribute_id' => $attribute->id]);
+
+    $other = Product::factory()->create(['vendor_id' => $store->id, 'type' => 'variable']);
+    $stranger = $other->variants()->create([
+        'name' => 'Untouched', 'price' => 100, 'stock_quantity' => 3, 'position' => 0,
+    ]);
+
+    $mine = Product::factory()->create(['vendor_id' => $store->id, 'type' => 'variable']);
+
+    $this->putJson(route('api.seller.products.update', $mine->id), [
+        'name' => $mine->name,
+        'type' => 'variable',
+        'price' => 999,
+        'status' => 'active',
+        'attribute_ids' => [$attribute->id],
+        'variants' => [
+            [
+                'id' => $stranger->id, 'name' => 'Mine', 'price' => 999, 'stock_quantity' => 7,
+                'values' => [['attribute_id' => $attribute->id, 'attribute_value_id' => $value->id]],
+            ],
+        ],
+    ])->assertOk();
+
+    expect($stranger->fresh()->name)->toBe('Untouched')
+        ->and($stranger->fresh()->product_id)->toBe($other->id)
+        ->and($mine->variants()->count())->toBe(1)
+        ->and($mine->variants()->first()->name)->toBe('Mine');
 });

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -55,9 +56,17 @@ class BunnyCdn
             return false;
         }
 
-        return Http::withHeaders(['AccessKey' => self::config('api_key')])
-            ->delete(self::storageUrl($path))
-            ->successful();
+        try {
+            return Http::withHeaders(['AccessKey' => self::config('api_key')])
+                ->connectTimeout((int) self::config('connect_timeout') ?: 5)
+                ->timeout((int) self::config('timeout') ?: 20)
+                ->delete(self::storageUrl($path))
+                ->successful();
+        } catch (ConnectionException) {
+            // Documented never to throw: a stale path on an unreachable zone is
+            // still just "could not delete it".
+            return false;
+        }
     }
 
     /**
@@ -107,12 +116,24 @@ class BunnyCdn
 
     /**
      * PUT raw bytes to the storage zone, throwing on any non-success response.
+     *
+     * A network failure is re-thrown as a RuntimeException so callers have one
+     * exception type to catch. Guzzle's own ConnectionException descends from
+     * Exception rather than RuntimeException, so letting it through turned an
+     * unreachable storage zone into an unhandled 500 — and, when the wait
+     * outlived the gateway, into the proxy's own 502 page instead of ours.
      */
     private static function put(string $path, string $contents, string $contentType): void
     {
-        $response = Http::withHeaders(['AccessKey' => self::config('api_key')])
-            ->withBody($contents, $contentType)
-            ->put(self::storageUrl($path));
+        try {
+            $response = Http::withHeaders(['AccessKey' => self::config('api_key')])
+                ->connectTimeout((int) self::config('connect_timeout') ?: 5)
+                ->timeout((int) self::config('timeout') ?: 20)
+                ->withBody($contents, $contentType)
+                ->put(self::storageUrl($path));
+        } catch (ConnectionException $e) {
+            throw new RuntimeException("BunnyCDN unreachable: {$e->getMessage()}", 0, $e);
+        }
 
         if (! $response->successful()) {
             throw new RuntimeException("BunnyCDN upload failed ({$response->status()}): {$response->body()}");

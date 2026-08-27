@@ -47,6 +47,11 @@ return [
         // Everything this app uploads lives under one prefix, because the
         // storage zone is shared with other projects.
         'prefix' => env('BUNNYCDN_PREFIX', 'cfo'),
+        // Kept well under a typical 60s gateway timeout, so an unreachable
+        // storage zone comes back as this app's own error rather than the
+        // proxy's "Service is not reachable" page.
+        'connect_timeout' => (int) env('BUNNYCDN_CONNECT_TIMEOUT', 5),
+        'timeout' => (int) env('BUNNYCDN_TIMEOUT', 20),
     ],
 
 ];

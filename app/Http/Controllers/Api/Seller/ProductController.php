@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Seller;
 
+use App\Concerns\SyncsChildRecords;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Seller\ProductResource;
 use App\Models\Product;
@@ -13,7 +14,7 @@ use Illuminate\Validation\Rule;
 
 class ProductController extends Controller
 {
-    use ScopesToStore;
+    use ScopesToStore, SyncsChildRecords;
 
     public function index(Request $request): AnonymousResourceCollection
     {
@@ -278,8 +279,9 @@ class ProductController extends Controller
         $keptImages = [];
 
         foreach (array_values($data['images'] ?? []) as $position => $image) {
-            $record = $product->images()->updateOrCreate(
-                ['id' => $image['id'] ?? null],
+            $record = $this->syncChild(
+                $product->images(),
+                $image['id'] ?? null,
                 ['path' => $image['path'], 'alt' => $image['alt'] ?? $product->name, 'position' => $position],
             );
 
@@ -297,8 +299,9 @@ class ProductController extends Controller
         $keptVariants = [];
 
         foreach (array_values($data['variants'] ?? []) as $position => $variant) {
-            $record = $product->variants()->updateOrCreate(
-                ['id' => $variant['id'] ?? null],
+            $record = $this->syncChild(
+                $product->variants(),
+                $variant['id'] ?? null,
                 [
                     'name' => $variant['name'] ?? null,
                     'sku' => $variant['sku'] ?? null,

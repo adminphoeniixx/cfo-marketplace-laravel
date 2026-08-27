@@ -408,6 +408,117 @@
 
     .qty span { width: 32px; text-align: center; font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; }
 
+    /* ------------------------------------------------------- product form */
+
+    .field textarea {
+        font-size: 14px; margin-top: 2px; width: 100%;
+        border: 0; background: transparent; color: var(--ink);
+        font-family: inherit; padding: 0; outline: none;
+        resize: vertical; min-height: 64px; line-height: 1.5;
+    }
+
+    .field textarea::placeholder { color: var(--ink-3); }
+    .field .val.mute { color: var(--ink-3); }
+    .field .hint { display: block; font-size: 10.5px; color: var(--ink-3); margin-top: 3px; line-height: 1.45; }
+    .field .suffix { font-size: 12px; color: var(--ink-3); font-weight: 600; }
+
+    /* A row of fields the seller rarely touches, folded away behind a tap —
+       the same disclosure the web form uses. */
+    .disc {
+        width: 100%; display: flex; align-items: center; gap: 5px;
+        background: var(--surface); border: 1px solid var(--line);
+        border-radius: 11px; padding: 8px 10px;
+        font-family: inherit; color: inherit; cursor: pointer; text-align: left;
+    }
+
+    .disc .tag {
+        font-size: 10px; background: var(--surface-2); color: var(--ink-2);
+        border-radius: 6px; padding: 2px 6px; white-space: nowrap;
+    }
+
+    .disc .chev { margin-left: auto; color: var(--ink-3); font-size: 11px; }
+    .disc .lead { font-size: 12px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* Switch — track quantity, physical product, backorders. */
+    .sw {
+        width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+        background: var(--surface); border: 1px solid var(--line);
+        border-radius: 11px; padding: 10px 12px;
+        font-size: 13.5px; font-weight: 600; color: inherit;
+        font-family: inherit; cursor: pointer; text-align: left;
+    }
+
+    .sw .sub { display: block; font-size: 11px; font-weight: 500; color: var(--ink-3); margin-top: 2px; }
+
+    .knob {
+        width: 38px; height: 22px; border-radius: 11px;
+        background: var(--line); position: relative; flex-shrink: 0;
+        transition: background .15s;
+    }
+
+    .knob::after {
+        content: ''; position: absolute; top: 2px; left: 2px;
+        width: 18px; height: 18px; border-radius: 50%;
+        background: var(--surface); box-shadow: 0 1px 2px rgba(0, 0, 0, .25);
+        transition: transform .15s;
+    }
+
+    .knob.on { background: var(--action); }
+    .knob.on::after { transform: translateX(16px); }
+
+    /* Photo grid. First tile is the cover. */
+    .media { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+
+    .tile {
+        position: relative; aspect-ratio: 1; border-radius: 10px;
+        background: var(--surface-2); border: 1px solid var(--line);
+        display: grid; place-items: center; font-size: 25px;
+    }
+
+    .tile.add { border-style: dashed; color: var(--ink-3); cursor: pointer; font-size: 20px; font-family: inherit; }
+
+    .tile .cover {
+        position: absolute; top: 3px; left: 3px;
+        font-size: 8px; font-weight: 700; letter-spacing: .04em;
+        background: var(--ink); color: var(--surface);
+        border-radius: 5px; padding: 1px 4px;
+    }
+
+    .tile .mini {
+        position: absolute; width: 19px; height: 19px; border-radius: 50%;
+        border: 0; background: rgba(0, 0, 0, .58); color: #fff;
+        font-size: 10px; line-height: 1; cursor: pointer; font-family: inherit;
+        display: grid; place-items: center;
+    }
+
+    .tile .mini.x { top: 2px; right: 2px; }
+    .tile .mini.star { bottom: 2px; right: 2px; }
+
+    .tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 3px; }
+
+    .tags .tg {
+        display: inline-flex; align-items: center; gap: 4px;
+        font-size: 11.5px; background: var(--surface-2); border: 1px solid var(--line);
+        border-radius: 7px; padding: 3px 4px 3px 8px; color: var(--ink-2);
+    }
+
+    .tags .tg button { border: 0; background: transparent; color: var(--ink-3); cursor: pointer; font-family: inherit; font-size: 11px; padding: 0 2px; }
+
+    /* Value chips inside an option — size, colour, fabric. */
+    .vals { display: flex; flex-wrap: wrap; gap: 6px; }
+
+    .vals button {
+        font-size: 12.5px; padding: 6px 11px; border-radius: 9px;
+        background: var(--surface); border: 1px solid var(--line);
+        color: var(--ink); cursor: pointer; font-family: inherit;
+        display: inline-flex; align-items: center; gap: 6px;
+    }
+
+    .vals button.on { background: var(--ink); border-color: var(--ink); color: var(--surface); font-weight: 600; }
+    .vals .swatch { width: 10px; height: 10px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .18); }
+
+    .check { width: 18px; height: 18px; flex-shrink: 0; color: var(--action); font-size: 14px; text-align: center; }
+
     .toast {
         position: absolute; left: 14px; right: 14px; bottom: 82px;
         background: var(--ink); color: var(--surface);
@@ -510,12 +621,100 @@
           shared: false, tracking: 'TRK-88213', carrier: 'Delhivery' }
     ];
 
+    /*
+    | Marketplace-wide reference data. In the app this is one call —
+    | GET /catalog/options — cached for the session.
+    */
+    const catalog = {
+        categories: [
+            { id: 1, name: 'Ethnic wear', parent_id: null },
+            { id: 2, name: 'Sarees', parent_id: 1 },
+            { id: 3, name: 'Kurtas', parent_id: 1 },
+            { id: 4, name: 'Dupattas & stoles', parent_id: 1 },
+            { id: 5, name: 'Winter wear', parent_id: null },
+            { id: 6, name: 'Shawls', parent_id: 5 },
+            { id: 7, name: 'Home linen', parent_id: null }
+        ],
+        taxClasses: [
+            { id: 1, name: 'GST 5%' },
+            { id: 2, name: 'GST 12%' },
+            { id: 3, name: 'GST 18%' }
+        ],
+        // Only `is_variant` attributes can build variants — the rest are
+        // filter facets and never appear on this screen.
+        attributes: [
+            { id: 1, name: 'Size', is_variant: true, values: [
+                { id: 11, value: 'S' }, { id: 12, value: 'M' }, { id: 13, value: 'L' }, { id: 14, value: 'XL' }] },
+            { id: 2, name: 'Colour', is_variant: true, values: [
+                { id: 21, value: 'Red', color: '#c0392b' }, { id: 22, value: 'Indigo', color: '#2c3e91' },
+                { id: 23, value: 'Cream', color: '#efe6d0' }] },
+            { id: 3, name: 'Fabric', is_variant: true, values: [
+                { id: 31, value: 'Cotton' }, { id: 32, value: 'Silk' }, { id: 33, value: 'Linen' }] }
+        ],
+        statuses: ['draft', 'active', 'archived']
+    };
+
+    const category = id => catalog.categories.find(c => c.id === id);
+    const attribute = id => catalog.attributes.find(a => a.id === id);
+    const attrValue = (attrId, valueId) => (attribute(attrId)?.values ?? []).find(v => v.id === valueId);
+
+    /*
+    | Products carry every field the product form edits, named the way the API
+    | names them — `stock`/`low`/`was` are the list-screen shorthands the rest
+    | of this prototype already reads.
+    */
     let products = [
-        { id: 47, name: 'Kanchipuram silk saree', sku: 'MINE-1', price: 4999, was: 6499, stock: 40, low: 5, status: 'active', emoji: '🥻', type: 'simple', cat: 'Sarees' },
-        { id: 48, name: 'Cotton kurta set', sku: 'KUR-22', price: 1999, was: null, stock: 2, low: 5, status: 'active', emoji: '👕', type: 'variable', cat: 'Ethnic wear' },
-        { id: 49, name: 'Wool shawl', sku: 'SHL-11', price: 3499, was: null, stock: 18, low: 5, status: 'draft', emoji: '🧶', type: 'simple', cat: 'Winter wear' },
-        { id: 50, name: 'Linen dupatta', sku: 'DUP-05', price: 899, was: 1199, stock: 60, low: 10, status: 'active', emoji: '🧣', type: 'simple', cat: 'Ethnic wear' },
-        { id: 51, name: 'Block print stole', sku: 'STL-03', price: 1299, was: null, stock: 0, low: 5, status: 'active', emoji: '🧵', type: 'simple', cat: 'Ethnic wear' }
+        { id: 47, name: 'Kanchipuram silk saree', sku: 'MINE-1', price: 4999, was: 6499, stock: 40, low: 5,
+          status: 'active', emoji: '🥻', type: 'simple', cat: 'Sarees',
+          images: ['🥻', '🧵'], category_id: 2, category_ids: [2], tax_class_id: 1,
+          short_description: 'Handwoven, gold zari border', description: 'Pure mulberry silk, woven in Kanchipuram. Dry clean only.',
+          cost_price: 3100, track_inventory: true, allow_backorder: false, barcode: '8901234567890',
+          requires_shipping: true, weight: 0.65, length: 30, width: 22, height: 6,
+          brand: 'Meera Looms', tags: ['silk', 'wedding'], slug: '',
+          seo_title: 'Kanchipuram silk saree', seo_description: 'Handwoven silk saree with a gold zari border.',
+          attribute_ids: [], variants: [], sold: 128, revenue: 639872, orderCount: 96 },
+
+        { id: 48, name: 'Cotton kurta set', sku: 'KUR-22', price: 1999, was: null, stock: 2, low: 5,
+          status: 'active', emoji: '👕', type: 'variable', cat: 'Ethnic wear',
+          images: ['👕'], category_id: 3, category_ids: [3], tax_class_id: 1,
+          short_description: 'Kurta with matching pyjama', description: '',
+          cost_price: null, track_inventory: true, allow_backorder: false, barcode: '',
+          requires_shipping: true, weight: 0.4, length: null, width: null, height: null,
+          brand: '', tags: ['cotton'], slug: '', seo_title: '', seo_description: '',
+          attribute_ids: [1],
+          variants: [
+            { id: 91, name: 'S', sku: 'KUR-22-S', price: 1999, compare_at_price: null, stock_quantity: 0, weight: 0.4, is_active: true, values: [{ attribute_id: 1, attribute_value_id: 11 }] },
+            { id: 92, name: 'M', sku: 'KUR-22-M', price: 1999, compare_at_price: null, stock_quantity: 1, weight: 0.4, is_active: true, values: [{ attribute_id: 1, attribute_value_id: 12 }] },
+            { id: 93, name: 'L', sku: 'KUR-22-L', price: 2199, compare_at_price: null, stock_quantity: 1, weight: 0.4, is_active: true, values: [{ attribute_id: 1, attribute_value_id: 13 }] }
+          ],
+          sold: 54, revenue: 107946, orderCount: 51 },
+
+        { id: 49, name: 'Wool shawl', sku: 'SHL-11', price: 3499, was: null, stock: 18, low: 5,
+          status: 'draft', emoji: '🧶', type: 'simple', cat: 'Winter wear',
+          images: ['🧶'], category_id: 6, category_ids: [6], tax_class_id: 2,
+          short_description: '', description: '', cost_price: null,
+          track_inventory: true, allow_backorder: false, barcode: '',
+          requires_shipping: true, weight: 0.8, length: null, width: null, height: null,
+          brand: '', tags: [], slug: '', seo_title: '', seo_description: '',
+          attribute_ids: [], variants: [], sold: 12, revenue: 41988, orderCount: 12 },
+
+        { id: 50, name: 'Linen dupatta', sku: 'DUP-05', price: 899, was: 1199, stock: 60, low: 10,
+          status: 'active', emoji: '🧣', type: 'simple', cat: 'Ethnic wear',
+          images: ['🧣'], category_id: 4, category_ids: [4], tax_class_id: 1,
+          short_description: '', description: '', cost_price: 520,
+          track_inventory: true, allow_backorder: true, barcode: '',
+          requires_shipping: true, weight: 0.2, length: null, width: null, height: null,
+          brand: '', tags: ['linen'], slug: '', seo_title: '', seo_description: '',
+          attribute_ids: [], variants: [], sold: 240, revenue: 215760, orderCount: 187 },
+
+        { id: 51, name: 'Block print stole', sku: 'STL-03', price: 1299, was: null, stock: 0, low: 5,
+          status: 'active', emoji: '🧵', type: 'simple', cat: 'Ethnic wear',
+          images: ['🧵'], category_id: 4, category_ids: [], tax_class_id: 1,
+          short_description: '', description: '', cost_price: null,
+          track_inventory: true, allow_backorder: false, barcode: '',
+          requires_shipping: true, weight: 0.15, length: null, width: null, height: null,
+          brand: '', tags: [], slug: '', seo_title: '', seo_description: '',
+          attribute_ids: [], variants: [], sold: 33, revenue: 42867, orderCount: 30 }
     ];
 
     const payouts = [
@@ -586,6 +785,321 @@
         toastEl.classList.add('on');
         clearTimeout(toast._t);
         toast._t = setTimeout(() => toastEl.classList.remove('on'), 2200);
+    }
+
+    /* ------------------------------------------------------- product draft */
+
+    /*
+    | One draft object backs both "New product" and "Edit product", keyed the
+    | way POST/PUT /products expects. Every input on the form writes straight
+    | into it through `data-bind`, so re-rendering the screen never loses what
+    | has been typed.
+    */
+    let draft = null;
+    let open = { pricing: false, inventory: false, shipping: false, seo: false };
+    let focusTag = false;
+
+    // Which values of each option are in play. Shopify lets a seller pick the
+    // three sizes they actually stock rather than every size on the list.
+    let chosen = {};
+
+    const photoPalette = ['📸', '🖼️', '🧵', '✨', '🪡', '🧶', '👗', '🎀'];
+
+    function newDraft(p) {
+        open = {
+            // Anything the product already has must not hide behind a tap.
+            pricing: !!(p && (p.was || p.cost_price)),
+            inventory: false, shipping: false, seo: false
+        };
+
+        draft = p ? {
+            id: p.id, name: p.name, short_description: p.short_description, description: p.description,
+            images: [...p.images], category_id: p.category_id, category_ids: [...p.category_ids],
+            price: p.price, compare_at_price: p.was, cost_price: p.cost_price, tax_class_id: p.tax_class_id,
+            track_inventory: p.track_inventory, stock_quantity: p.stock, low_stock_threshold: p.low,
+            sku: p.sku, barcode: p.barcode, allow_backorder: p.allow_backorder,
+            requires_shipping: p.requires_shipping, weight: p.weight,
+            length: p.length, width: p.width, height: p.height,
+            attribute_ids: [...p.attribute_ids],
+            variants: p.variants.map(v => ({ ...v, values: v.values.map(x => ({ ...x })) })),
+            brand: p.brand, tags: [...p.tags],
+            seo_title: p.seo_title, seo_description: p.seo_description, slug: p.slug,
+            status: p.status, emoji: p.emoji, tagInput: ''
+        } : {
+            id: null, name: '', short_description: '', description: '',
+            images: [], category_id: null, category_ids: [],
+            price: '', compare_at_price: '', cost_price: '', tax_class_id: null,
+            track_inventory: true, stock_quantity: 0, low_stock_threshold: 5,
+            sku: '', barcode: '', allow_backorder: false,
+            requires_shipping: true, weight: '', length: '', width: '', height: '',
+            attribute_ids: [], variants: [], brand: '', tags: [],
+            seo_title: '', seo_description: '', slug: '',
+            status: 'draft', emoji: '🧵', tagInput: ''
+        };
+
+        // Rebuild the chip selection from the variants that already exist.
+        chosen = {};
+        for (const id of draft.attribute_ids) {
+            const used = [...new Set(draft.variants.flatMap(v => v.values)
+                .filter(x => x.attribute_id === id).map(x => x.attribute_value_id))];
+
+            chosen[id] = used.length ? used : (attribute(id)?.values ?? []).map(v => v.id);
+        }
+
+        return draft;
+    }
+
+    /** `data-bind="variants.0.price"` writes through the dotted path. */
+    function setPath(path, value) {
+        const parts = path.split('.');
+        let target = draft;
+
+        while (parts.length > 1) target = target[parts.shift()];
+
+        target[parts[0]] = value;
+    }
+
+    const readPath = path => path.split('.').reduce((o, k) => (o ?? {})[k], draft);
+
+    const variantType = () => draft.variants.length ? 'variable' : 'simple';
+    const variantStock = () => draft.variants.reduce((s, v) => s + (+v.stock_quantity || 0), 0);
+    const variantLabel = v => v.values.map(x => attrValue(x.attribute_id, x.attribute_value_id)?.value)
+        .filter(Boolean).join(' / ') || v.name || 'Variant';
+
+    const marginOf = () => {
+        const price = +draft.price || 0, cost = +draft.cost_price || 0;
+
+        return price && cost
+            ? { profit: price - cost, pct: (((price - cost) / price) * 100).toFixed(1) }
+            : null;
+    };
+
+    const comboKey = values => [...values].sort((a, b) => a.attribute_id - b.attribute_id)
+        .map(v => v.attribute_id + ':' + v.attribute_value_id).join('|');
+
+    /** Cartesian product of the chosen values, keeping rows already edited. */
+    function regenerate() {
+        const groups = draft.attribute_ids
+            .map(id => ({ id, values: chosen[id] ?? [] }))
+            .filter(g => g.values.length);
+
+        if (!groups.length) {
+            draft.variants = [];
+
+            return;
+        }
+
+        let combos = [[]];
+
+        for (const group of groups) {
+            const next = [];
+
+            for (const combo of combos) {
+                for (const valueId of group.values) {
+                    next.push([...combo, { attribute_id: group.id, attribute_value_id: valueId }]);
+                }
+            }
+
+            combos = next;
+        }
+
+        const existing = new Map(draft.variants.map(v => [comboKey(v.values), v]));
+
+        // 100 is the cap the API enforces on `variants`.
+        draft.variants = combos.slice(0, 100).map(values => {
+            const found = existing.get(comboKey(values));
+
+            if (found) return found;
+
+            const label = values.map(v => attrValue(v.attribute_id, v.attribute_value_id)?.value).join(' / ');
+
+            return {
+                id: null, name: label,
+                sku: draft.sku ? draft.sku + '-' + label.replace(/[^a-zA-Z0-9]+/g, '-').toUpperCase() : '',
+                price: draft.price, compare_at_price: draft.compare_at_price,
+                stock_quantity: 0, weight: +draft.weight || 0, is_active: true, values
+            };
+        });
+    }
+
+    const marginText = () => {
+        const m = marginOf();
+
+        return m
+            ? `Profit <strong>${money(m.profit)}</strong> · Margin <strong>${m.pct}%</strong>`
+            : 'Add a price and a cost per item to see profit and margin.';
+    };
+
+    const countLabel = n => `<span style="text-transform:none;letter-spacing:0;font-size:11px;font-weight:600;color:var(--ink-3)">${n}</span>`;
+
+    /**
+     * The form itself — shared by "New product" and the edit screen, because
+     * they are the same fields against the same payload.
+     */
+    function productForm() {
+        const cat = category(draft.category_id);
+        const tax = catalog.taxClasses.find(t => t.id === draft.tax_class_id);
+        const has = draft.variants.length > 0;
+
+        return `
+        <div class="sect">Basics</div>
+        <label class="field"><span class="lbl">Title</span>
+            <input data-bind="name" value="${esc(draft.name)}" placeholder="e.g. Chanderi cotton saree"></label>
+        <label class="field"><span class="lbl">Subtitle</span>
+            <input data-bind="short_description" value="${esc(draft.short_description)}" placeholder="One line shoppers see in listings"></label>
+        <label class="field"><span class="lbl">Description</span>
+            <textarea data-bind="description" rows="4" placeholder="What it is, what it's made of, how it's cared for…">${esc(draft.description)}</textarea></label>
+
+        <div class="sect">Media ${countLabel(draft.images.length + '/10')}</div>
+        <div class="card">
+            <div class="media">
+                ${draft.images.map((img, i) => `<div class="tile">${img}
+                    ${i === 0 ? '<span class="cover">COVER</span>' : ''}
+                    <button class="mini x" data-act="removePhoto:${i}" aria-label="Remove photo">✕</button>
+                    ${i > 0 ? `<button class="mini star" data-act="makeCover:${i}" aria-label="Make cover">★</button>` : ''}
+                </div>`).join('')}
+                ${draft.images.length < 10 ? '<button class="tile add" data-act="addPhoto" aria-label="Add a photo">＋</button>' : ''}
+            </div>
+            <p class="note" style="padding:9px 0 0">First photo is the cover, and the
+                order here is the order shoppers see. JPG, PNG, WEBP or AVIF up to
+                5 MB — upload each one first, then send back its path.</p>
+        </div>
+
+        <div class="sect">Category</div>
+        <button class="field tap" data-go="pickCategory">
+            <span><span class="lbl">Category</span>
+                <span class="val ${cat ? '' : 'mute'}">${cat ? esc(cat.name) : 'Choose'}</span></span>
+            <span class="chev">›</span></button>
+
+        <div class="sect">Pricing</div>
+        <label class="field"><span class="lbl">Price</span>
+            <input type="number" inputmode="decimal" data-bind="price" value="${draft.price}" placeholder="0.00"></label>
+        <button class="disc" data-act="sect:pricing">
+            <span class="tag">Compare-at</span><span class="tag">Cost</span><span class="tag">Tax</span><span class="tag">Margin</span>
+            <span class="chev">${open.pricing ? '▲' : '▼'}</span></button>
+        ${open.pricing ? `
+            <div class="two">
+                <label class="field"><span class="lbl">Compare at</span>
+                    <input type="number" inputmode="decimal" data-bind="compare_at_price" value="${draft.compare_at_price ?? ''}" placeholder="—">
+                    <span class="hint">Struck through next to the price</span></label>
+                <label class="field"><span class="lbl">Cost per item</span>
+                    <input type="number" inputmode="decimal" data-bind="cost_price" value="${draft.cost_price ?? ''}" placeholder="—">
+                    <span class="hint">Only you ever see this</span></label>
+            </div>
+            <button class="field tap" data-go="pickTax">
+                <span><span class="lbl">Tax class</span>
+                    <span class="val ${tax ? '' : 'mute'}">${tax ? esc(tax.name) : 'No tax class'}</span></span>
+                <span class="chev">›</span></button>
+            <p class="note" id="marginLine">${marginText()}</p>` : ''}
+
+        <div class="sect">Inventory</div>
+        <button class="sw" data-act="toggle:track_inventory">
+            <span>Track quantity<span class="sub">Counts down as orders come in</span></span>
+            <span class="knob ${draft.track_inventory ? 'on' : ''}"></span></button>
+        ${has
+            ? `<div class="banner">Quantity is set per variant below — <strong>${variantStock()}</strong>
+                   in stock across ${draft.variants.length} variants.</div>`
+            : draft.track_inventory
+                ? `<div class="two">
+                    <label class="field"><span class="lbl">Quantity</span>
+                        <input type="number" inputmode="numeric" data-bind="stock_quantity" value="${draft.stock_quantity}"></label>
+                    <label class="field"><span class="lbl">Low stock alert at</span>
+                        <input type="number" inputmode="numeric" data-bind="low_stock_threshold" value="${draft.low_stock_threshold}"></label>
+                   </div>`
+                : '<p class="note">Stock is not tracked, so this never sells out.</p>'}
+        <button class="disc" data-act="sect:inventory">
+            <span class="tag">SKU</span><span class="tag">Barcode</span><span class="tag">Backorders</span>
+            <span class="chev">${open.inventory ? '▲' : '▼'}</span></button>
+        ${open.inventory ? `
+            <div class="two">
+                <label class="field"><span class="lbl">SKU</span>
+                    <input data-bind="sku" value="${esc(draft.sku)}" placeholder="MINE-1"></label>
+                <label class="field"><span class="lbl">Barcode</span>
+                    <input data-bind="barcode" value="${esc(draft.barcode)}" placeholder="ISBN, UPC, GTIN"></label>
+            </div>
+            <button class="sw" data-act="toggle:allow_backorder">
+                <span>Keep selling when out of stock<span class="sub">Orders keep coming in at zero</span></span>
+                <span class="knob ${draft.allow_backorder ? 'on' : ''}"></span></button>` : ''}
+
+        <div class="sect">Shipping</div>
+        <button class="sw" data-act="toggle:requires_shipping">
+            <span>Physical product<span class="sub">Switch off for anything downloaded</span></span>
+            <span class="knob ${draft.requires_shipping ? 'on' : ''}"></span></button>
+        ${draft.requires_shipping ? `
+            <label class="field"><span class="lbl">Weight (kg)</span>
+                <input type="number" inputmode="decimal" data-bind="weight" value="${draft.weight}" placeholder="0.000"></label>
+            <button class="disc" data-act="sect:shipping">
+                <span class="tag">Length</span><span class="tag">Width</span><span class="tag">Height</span>
+                <span class="chev">${open.shipping ? '▲' : '▼'}</span></button>
+            ${open.shipping ? `
+                <div class="two">
+                    <label class="field"><span class="lbl">Length (cm)</span>
+                        <input type="number" inputmode="decimal" data-bind="length" value="${draft.length ?? ''}"></label>
+                    <label class="field"><span class="lbl">Width (cm)</span>
+                        <input type="number" inputmode="decimal" data-bind="width" value="${draft.width ?? ''}"></label>
+                    <label class="field"><span class="lbl">Height (cm)</span>
+                        <input type="number" inputmode="decimal" data-bind="height" value="${draft.height ?? ''}"></label>
+                </div>` : ''}`
+            : '<p class="note">Digital product — no weight or delivery needed.</p>'}
+
+        <div class="sect">Variants ${has ? countLabel(draft.variants.length + ' · ' + variantType()) : ''}</div>
+        ${draft.attribute_ids.length ? `<div class="card flat">
+            ${draft.attribute_ids.map(id => `<button class="row" data-go="option:${id}">
+                <span class="grow"><span class="t"><span class="txt">${esc(attribute(id).name)}</span></span>
+                    <span class="s">${(chosen[id] ?? []).map(v => esc(attrValue(id, v)?.value ?? '')).join(' · ') || 'No values picked yet'}</span></span>
+                <span class="chev">›</span></button>`).join('')}
+        </div>` : ''}
+        <button class="btn ghost" data-go="addOption">＋ Add options like size or colour</button>
+        ${has ? `<div class="card flat">
+            ${draft.variants.map((v, i) => `<button class="row" data-go="variant:${i}">
+                <span class="grow"><span class="t"><span class="txt">${esc(variantLabel(v))}</span>
+                    ${v.is_active ? '' : '<span class="pill mute">Off</span>'}</span>
+                    <span class="s">${esc(v.sku || 'No SKU')} · ${v.stock_quantity} available</span></span>
+                <span class="amt">${short(+v.price || 0)}</span>
+                <span class="chev">›</span></button>`).join('')}
+        </div>
+        <p class="note">Total inventory: ${variantStock()} available. The type is
+            <strong>${variantType()}</strong> — worked out from the variants, never
+            picked by hand.</p>` : ''}
+
+        <div class="sect">Organisation</div>
+        <label class="field"><span class="lbl">Brand</span>
+            <input data-bind="brand" value="${esc(draft.brand)}" placeholder="Optional"></label>
+        <div class="field">
+            <span class="lbl">Tags</span>
+            ${draft.tags.length ? `<div class="tags">${draft.tags.map(t => `<span class="tg">${esc(t)}
+                <button data-act="removeTag:${esc(t)}" aria-label="Remove ${esc(t)}">✕</button></span>`).join('')}</div>` : ''}
+            <input data-tagin data-bind="tagInput" value="${esc(draft.tagInput)}" placeholder="Add a tag and press Enter">
+        </div>
+        <button class="field tap" data-go="moreCats">
+            <span><span class="lbl">Also list under</span>
+                <span class="val ${draft.category_ids.length ? '' : 'mute'}">${draft.category_ids.length
+                    ? draft.category_ids.map(id => esc(category(id)?.name ?? '')).join(', ')
+                    : 'Nothing else'}</span></span>
+            <span class="chev">›</span></button>
+
+        <div class="sect">Search engine listing</div>
+        <button class="disc" data-act="sect:seo">
+            <span class="lead">${esc(draft.seo_title || draft.name || 'How this shows up in search')}</span>
+            <span class="chev">${open.seo ? '▲' : '▼'}</span></button>
+        ${open.seo ? `
+            <label class="field"><span class="lbl">Page title</span>
+                <input data-bind="seo_title" value="${esc(draft.seo_title)}">
+                <span class="hint">${draft.seo_title.length} of 70 characters used</span></label>
+            <label class="field"><span class="lbl">Meta description</span>
+                <textarea data-bind="seo_description" rows="3">${esc(draft.seo_description)}</textarea></label>
+            <label class="field"><span class="lbl">URL handle</span>
+                <input data-bind="slug" value="${esc(draft.slug)}" placeholder="/products/…">
+                <span class="hint">Leave it blank to build one from the title</span></label>` : ''}
+
+        <div class="sect">Status</div>
+        <button class="field tap" data-go="pickStatus">
+            <span><span class="lbl">Status</span>
+                <span class="val" style="text-transform:capitalize">${draft.status}</span></span>
+            <span class="chev">›</span></button>
+        <p class="note">Only <strong>Active</strong> products are visible to
+            shoppers. Save with <strong>Save</strong>, top right — status is a
+            field here, not a second save button.</p>`;
     }
 
     /* ----------------------------------------------------------- screens */
@@ -804,57 +1318,160 @@
             };
         },
 
+        /*
+        | The product form. One screen for both "New product" and editing an
+        | existing one — the same fields the seller web panel carries, with the
+        | rarely-touched ones folded behind a disclosure row. Every field maps
+        | to a key on POST/PUT /api/seller/products.
+        */
         product: id => {
             const p = products.find(x => x.id === +id);
+
+            if (!draft || draft.id !== p.id) newDraft(p);
+
             return {
-                bar: { title: p.name, sub: p.sku }, chrome: 'back-save',
+                bar: { title: p.name, sub: p.sku || 'No SKU' }, chrome: 'back-save',
                 html: `
-                <div class="card" style="display:flex;gap:9px;align-items:center">
-                    <span class="thumb" style="width:62px;height:62px;font-size:26px">${p.emoji}</span>
-                    <span class="thumb" style="width:62px;height:62px;background:var(--surface-2);color:var(--ink-3);font-size:22px">+</span>
+                <div class="kpis" style="grid-template-columns:1fr 1fr 1fr">
+                    <div class="kpi"><div class="k">Sold</div><div class="v" style="font-size:16px">${p.sold}</div></div>
+                    <div class="kpi"><div class="k">Revenue</div><div class="v" style="font-size:16px">${short(p.revenue)}</div></div>
+                    <div class="kpi"><div class="k">Orders</div><div class="v" style="font-size:16px">${p.orderCount}</div></div>
                 </div>
-                <label class="field"><span class="lbl">Name</span><input value="${esc(p.name)}"></label>
-                <div class="two">
-                    <label class="field"><span class="lbl">Price</span><input value="${p.price}"></label>
-                    <label class="field"><span class="lbl">Compare at</span><input value="${p.was || ''}" placeholder="—"></label>
-                </div>
-                ${p.type === 'variable'
-                    ? `<div class="banner warn">Stock for a variable product is the sum of its variants. Edit the variants to change it.</div>
-                       <button class="row card" style="border-radius:11px" data-act="soon"><span class="grow"><span class="t"><span class="txt">3 variants</span></span><span class="s">S · M · L</span></span><span class="chev">›</span></button>`
-                    : `<div class="two">
-                        <label class="field"><span class="lbl">Stock</span><input value="${p.stock}" id="stockIn"></label>
-                        <label class="field"><span class="lbl">Low at</span><input value="${p.low}"></label>
-                       </div>`}
-                <button class="field tap" data-act="soon"><span><span class="lbl">Category</span><span class="val">${p.cat}</span></span><span class="chev">›</span></button>
-                <button class="field tap" data-act="soon"><span><span class="lbl">Type</span><span class="val" style="text-transform:capitalize">${p.type}</span></span><span class="chev">›</span></button>
-                <button class="field tap" data-act="toggleStatus:${p.id}"><span><span class="lbl">Status</span><span class="val" style="text-transform:capitalize">${p.status}</span></span><span class="chev">›</span></button>
+                ${productForm()}
                 <div class="spacer"></div>
                 <button class="btn danger" data-act="delete:${p.id}">Delete this product</button>`
             };
         },
 
-        newProduct: () => ({
-            bar: { title: 'New product' }, chrome: 'close-save',
+        newProduct: () => {
+            if (!draft || draft.id !== null) newDraft(null);
+
+            return { bar: { title: 'New product' }, chrome: 'close-save', html: productForm() };
+        },
+
+        /* ------------------------------------------- pickers off the form */
+
+        pickCategory: () => ({
+            bar: { title: 'Category' }, chrome: 'back',
             html: `
-                <div class="card" style="display:flex;gap:9px;align-items:center">
-                    <span class="thumb" style="width:62px;height:62px;background:var(--surface-2);color:var(--ink-3);font-size:22px">+</span>
-                    <span class="note" style="flex:1">Add up to 10 photos. First one is the cover.</span>
-                </div>
-                <label class="field"><span class="lbl">Name</span><input placeholder="e.g. Chanderi cotton saree"></label>
-                <div class="two">
-                    <label class="field"><span class="lbl">Price</span><input placeholder="0"></label>
-                    <label class="field"><span class="lbl">Compare at</span><input placeholder="—"></label>
-                </div>
-                <div class="two">
-                    <label class="field"><span class="lbl">Stock</span><input placeholder="0"></label>
-                    <label class="field"><span class="lbl">Low at</span><input value="5"></label>
-                </div>
-                <button class="field tap" data-act="soon"><span><span class="lbl">Category</span><span class="val" style="color:var(--ink-3)">Choose</span></span><span class="chev">›</span></button>
-                <button class="field tap" data-act="soon"><span><span class="lbl">Type</span><span class="val">Simple</span></span><span class="chev">›</span></button>
-                <div class="spacer"></div>
-                <button class="btn" data-act="createProduct">Publish product</button>
-                <button class="btn ghost" data-act="createDraft">Save as draft</button>`
+                <p class="note">Sets the tax rate and where the product shows up
+                    in browse.</p>
+                <div class="card flat">
+                    ${catalog.categories.map(c => `<button class="row" data-act="setCategory:${c.id}">
+                        <span class="grow"><span class="t"><span class="txt" style="${c.parent_id ? 'padding-left:12px;font-weight:500' : ''}">${esc(c.name)}</span></span></span>
+                        <span class="check">${draft.category_id === c.id ? '✓' : ''}</span></button>`).join('')}
+                </div>`
         }),
+
+        moreCats: () => ({
+            bar: { title: 'Also list under', sub: `${draft.category_ids.length} chosen` }, chrome: 'back',
+            html: `
+                <p class="note">Extra places this product appears, on top of its
+                    main category.</p>
+                <div class="card flat">
+                    ${catalog.categories.map(c => `<button class="row" data-act="toggleCat:${c.id}">
+                        <span class="grow"><span class="t"><span class="txt" style="${c.parent_id ? 'padding-left:12px;font-weight:500' : ''}">${esc(c.name)}</span></span></span>
+                        <span class="check">${draft.category_ids.includes(c.id) ? '✓' : ''}</span></button>`).join('')}
+                </div>`
+        }),
+
+        pickTax: () => ({
+            bar: { title: 'Tax class' }, chrome: 'back',
+            html: `
+                <div class="card flat">
+                    <button class="row" data-act="setTax:0">
+                        <span class="grow"><span class="t"><span class="txt">No tax class</span></span></span>
+                        <span class="check">${draft.tax_class_id ? '' : '✓'}</span></button>
+                    ${catalog.taxClasses.map(t => `<button class="row" data-act="setTax:${t.id}">
+                        <span class="grow"><span class="t"><span class="txt">${esc(t.name)}</span></span></span>
+                        <span class="check">${draft.tax_class_id === t.id ? '✓' : ''}</span></button>`).join('')}
+                </div>`
+        }),
+
+        pickStatus: () => {
+            const blurb = {
+                draft: 'Only you can see it. Nothing sells.',
+                active: 'Live on the marketplace, ready to sell.',
+                archived: 'Hidden and out of the way, but not deleted.'
+            };
+
+            return {
+                bar: { title: 'Status' }, chrome: 'back',
+                html: `
+                <div class="card flat">
+                    ${catalog.statuses.map(s => `<button class="row" data-act="setStatus:${s}">
+                        <span class="grow"><span class="t"><span class="txt" style="text-transform:capitalize">${s}</span></span>
+                            <span class="s">${blurb[s]}</span></span>
+                        <span class="check">${draft.status === s ? '✓' : ''}</span></button>`).join('')}
+                </div>`
+            };
+        },
+
+        /* --------------------------------------------------------- variants */
+
+        addOption: () => {
+            const unused = catalog.attributes.filter(a => a.is_variant && !draft.attribute_ids.includes(a.id));
+
+            return {
+                bar: { title: 'Add an option' }, chrome: 'back',
+                html: unused.length ? `
+                <p class="note">Options come from the marketplace — you pick which
+                    of their values you stock.</p>
+                <div class="card flat">
+                    ${unused.map(a => `<button class="row" data-act="addOption:${a.id}">
+                        <span class="grow"><span class="t"><span class="txt">${esc(a.name)}</span></span>
+                            <span class="s">${a.values.map(v => esc(v.value)).join(' · ')}</span></span>
+                        <span class="chev">›</span></button>`).join('')}
+                </div>`
+                : `<div class="empty"><span class="big">🎚️</span>Every option is already on this product.</div>`
+            };
+        },
+
+        option: attrId => {
+            const a = attribute(+attrId);
+            const picked = chosen[+attrId] ?? [];
+
+            return {
+                bar: { title: a.name, sub: 'Pick the ones you stock' }, chrome: 'back',
+                html: `
+                <div class="card">
+                    <div class="vals">
+                        ${a.values.map(v => `<button class="${picked.includes(v.id) ? 'on' : ''}" data-act="toggleValue:${a.id}-${v.id}">
+                            ${v.color ? `<span class="swatch" style="background:${v.color}"></span>` : ''}${esc(v.value)}</button>`).join('')}
+                    </div>
+                </div>
+                <p class="note">Every combination across your options becomes a
+                    variant with its own price, stock and SKU. Rows you have
+                    already edited are kept.</p>
+                <button class="btn" data-act="doneOption">Done</button>
+                <div class="spacer"></div>
+                <button class="btn danger" data-act="removeOption:${a.id}">Remove this option</button>`
+            };
+        },
+
+        variant: index => {
+            const i = +index;
+            const v = draft.variants[i];
+
+            return {
+                bar: { title: variantLabel(v), sub: 'Variant' }, chrome: 'back',
+                html: `
+                <div class="two">
+                    <label class="field"><span class="lbl">Price</span><input type="number" inputmode="decimal" data-bind="variants.${i}.price" value="${v.price}"></label>
+                    <label class="field"><span class="lbl">Available</span><input type="number" inputmode="numeric" data-bind="variants.${i}.stock_quantity" value="${v.stock_quantity}"></label>
+                </div>
+                <label class="field"><span class="lbl">SKU</span><input data-bind="variants.${i}.sku" value="${esc(v.sku ?? '')}" placeholder="Optional"></label>
+                <div class="two">
+                    <label class="field"><span class="lbl">Compare at</span><input type="number" inputmode="decimal" data-bind="variants.${i}.compare_at_price" value="${v.compare_at_price ?? ''}" placeholder="—"></label>
+                    <label class="field"><span class="lbl">Weight (kg)</span><input type="number" inputmode="decimal" data-bind="variants.${i}.weight" value="${v.weight ?? ''}"></label>
+                </div>
+                <button class="sw" data-act="toggleVariant:${i}">
+                    <span>Available to buy<span class="sub">Switch off to hide just this variant</span></span>
+                    <span class="knob ${v.is_active ? 'on' : ''}"></span></button>
+                <div class="spacer"></div>
+                <button class="btn danger" data-act="removeVariant:${i}">Remove this variant</button>`
+            };
+        },
 
         /* ----------------------------------------------------------- money */
 
@@ -1153,9 +1770,22 @@
         tabbar.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.tab === s.tab));
 
         stage.innerHTML = `<div class="screen on ${s.plain ? 'plain' : ''}">${s.html}</div>`;
+
+        // Adding a tag re-renders the screen, so put the caret back where the
+        // seller left it — they usually have another tag to type.
+        if (focusTag) {
+            document.querySelector('[data-tagin]')?.focus();
+            focusTag = false;
+        }
     }
 
-    function go(key) { stack.push(key); render(); }
+    /** The product form is entered fresh every time, never half-edited. */
+    function go(key) {
+        if (key === 'newProduct') newDraft(null);
+        if (key.startsWith('product:')) newDraft(products.find(p => p.id === +key.split(':')[1]));
+
+        stack.push(key); render();
+    }
     function back() { if (stack.length > 1) { stack.pop(); render(); } }
     function root(key) { stack = [key]; render(); }
 
@@ -1175,19 +1805,129 @@
         goPack() { ordersFilter = 'unfulfilled'; root('orders'); },
         goLow() { productsFilter = 'low'; root('products'); },
         soon() { toast('Not part of this prototype'); },
-        createProduct() { back(); toast('Product published'); },
-        createDraft() { back(); toast('Saved as a draft'); },
         addMember() {
             team.push({ name: 'New login', email: 'new@meeratextiles.in', you: false, active: true });
             back();
             toast('Login created');
         },
 
-        'toggleStatus': id => {
-            const p = products.find(x => x.id === +id);
-            p.status = p.status === 'active' ? 'draft' : 'active';
+        /* ------------------------------------------------- the product form */
+
+        'sect': key => { open[key] = !open[key]; render(); },
+        'toggle': key => { draft[key] = !draft[key]; render(); },
+
+        addPhoto() {
+            if (draft.images.length >= 10) return toast('Ten photos is the limit');
+
+            // Stands in for POST /uploads — the real app uploads the file and
+            // keeps the `path` that comes back.
+            draft.images.push(photoPalette[draft.images.length % photoPalette.length]);
             render();
-            toast(p.status === 'active' ? 'Product is live' : 'Moved to draft');
+        },
+
+        'removePhoto': i => { draft.images.splice(+i, 1); render(); },
+        'makeCover': i => {
+            const [img] = draft.images.splice(+i, 1);
+            draft.images.unshift(img);
+            render();
+            toast('New cover photo');
+        },
+
+        'setCategory': id => { draft.category_id = +id; back(); },
+        'toggleCat': id => {
+            const n = +id;
+            draft.category_ids = draft.category_ids.includes(n)
+                ? draft.category_ids.filter(x => x !== n)
+                : [...draft.category_ids, n];
+            render();
+        },
+        'setTax': id => { draft.tax_class_id = +id || null; back(); },
+        'setStatus': s => { draft.status = s; back(); },
+
+        addTag() {
+            const tag = draft.tagInput.trim().replace(/,$/, '');
+
+            if (tag && !draft.tags.includes(tag)) draft.tags.push(tag);
+
+            draft.tagInput = '';
+            focusTag = true;
+            render();
+        },
+
+        'removeTag': tag => { draft.tags = draft.tags.filter(t => t !== tag); render(); },
+
+        'addOption': attrId => {
+            const id = +attrId;
+            draft.attribute_ids.push(id);
+            chosen[id] = [];
+            stack.pop();
+            go('option:' + id);
+        },
+
+        'toggleValue': arg => {
+            const [attrId, valueId] = arg.split('-').map(Number);
+            const list = chosen[attrId] ?? [];
+
+            chosen[attrId] = list.includes(valueId)
+                ? list.filter(v => v !== valueId)
+                : [...list, valueId];
+            render();
+        },
+
+        doneOption() { regenerate(); back(); },
+
+        'removeOption': attrId => {
+            const id = +attrId;
+            draft.attribute_ids = draft.attribute_ids.filter(x => x !== id);
+            delete chosen[id];
+            regenerate();
+            back();
+        },
+
+        'toggleVariant': i => { draft.variants[+i].is_active = !draft.variants[+i].is_active; render(); },
+        'removeVariant': i => { draft.variants.splice(+i, 1); back(); toast('Variant removed'); },
+
+        saveProduct() {
+            if (!draft.name.trim()) return toast('A title is needed');
+            if (draft.price === '' || draft.price === null) return toast('A price is needed');
+
+            // What the app would PUT/POST — always the whole payload, because
+            // anything left out of a PUT is cleared.
+            const saved = {
+                name: draft.name.trim(), sku: draft.sku, price: +draft.price || 0,
+                was: draft.compare_at_price === '' ? null : +draft.compare_at_price,
+                stock: draft.variants.length ? variantStock() : +draft.stock_quantity || 0,
+                low: +draft.low_stock_threshold || 0,
+                status: draft.status, type: variantType(),
+                emoji: draft.images[0] ?? '🧵', images: [...draft.images],
+                cat: category(draft.category_id)?.name ?? '—', category_id: draft.category_id,
+                category_ids: [...draft.category_ids], tax_class_id: draft.tax_class_id,
+                short_description: draft.short_description, description: draft.description,
+                cost_price: draft.cost_price === '' ? null : +draft.cost_price,
+                track_inventory: draft.track_inventory, allow_backorder: draft.allow_backorder,
+                barcode: draft.barcode, requires_shipping: draft.requires_shipping,
+                weight: +draft.weight || 0,
+                length: draft.length === '' ? null : +draft.length,
+                width: draft.width === '' ? null : +draft.width,
+                height: draft.height === '' ? null : +draft.height,
+                brand: draft.brand, tags: [...draft.tags], slug: draft.slug,
+                seo_title: draft.seo_title, seo_description: draft.seo_description,
+                attribute_ids: [...draft.attribute_ids],
+                variants: draft.variants.map(v => ({ ...v, price: +v.price || 0, stock_quantity: +v.stock_quantity || 0 }))
+            };
+
+            if (draft.id) {
+                Object.assign(products.find(p => p.id === draft.id), saved);
+            } else {
+                products.unshift({ id: Math.max(...products.map(p => p.id)) + 1, sold: 0, revenue: 0, orderCount: 0, ...saved });
+            }
+
+            const wasNew = !draft.id;
+            draft = null;
+            back();
+            toast(wasNew
+                ? (saved.status === 'active' ? 'Product published' : 'Saved as a draft')
+                : 'Product saved');
         },
 
         'delete': id => {
@@ -1240,8 +1980,40 @@
         if (actions[name]) actions[name](arg);
     });
 
+    /*
+    | Every field on the product form writes straight into the draft, so a
+    | re-render — opening a section, adding a photo — never loses a keystroke.
+    */
+    document.addEventListener('input', e => {
+        const el = e.target.closest('[data-bind]');
+        if (!el || !draft) return;
+
+        setPath(el.dataset.bind, el.value);
+
+        // Margin follows price and cost without redrawing the screen under
+        // the caret.
+        const line = $('marginLine');
+        if (line) line.innerHTML = marginText();
+    });
+
+    document.addEventListener('keydown', e => {
+        if (e.key !== 'Enter' || !e.target.matches('[data-tagin]')) return;
+
+        e.preventDefault();
+        actions.addTag();
+    });
+
     $('backBtn').addEventListener('click', back);
-    $('saveBtn').addEventListener('click', () => { back(); toast('Saved'); });
+
+    $('saveBtn').addEventListener('click', () => {
+        const key = stack[stack.length - 1];
+
+        // The product form owns its save — one action, and status is a field.
+        if (key === 'newProduct' || key.startsWith('product:')) return actions.saveProduct();
+
+        back();
+        toast('Saved');
+    });
     $('bellBtn').addEventListener('click', () => go('notifications'));
     $('acctBtn').addEventListener('click', () => go('account'));
 

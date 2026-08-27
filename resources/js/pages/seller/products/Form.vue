@@ -9,9 +9,10 @@ import PCombobox from '@/components/admin/PCombobox.vue';
 import PModal from '@/components/admin/PModal.vue';
 import PRichText from '@/components/admin/PRichText.vue';
 import PSelect from '@/components/admin/PSelect.vue';
-import PToggle from '@/components/admin/PToggle.vue';
 import PTextarea from '@/components/admin/PTextarea.vue';
 import PTextField from '@/components/admin/PTextField.vue';
+import PToggle from '@/components/admin/PToggle.vue';
+import { compressImage } from '@/lib/compressImage';
 import { currency, number, statusTone, titleCase } from '@/lib/format';
 
 type AttributeValue = { id: number; value: string; color_hex: string | null };
@@ -203,7 +204,7 @@ const sendFiles = async (files: File[]) => {
     try {
         for (const file of files.slice(0, 10 - form.images.length)) {
             const body = new FormData();
-            body.append('file', file);
+            body.append('file', await compressImage(file));
             body.append('folder', 'products');
 
             const response = await fetch('/seller/uploads', {

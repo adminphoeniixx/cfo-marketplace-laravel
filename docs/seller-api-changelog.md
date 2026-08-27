@@ -15,6 +15,32 @@ with both.
 
 ---
 
+## 2026-08-26
+
+### Fixed
+
+- `POST /products` and `PUT /products/{id}` answered `500` whenever the payload
+  carried `variants[]` (or `images[]`) with `id: null`, or with no `id` key at
+  all — the null was written straight into the primary key and the database
+  refused it. New rows are now inserted without an id, so send a variant with
+  no `id` to add one and with its `id` to edit one, exactly as documented.
+- A `variants[].id` or `images[].id` that belongs to a different product is now
+  treated as a new row rather than rewriting — or colliding with — that other
+  product's record.
+- `POST /uploads` answered an unhandled `500` — and, when the wait outlived the
+  gateway, the proxy's own `502` page — whenever the storage zone was slow or
+  unreachable from the server. The storage request is now given a short timeout
+  and every network failure comes back as this endpoint's documented
+  `502 {"message":"Upload failed. Please try again."}`, so the app can offer a
+  retry instead of showing a raw gateway error.
+
+### Changed
+
+- `POST /uploads` now documents a **resize-before-send** step. Nothing about the
+  request changed — the 5 MB ceiling and the payload are the same — but a native
+  client that sends a full-size camera file will keep losing the race to the
+  gateway. Scale the longest edge to ~2000px and re-encode before posting.
+
 ## 2026-08-25
 
 ### Added

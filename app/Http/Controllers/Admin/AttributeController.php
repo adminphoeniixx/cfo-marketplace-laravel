@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Concerns\SyncsChildRecords;
 use App\Http\Controllers\Controller;
 use App\Models\Attribute;
 use Illuminate\Http\RedirectResponse;
@@ -13,6 +14,8 @@ use Inertia\Response;
 
 class AttributeController extends Controller
 {
+    use SyncsChildRecords;
+
     public function index(Request $request): Response
     {
         $attributes = Attribute::query()
@@ -128,8 +131,9 @@ class AttributeController extends Controller
         $keptIds = [];
 
         foreach (array_values($values) as $position => $value) {
-            $record = $attribute->values()->updateOrCreate(
-                ['id' => $value['id'] ?? null],
+            $record = $this->syncChild(
+                $attribute->values(),
+                $value['id'] ?? null,
                 [
                     'value' => $value['value'],
                     'slug' => Str::slug($value['value']),

@@ -9,6 +9,7 @@ import PCheckbox from '@/components/admin/PCheckbox.vue';
 import PSelect from '@/components/admin/PSelect.vue';
 import PTextarea from '@/components/admin/PTextarea.vue';
 import PTextField from '@/components/admin/PTextField.vue';
+import { compressImage } from '@/lib/compressImage';
 import {
     compactCurrency,
     currency,
@@ -236,7 +237,7 @@ const uploadImages = async (event: Event) => {
     try {
         for (const file of files) {
             const body = new FormData();
-            body.append('file', file);
+            body.append('file', await compressImage(file));
             body.append('folder', 'products');
 
             const response = await fetch('/admin/uploads', {
