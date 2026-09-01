@@ -1,0 +1,2942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Clickable prototype of the CFO customer app — browse, cart, checkout, orders, returns. Hand this to whoever builds the shopper app, alongside docs/seller-app.html.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap">
+<title>CFO Shop — customer app prototype</title>
+</head>
+<body>
+
+<style>
+    /*
+    | Sibling of docs/seller-app.html: same device shell, same screen/router
+    | shape, same "one object per API resource" data. The skin is the shopper
+    | one — a white app bar, a search field in it, price-first cards.
+    |
+    | Colour roles, so a change of mind stays a change of one token:
+    |   ground     the blush the whole app sits on
+    |   surface    white, and every card is one
+    |   brand      pink — every call to action and every active state
+    |   brand-soft the pale pink behind an active thing (the tab pill, chips)
+    |   sale       orange — and only ever the discount percentage
+    |   deal       green — and only ever money saved or delivery gone free
+    |   teal       the rating chip
+    |   critical   red — and only ever destructive
+    |
+    | One theme on purpose. A fashion app commits to its own light, and the
+    | blush IS the brand here — so nothing follows the OS into dark, and every
+    | colour below is painted explicitly rather than inherited from the host.
+    */
+
+    :root {
+        --brand: #dd2f60;
+        --brand-soft: #ffe7ed;
+        --on-brand: #ffffff;
+        --chrome: #feebe5;
+        --chrome-ink: #282c3f;
+        --ground: #feebe5;
+        --surface: #ffffff;
+        --surface-2: #fdf0e8;
+        --line: #f4e2da;
+        --line-soft: #f7ece6;
+        --ink: #282c3f;
+        --ink-2: #4d4d58;
+        --ink-3: #6e6a72;
+        --action: #cc1a4f;   /* the same pink, a shade down, so links clear 4.5:1 on the pale pink rows too */
+        --deal: #016a57;   /* deep enough to hold 4.5:1 on the blush ground, not just on white */
+        --deal-soft: #e3f7f1;
+        --sale: #c0530f;
+        --gold: #ffa53b;
+        --teal: #0f7d78;
+        --critical: #d0021b;
+        --ok-bg: #e3f7f1; --ok-ink: #016450;
+        --warn-bg: #fff3e4; --warn-ink: #8a4b12;
+        --info-bg: #ffe7ed; --info-ink: #a01342;
+        --crit-bg: #fdeced; --crit-ink: #a3121f;
+        --page: #e8dcd6;
+        --sans: "Roboto", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+        --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    [hidden] { display: none !important; }
+
+    body {
+        margin: 0;
+        background: var(--page);
+        font-family: var(--sans);
+        color: var(--ink);
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+        padding: 24px;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    /* --------------------------------------------------------- the device */
+
+    .device {
+        width: 390px; height: 844px;
+        max-height: calc(100vh - 48px);
+        border-radius: 46px;
+        background: #0b0d10;
+        padding: 11px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, .3), 0 30px 70px rgba(0, 0, 0, .35);
+        flex-shrink: 0;
+    }
+
+    @media (max-width: 460px), (max-height: 700px) {
+        body { padding: 0; display: block; }
+        .device { width: 100%; height: 100vh; max-height: none; border-radius: 0; padding: 0; box-shadow: none; }
+        .app { border-radius: 0 !important; }
+        .deskhint { display: none; }
+    }
+
+    .app {
+        position: relative; height: 100%;
+        border-radius: 36px; overflow: hidden;
+        background: var(--ground);
+        display: flex; flex-direction: column;
+    }
+
+    /* ---------------------------------------------------------- app chrome */
+
+    .statusbar {
+        background: var(--chrome); color: var(--ink-3);
+        font-size: 11px; font-family: var(--mono);
+        display: flex; justify-content: space-between;
+        padding: 10px 24px 3px; flex-shrink: 0;
+    }
+
+    /* No bar of its own: the chrome is the same blush the page sits on, and
+       the pink is spent on what you can tap. */
+    .appbar {
+        background: var(--chrome); color: var(--chrome-ink);
+        padding: 6px 8px 10px;
+        display: flex; align-items: center; gap: 4px;
+        flex-shrink: 0; min-height: 52px;
+    }
+
+    .appbar .titles { min-width: 0; flex: 1; padding-left: 4px; }
+    .appbar .t, .appbar .s { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .appbar .t { font-size: 16.5px; font-weight: 500; letter-spacing: -.01em; }
+    .appbar .s { font-size: 11.5px; color: var(--ink-3); margin-top: 1px; }
+
+    /* The search field replaces the title on the shopping tabs — it is the
+       one control that has to be reachable from anywhere. */
+    .searchfield {
+        flex: 1; min-width: 0;
+        background: var(--surface); color: var(--ink-3);
+        border: 1px solid rgba(40, 44, 63, .08); border-radius: 10px;
+        height: 40px; padding: 0 12px;
+        display: flex; align-items: center; gap: 9px;
+        font-size: 13.5px; font-family: inherit;
+        cursor: pointer; text-align: left;
+    }
+
+    .searchfield svg { width: 17px; height: 17px; fill: var(--ink-3); flex-shrink: 0; }
+    .searchfield input { border: 0; background: transparent; font: inherit; color: var(--ink); width: 100%; outline: 0; }
+
+    .iconbtn {
+        width: 36px; height: 36px;
+        display: grid; place-items: center;
+        border-radius: 50%; border: 0; background: transparent;
+        color: var(--chrome-ink); font-size: 18px; cursor: pointer;
+        flex-shrink: 0; font-family: inherit;
+    }
+
+    .iconbtn:hover { background: rgba(40, 44, 63, .07); }
+    .iconbtn:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+    .iconbtn.text { width: auto; padding: 0 10px; font-size: 13.5px; font-weight: 700; border-radius: 6px; color: var(--action); }
+    .iconbtn svg { width: 20px; height: 20px; fill: currentColor; }
+
+    .badged { position: relative; }
+
+    .badged .dot {
+        position: absolute; top: 3px; right: 2px;
+        min-width: 16px; height: 16px; padding: 0 4px;
+        border-radius: 9px; background: var(--brand);
+        color: var(--on-brand); font-size: 9.5px; font-weight: 700;
+        display: grid; place-items: center; line-height: 1;
+        border: 1.5px solid var(--chrome);
+    }
+
+    /* ------------------------------------------------------------- screens */
+
+    .stage { position: relative; flex: 1; overflow: hidden; }
+
+    .screen {
+        position: absolute; inset: 0;
+        overflow-y: auto; overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+        padding: 10px 10px 20px;
+        display: none; flex-direction: column; gap: 9px;
+    }
+
+    /* The screen is a flex column, so its children would otherwise shrink to
+       fit — rails and cards have to keep their own height. */
+    .screen > * { flex-shrink: 0; }
+
+    .screen.on { display: flex; animation: slide .22s cubic-bezier(.2, .7, .3, 1); }
+    .screen.plain { background: var(--surface); padding: 16px 16px 20px; gap: 11px; }
+    .screen.flush { padding: 0 0 20px; gap: 8px; }
+
+    @keyframes slide { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+    @media (prefers-reduced-motion: reduce) { .screen.on { animation: none; } }
+
+    /* -------------------------------------------------------------- tabbar */
+
+    .tabbar {
+        display: flex; background: var(--surface);
+        border-top: 1px solid var(--line);
+        padding: 6px 2px 9px; flex-shrink: 0;
+    }
+
+    .tabbar button {
+        flex: 1; border: 0; background: transparent; cursor: pointer;
+        display: grid; gap: 3px; justify-items: center;
+        font-size: 9.5px; color: var(--ink-3); font-family: inherit;
+        padding: 2px 0; position: relative;
+    }
+
+    .tabbar button.on { color: var(--action); font-weight: 700; }
+    .tabbar button:focus-visible { outline: 2px solid var(--action); outline-offset: 2px; border-radius: 8px; }
+
+    /* The active tab wears a pale pink pill behind its icon. */
+    .tabbar svg {
+        width: 21px; height: 21px; fill: currentColor;
+        box-sizing: content-box; padding: 3px 14px;
+        border-radius: 14px; transition: background .15s;
+    }
+
+    .tabbar button.on svg { background: var(--brand-soft); }
+    .tabbar.hide { display: none; }
+
+    .tabbar .tdot {
+        position: absolute; top: -1px; left: 50%; margin-left: 5px;
+        min-width: 15px; height: 15px; padding: 0 4px;
+        border-radius: 9px; background: var(--brand); color: var(--on-brand);
+        font-size: 9px; font-weight: 700; display: grid; place-items: center; line-height: 1;
+    }
+
+    /* ---------------------------------------------------------- components */
+
+    .card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 12px; padding: 12px;
+    }
+
+    .card.flat { padding: 0; overflow: hidden; }
+    .card.tight { padding: 10px; }
+
+    .sect {
+        font-size: 13px; font-weight: 700; letter-spacing: -.01em;
+        padding: 2px 4px; display: flex;
+        justify-content: space-between; align-items: baseline;
+    }
+
+    .sect .more { color: var(--action); font-size: 11.5px; font-weight: 700; cursor: pointer; border: 0; background: 0; font-family: inherit; }
+    .sect .cap { font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-3); font-weight: 700; }
+
+    .row {
+        display: flex; align-items: center; gap: 11px;
+        padding: 12px; border-bottom: 1px solid var(--line-soft);
+        background: var(--surface); width: 100%;
+        border-left: 0; border-right: 0; border-top: 0;
+        text-align: left; font-family: inherit; color: inherit; cursor: pointer;
+    }
+
+    .row:last-child { border-bottom: 0; }
+    .row:active { background: var(--surface-2); }
+    .row:focus-visible { outline: 2px solid var(--action); outline-offset: -2px; }
+    .row.static { cursor: default; }
+    .row .grow { flex: 1; min-width: 0; }
+    .row .t { font-size: 13.5px; font-weight: 500; display: flex; align-items: center; gap: 6px; }
+    .row .t span.txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .row .s { display: block; font-size: 11.5px; color: var(--ink-3); margin-top: 2px; line-height: 1.45; }
+    .row .amt { font-size: 13.5px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .row .chev { color: var(--ink-3); font-size: 18px; }
+
+    .thumb {
+        width: 44px; height: 44px; border-radius: 9px;
+        background: var(--surface-2); border: 1px solid var(--line);
+        flex-shrink: 0; display: grid; place-items: center; font-size: 20px;
+    }
+
+    .thumb.lg { width: 68px; height: 78px; font-size: 30px; }
+    .thumb.xs { width: 34px; height: 34px; font-size: 15px; border-radius: 5px; }
+
+    .pill {
+        display: inline-block; font-size: 9.5px; font-weight: 700;
+        padding: 2px 7px; border-radius: 3px; white-space: nowrap;
+    }
+
+    .pill.ok { background: var(--ok-bg); color: var(--ok-ink); }
+    .pill.warn { background: var(--warn-bg); color: var(--warn-ink); }
+    .pill.crit { background: var(--crit-bg); color: var(--crit-ink); }
+    .pill.info { background: var(--info-bg); color: var(--info-ink); }
+    .pill.mute { background: var(--line-soft); color: var(--ink-2); }
+
+    .btn {
+        width: 100%; border: 0; border-radius: 6px;
+        padding: 13px 14px; font-family: inherit;
+        font-size: 14px; font-weight: 700; letter-spacing: .02em;
+        background: var(--brand); color: var(--on-brand); cursor: pointer;
+    }
+
+    .btn:active { filter: brightness(.94); }
+    .btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+    .btn.buy { background: var(--brand); }
+    .btn.cart { background: var(--surface); color: var(--brand); box-shadow: inset 0 0 0 1px var(--brand); }
+    .btn.ghost { background: var(--surface); color: var(--action); border: 1px solid var(--line); }
+    .btn.danger { background: var(--surface); color: var(--critical); border: 1px solid var(--line); }
+    .btn.sm { padding: 9px 12px; font-size: 12.5px; width: auto; }
+    .btn[disabled] { opacity: .5; cursor: not-allowed; }
+
+    .btnrow { display: flex; gap: 9px; }
+    .btnrow .btn { flex: 1; }
+
+    .field { display: grid; gap: 5px; }
+    .field .lbl { font-size: 11px; color: var(--ink-2); font-weight: 500; }
+
+    .field input, .field select, .field textarea {
+        width: 100%; padding: 11px 12px;
+        border: 1px solid var(--line); border-radius: 8px;
+        background: var(--surface); color: var(--ink);
+        font-family: inherit; font-size: 14px;
+    }
+
+    .field input:focus, .field select:focus, .field textarea:focus { outline: 2px solid var(--action); outline-offset: -1px; border-color: var(--action); }
+    .field textarea { min-height: 74px; resize: vertical; }
+    .field .hint { font-size: 10.5px; color: var(--ink-3); }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    .chiprow { display: flex; gap: 7px; overflow-x: auto; padding: 2px 4px 4px; scrollbar-width: none; }
+    .chiprow::-webkit-scrollbar { display: none; }
+
+    .chip {
+        border: 1px solid var(--line); background: var(--surface);
+        color: var(--ink-2); border-radius: 20px;
+        padding: 6px 12px; font-size: 12px; font-weight: 500;
+        font-family: inherit; white-space: nowrap; cursor: pointer;
+    }
+
+    .chip.on { background: var(--info-bg); border-color: var(--action); color: var(--action); font-weight: 700; }
+
+    .spacer { flex: 1; min-height: 4px; }
+    .note { font-size: 11.5px; color: var(--ink-3); line-height: 1.55; margin: 0; padding: 0 4px; }
+    .divider { height: 1px; background: var(--line-soft); }
+
+    .empty { display: grid; justify-items: center; gap: 8px; padding: 40px 20px; text-align: center; }
+    .empty .big { font-size: 44px; }
+    .empty .t { font-size: 15px; font-weight: 700; }
+    .empty .s { font-size: 12.5px; color: var(--ink-3); line-height: 1.5; }
+
+    .toast {
+        position: absolute; left: 14px; right: 14px; bottom: 84px;
+        background: var(--ink); color: var(--surface);
+        padding: 12px 14px; border-radius: 6px;
+        font-size: 13px; font-weight: 500;
+        opacity: 0; transform: translateY(8px);
+        transition: opacity .2s, transform .2s;
+        pointer-events: none; z-index: 30; text-align: center;
+    }
+
+    .toast.on { opacity: 1; transform: none; }
+
+    .deskhint {
+        position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%);
+        font-size: 11.5px; color: var(--ink-2); background: var(--surface);
+        border: 1px solid var(--line); border-radius: 20px; padding: 6px 14px;
+        white-space: nowrap;
+    }
+</style>
+
+<style>
+    /* ------------------------------------------------------ shopping bits */
+
+    .rate {
+        display: inline-flex; align-items: center; gap: 3px;
+        background: var(--teal); color: #fff;
+        font-size: 10.5px; font-weight: 700;
+        padding: 1px 5px; border-radius: 3px;
+    }
+
+    .rate.low { background: var(--warn-bg); color: var(--warn-ink); }
+    .ratecount { font-size: 10.5px; color: var(--ink-3); font-weight: 500; }
+
+    .price { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .mrp { font-size: 11.5px; color: var(--ink-3); text-decoration: line-through; }
+    .off { font-size: 11.5px; color: var(--sale); font-weight: 700; }
+    .priceline { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+
+    /* A category strip, the app's first row of navigation. */
+    .circles { display: flex; gap: 4px; overflow-x: auto; padding: 4px 2px; scrollbar-width: none; }
+    .circles::-webkit-scrollbar { display: none; }
+
+    .circles button {
+        border: 0; background: transparent; cursor: pointer; font-family: inherit;
+        display: grid; justify-items: center; gap: 5px;
+        width: 68px; flex-shrink: 0; padding: 4px 0;
+    }
+
+    .circles .ic {
+        width: 54px; height: 54px; border-radius: 16px;
+        background: var(--surface); border: 1px solid var(--line);
+        display: grid; place-items: center; font-size: 24px;
+    }
+
+    .circles button.on .ic { border-color: var(--brand); }
+    .circles button.on .nm { color: var(--action); font-weight: 700; }
+
+    .circles .nm { font-size: 10.5px; color: var(--ink-2); font-weight: 500; line-height: 1.25; text-align: center; }
+
+    /* Banner rail — one card per marketplace campaign. */
+    .rail { display: flex; gap: 9px; overflow-x: auto; padding: 2px 4px 6px; scroll-snap-type: x mandatory; scrollbar-width: none; }
+    .rail::-webkit-scrollbar { display: none; }
+    .rail > * { scroll-snap-align: start; flex-shrink: 0; }
+
+    .banner {
+        width: 300px; height: 132px; border-radius: 12px;
+        padding: 16px; color: #fff; cursor: pointer;
+        border: 0; font-family: inherit; text-align: left;
+        display: grid; align-content: center; gap: 4px;
+    }
+
+    .banner .k { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; opacity: .85; }
+    .banner .h { font-size: 21px; font-weight: 900; letter-spacing: -.02em; line-height: 1.1; }
+    .banner .d { font-size: 12px; opacity: .9; }
+
+    .pgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+    .pcard {
+        background: var(--surface); border: 1px solid var(--line);
+        border-radius: 12px; padding: 10px; cursor: pointer;
+        font-family: inherit; color: inherit; text-align: left;
+        display: grid; gap: 5px; align-content: start; position: relative;
+    }
+
+    .pcard:active { background: var(--surface-2); }
+    .pcard:focus-visible { outline: 2px solid var(--action); outline-offset: 1px; }
+
+    .pcard .shot {
+        height: 116px; border-radius: 9px; background: var(--surface-2);
+        display: grid; place-items: center; font-size: 46px;
+    }
+
+    .pcard.mini { width: 132px; flex-shrink: 0; }
+    .pcard.mini .shot { height: 96px; font-size: 38px; }
+    .pcard .nm { font-size: 12.5px; font-weight: 500; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .pcard .br { font-size: 10.5px; color: var(--ink-3); font-weight: 500; }
+
+    .heart {
+        position: absolute; top: 6px; right: 6px;
+        width: 28px; height: 28px; border-radius: 50%;
+        border: 1px solid var(--line); background: var(--surface);
+        display: grid; place-items: center; cursor: pointer;
+        font-size: 13px; color: var(--ink-3); padding: 0;
+    }
+
+    .heart.on { color: var(--brand); border-color: var(--brand); }
+
+    .assured { font-size: 9.5px; font-weight: 700; color: var(--action); letter-spacing: .02em; }
+
+    /* -------------------------------------------------------- product page */
+
+    .gallery {
+        background: var(--surface); border-radius: 12px;
+        border: 1px solid var(--line); padding: 8px;
+        display: grid; gap: 8px;
+    }
+
+    .shotbig { height: 250px; display: grid; place-items: center; font-size: 108px; background: var(--surface-2); border-radius: 9px; }
+    .shots { display: flex; gap: 7px; justify-content: center; }
+
+    .shots button {
+        width: 44px; height: 44px; border-radius: 5px;
+        border: 1px solid var(--line); background: var(--surface-2);
+        font-size: 20px; cursor: pointer; display: grid; place-items: center;
+    }
+
+    .shots button.on { border-color: var(--action); border-width: 2px; }
+
+    .swatches { display: flex; gap: 7px; flex-wrap: wrap; }
+
+    .swatch {
+        min-width: 42px; padding: 8px 11px;
+        border: 1px solid var(--line); border-radius: 4px;
+        background: var(--surface); color: var(--ink);
+        font-family: inherit; font-size: 12.5px; font-weight: 500; cursor: pointer;
+    }
+
+    .swatch.on { border-color: var(--action); border-width: 2px; color: var(--action); font-weight: 700; }
+    .swatch.out { opacity: .45; text-decoration: line-through; cursor: not-allowed; }
+
+    .specs { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    .specs td { padding: 8px 0; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+    .specs td:first-child { color: var(--ink-3); width: 40%; }
+    .specs tr:last-child td { border-bottom: 0; }
+
+    .bars { display: grid; gap: 5px; }
+    .bar { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--ink-3); }
+    .bar .track { flex: 1; height: 5px; border-radius: 3px; background: var(--line-soft); overflow: hidden; }
+    .bar .fill { height: 100%; background: var(--deal); }
+    .bar .n { width: 34px; text-align: right; font-variant-numeric: tabular-nums; }
+
+    .review { display: grid; gap: 6px; padding: 12px 0; border-bottom: 1px solid var(--line-soft); }
+    .review:last-child { border-bottom: 0; }
+    .review .head { display: flex; align-items: center; gap: 7px; }
+    .review .body { font-size: 12.5px; line-height: 1.55; color: var(--ink-2); }
+    .review .who { font-size: 11px; color: var(--ink-3); }
+
+    .stars { display: flex; gap: 3px; }
+    .stars button { border: 0; background: 0; font-size: 27px; cursor: pointer; padding: 0; color: var(--line); line-height: 1; }
+    .stars button.on { color: var(--gold); }
+
+    /* A bar pinned over the scroller, not inside it — the two buy actions
+       stay reachable however far down the page the shopper is. */
+    .buybar {
+        position: absolute; left: 0; right: 0; bottom: 0;
+        display: flex; background: var(--surface);
+        border-top: 1px solid var(--line); z-index: 12;
+    }
+
+    .buybar button {
+        flex: 1; border: 0; padding: 15px 8px;
+        font-family: inherit; font-size: 13.5px; font-weight: 700;
+        color: var(--on-brand); cursor: pointer; letter-spacing: .02em;
+    }
+
+    /* Two weights, not two hues: the secondary action is the same pink,
+       hollowed out. */
+    .buybar .add { background: var(--surface); color: var(--brand); }
+    .buybar .now { background: var(--brand); }
+    .haspad { padding-bottom: 66px !important; }
+
+    /* --------------------------------------------------------------- cart */
+
+    .line { display: flex; gap: 11px; padding: 12px; border-bottom: 1px solid var(--line-soft); }
+    .line:last-child { border-bottom: 0; }
+    .line .grow { flex: 1; min-width: 0; }
+    .line .nm { display: block; font-size: 13px; font-weight: 500; line-height: 1.35; }
+    .line .meta { display: block; font-size: 11px; color: var(--ink-3); margin-top: 3px; }
+
+    .qty { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+    .qty button { width: 30px; height: 28px; border: 0; background: var(--surface); color: var(--ink); font-size: 16px; cursor: pointer; font-family: inherit; }
+    .qty button:disabled { color: var(--ink-3); cursor: not-allowed; }
+    .qty .n { width: 32px; text-align: center; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; border-left: 1px solid var(--line); border-right: 1px solid var(--line); line-height: 28px; }
+
+    .linkbtn { border: 0; background: 0; font-family: inherit; font-size: 12px; font-weight: 700; color: var(--action); cursor: pointer; padding: 0; white-space: nowrap; }
+    .linkbtn.mute { color: var(--ink-2); }
+    .linkbtn.crit { color: var(--critical); }
+    .lineacts { display: flex; gap: 16px; margin-top: 10px; align-items: center; }
+
+    .totals { display: grid; gap: 9px; font-size: 13px; }
+    .totals .r { display: flex; justify-content: space-between; }
+    .totals .r span:last-child { font-variant-numeric: tabular-nums; }
+    .totals .r.free span:last-child, .totals .r.cut span:last-child { color: var(--deal); font-weight: 700; }
+    .totals .grand { font-weight: 700; font-size: 15px; border-top: 1px dashed var(--line); padding-top: 10px; }
+
+    .sellerhead { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--surface-2); border-bottom: 1px solid var(--line-soft); font-size: 11.5px; font-weight: 700; }
+
+    /* ------------------------------------------------------------ tracking */
+
+    .steps { display: flex; gap: 6px; padding: 0 4px; }
+    .steps .s { flex: 1; height: 3px; border-radius: 2px; background: var(--line); }
+    .steps .s.on { background: var(--brand); }
+
+    .track { display: grid; gap: 0; }
+
+    .tnode { display: grid; grid-template-columns: 20px 1fr; gap: 12px; }
+    .tnode .mark { display: grid; justify-items: center; }
+    .tnode .bead { width: 11px; height: 11px; border-radius: 50%; background: var(--line); margin-top: 4px; }
+    .tnode .stem { width: 2px; flex: 1; background: var(--line); min-height: 26px; }
+    .tnode.done .bead { background: var(--deal); }
+    .tnode.done .stem { background: var(--deal); }
+    .tnode.now .bead { background: var(--brand); box-shadow: 0 0 0 4px var(--info-bg); }
+    .tnode .txt { padding-bottom: 16px; }
+    .tnode .txt .t { display: block; font-size: 13px; font-weight: 500; }
+    .tnode .txt .s { display: block; font-size: 11.5px; color: var(--ink-3); margin-top: 2px; line-height: 1.45; }
+    .tnode:last-child .stem { display: none; }
+    .tnode:last-child .txt { padding-bottom: 0; }
+
+    /* -------------------------------------------------------- bottom sheet */
+
+    .sheet {
+        position: absolute; left: 0; right: 0; bottom: 0; top: 0;
+        background: rgba(0, 0, 0, .38); z-index: 25;
+        display: flex; align-items: flex-end;
+    }
+
+    .sheet .panel {
+        background: var(--surface); width: 100%;
+        border-radius: 14px 14px 0 0; padding: 14px;
+        max-height: 78%; overflow-y: auto;
+        display: grid; gap: 11px;
+        animation: rise .2s cubic-bezier(.2, .7, .3, 1);
+    }
+
+    @keyframes rise { from { transform: translateY(30px); opacity: .4; } to { transform: none; opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) { .sheet .panel { animation: none; } }
+
+    .sheet .hd { display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: 700; }
+
+    .opt { display: flex; align-items: flex-start; gap: 10px; padding: 11px 2px; border-bottom: 1px solid var(--line-soft); cursor: pointer; width: 100%; background: 0; border-left: 0; border-right: 0; border-top: 0; font-family: inherit; text-align: left; color: inherit; }
+    .opt:last-of-type { border-bottom: 0; }
+    .opt .grow { flex: 1; min-width: 0; }
+    .opt .t { display: block; font-size: 13.5px; font-weight: 500; }
+    .opt .s { display: block; font-size: 11.5px; color: var(--ink-3); margin-top: 2px; line-height: 1.45; }
+
+    .mark {
+        width: 19px; height: 19px; border-radius: 50%;
+        border: 2px solid var(--line); flex-shrink: 0; margin-top: 1px;
+        display: grid; place-items: center;
+    }
+
+    .mark.sq { border-radius: 4px; }
+    .mark.on { border-color: var(--action); }
+    .mark.on::after { content: ''; width: 9px; height: 9px; border-radius: 50%; background: var(--action); }
+    .mark.sq.on::after { border-radius: 1px; }
+
+    .switch { width: 38px; height: 22px; border-radius: 12px; background: var(--line); position: relative; flex-shrink: 0; border: 0; cursor: pointer; padding: 0; }
+    .switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: var(--surface); transition: transform .16s; }
+    .switch.on { background: var(--deal); }
+    .switch.on::after { transform: translateX(16px); }
+
+    .brandmark {
+        width: 56px; height: 56px; border-radius: 12px;
+        background: linear-gradient(135deg, #e01e57 0%, #e2620f 100%); color: #fff;
+        display: grid; place-items: center;
+        font-size: 26px; font-weight: 900; margin: 0 auto;
+        font-style: italic; letter-spacing: -.03em;
+    }
+
+    .otpbox { display: flex; gap: 9px; justify-content: center; }
+    .otpbox input { width: 46px; height: 54px; text-align: center; font-size: 21px; font-weight: 700; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); font-family: inherit; }
+    .otpbox input:focus { outline: 2px solid var(--action); outline-offset: -1px; }
+</style>
+
+<div class="device">
+    <div class="app">
+        <div class="statusbar"><span>9:41</span><span>5G ▮▮▮</span></div>
+
+        <div class="appbar">
+            <button class="iconbtn" id="backBtn" hidden aria-label="Back">‹</button>
+            <span class="titles" id="barTitles">
+                <span class="t" id="barTitle">Sign in</span>
+                <span class="s" id="barSub" hidden></span>
+            </span>
+            <button class="searchfield" id="searchBtn" hidden>
+                <svg viewBox="0 0 20 20"><path d="M8.5 3a5.5 5.5 0 014.38 8.84l3.64 3.64-1.04 1.04-3.64-3.64A5.5 5.5 0 118.5 3zm0 1.5a4 4 0 100 8 4 4 0 000-8z"/></svg>
+                <span>Search for sarees, kurtas…</span>
+            </button>
+            <button class="iconbtn badged" id="wishBtn" hidden aria-label="Wishlist">
+                <svg viewBox="0 0 20 20"><path d="M10 17s-6.5-4.2-6.5-8.3A3.7 3.7 0 0110 6.4a3.7 3.7 0 016.5 2.3C16.5 12.8 10 17 10 17z"/></svg>
+                <span class="dot" id="wishDot">0</span>
+            </button>
+            <button class="iconbtn badged" id="cartBtn" hidden aria-label="Cart">
+                <svg viewBox="0 0 20 20"><path d="M2 3h2.2l.7 2.6h11.4a1 1 0 01.97 1.25l-1.4 5.2A1.4 1.4 0 0114.5 13H7.2l.3 1.2h8.2v1.5H6.9a1.2 1.2 0 01-1.16-.9L3.2 4.5H2V3zm5 13.2a1.2 1.2 0 110 2.4 1.2 1.2 0 010-2.4zm7.6 0a1.2 1.2 0 110 2.4 1.2 1.2 0 010-2.4z"/></svg>
+                <span class="dot" id="cartDot2">0</span>
+            </button>
+            <button class="iconbtn badged" id="bellBtn" hidden aria-label="Notifications">
+                <svg viewBox="0 0 20 20"><path d="M10 2a5 5 0 00-5 5v3.2l-1.3 2.3A1 1 0 004.6 14h10.8a1 1 0 00.9-1.5L15 10.2V7a5 5 0 00-5-5zm0 15a2.5 2.5 0 002.4-2h-4.8A2.5 2.5 0 0010 17z"/></svg>
+                <span class="dot" id="bellDot">3</span>
+            </button>
+            <button class="iconbtn text" id="saveBtn" hidden>Save</button>
+        </div>
+
+        <div class="stage" id="stage"></div>
+
+        <nav class="tabbar hide" id="tabbar">
+            <button data-tab="home" class="on">
+                <svg viewBox="0 0 20 20"><path d="M10 2.5l7 6V17a1 1 0 01-1 1h-4v-5H8v5H4a1 1 0 01-1-1V8.5l7-6z"/></svg>Home
+            </button>
+            <button data-tab="categories">
+                <svg viewBox="0 0 20 20"><path d="M3 3h6v6H3V3zm8 0h6v6h-6V3zM3 11h6v6H3v-6zm8 0h6v6h-6v-6z"/></svg>Categories
+            </button>
+            <button data-tab="orders">
+                <svg viewBox="0 0 20 20"><path d="M4 3h12a1 1 0 011 1v3H3V4a1 1 0 011-1zm-1 6h14v7a1 1 0 01-1 1H4a1 1 0 01-1-1V9zm4 2v2h6v-2H7z"/></svg>Orders
+            </button>
+            <button data-tab="cart">
+                <svg viewBox="0 0 20 20"><path d="M2 3h2.2l.7 2.6h11.4a1 1 0 01.97 1.25l-1.4 5.2A1.4 1.4 0 0114.5 13H7.2l.3 1.2h8.2v1.5H6.9a1.2 1.2 0 01-1.16-.9L3.2 4.5H2V3zm5 13.2a1.2 1.2 0 110 2.4 1.2 1.2 0 010-2.4zm7.6 0a1.2 1.2 0 110 2.4 1.2 1.2 0 010-2.4z"/></svg>Cart
+                <span class="tdot" id="cartDot" hidden>0</span>
+            </button>
+            <button data-tab="account">
+                <svg viewBox="0 0 20 20"><path d="M10 10a3.5 3.5 0 100-7 3.5 3.5 0 000 7zm0 1.6c-3 0-6 1.5-6 3.4V18h12v-3c0-1.9-3-3.4-6-3.4z"/></svg>Account
+            </button>
+        </nav>
+
+        <div class="toast" id="toast"></div>
+    </div>
+</div>
+
+<div class="deskhint">Tap through it — search, add to cart, check out, then return an item</div>
+
+<script>
+(function () {
+    'use strict';
+
+    /* ------------------------------------------------------------- data */
+
+    /*
+    | Everything below stands in for one API resource each, named the way the
+    | Laravel side already names it: customers, customer_addresses, products
+    | (+ variants), categories, vendors, orders (+ items, events),
+    | cancellations, refunds, payment_methods, delivery_partners.
+    */
+
+    const customer = {
+        first_name: 'Priya', last_name: 'Nair',
+        email: 'priya.nair@example.com', phone: '98765 43210',
+        gender: 'female', date_of_birth: '1994-03-11',
+        accepts_marketing: true, email_verified: true,
+        orders_count: 14, total_spent: 48250
+    };
+
+    const money = n => '₹' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+    const money2 = n => '₹' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const vendors = [
+        { id: 1, name: 'Meera Textiles', city: 'Kanchipuram', rating: 4.4, since: '2023', products: 86 },
+        { id: 2, name: 'Sharma Home', city: 'Jaipur', rating: 4.1, since: '2024', products: 42 },
+        { id: 3, name: 'Bombay Kicks', city: 'Mumbai', rating: 3.9, since: '2022', products: 129 }
+    ];
+
+    const vendor = id => vendors.find(v => v.id === id);
+
+    /* The same tree the admin panel edits — parent_id and all. */
+    const categories = [
+        { id: 1, name: 'Ethnic wear', parent_id: null, icon: '🥻' },
+        { id: 2, name: 'Sarees', parent_id: 1, icon: '🥻' },
+        { id: 3, name: 'Kurtas', parent_id: 1, icon: '👕' },
+        { id: 4, name: 'Dupattas & stoles', parent_id: 1, icon: '🧣' },
+        { id: 5, name: 'Winter wear', parent_id: null, icon: '🧶' },
+        { id: 6, name: 'Shawls', parent_id: 5, icon: '🧶' },
+        { id: 7, name: 'Jackets', parent_id: 5, icon: '🧥' },
+        { id: 8, name: 'Home linen', parent_id: null, icon: '🛏️' },
+        { id: 9, name: 'Bedsheets', parent_id: 8, icon: '🛏️' },
+        { id: 10, name: 'Curtains', parent_id: 8, icon: '🪟' },
+        { id: 11, name: 'Footwear', parent_id: null, icon: '👟' },
+        { id: 12, name: 'Sneakers', parent_id: 11, icon: '👟' },
+        { id: 13, name: 'Sandals', parent_id: 11, icon: '🥿' }
+    ];
+
+    const category = id => categories.find(c => c.id === id);
+    const topCategories = () => categories.filter(c => c.parent_id === null);
+    const childrenOf = id => categories.filter(c => c.parent_id === id);
+
+    /*
+    | A product as the shopper sees it. `options` are the seller's variant
+    | attributes; every combination that exists is a row in `variants`, keyed
+    | by the values in order — that is what goes on the cart line and, later,
+    | on order_items.options.
+    */
+    const products = [
+        { id: 47, name: 'Kanchipuram pure silk saree with gold zari border', brand: 'Meera Looms', vendor_id: 1,
+          category_id: 2, price: 4999, mrp: 6499, rating: 4.4, ratings: 1284, reviews: 213,
+          images: ['🥻', '🧵', '👘'], assured: true, stock: 40, eta: '3–5 days', returnDays: 7, cod: true,
+          short: 'Handwoven mulberry silk, gold zari border',
+          description: 'Woven on a pit loom in Kanchipuram from pure mulberry silk. The zari is half-fine, tested for colour hold. Comes with an unstitched blouse piece of 0.8m.',
+          specs: { Fabric: 'Pure mulberry silk', Length: '6.3 m with blouse piece', Weave: 'Handloom, pit loom', Wash: 'Dry clean only', Weight: '650 g', Packed: 'Saree + blouse piece' },
+          options: [{ name: 'Colour', values: [{ v: 'Ruby red', stock: 12 }, { v: 'Indigo', stock: 20 }, { v: 'Cream', stock: 8 }] }],
+          tags: ['silk', 'wedding'] },
+
+        { id: 48, name: 'Cotton kurta and pyjama set', brand: 'Meera Looms', vendor_id: 1,
+          category_id: 3, price: 1999, mrp: 2799, rating: 4.1, ratings: 640, reviews: 98,
+          images: ['👕', '🧵'], assured: true, stock: 6, eta: '2–4 days', returnDays: 7, cod: true,
+          short: 'Breathable cotton, matching pyjama',
+          description: 'Two-piece set in 100% combed cotton. Side pockets on both pieces, drawstring waist.',
+          specs: { Fabric: '100% cotton', Fit: 'Regular', Sleeve: 'Full', Wash: 'Machine wash cold', Pockets: 'Yes, both pieces' },
+          options: [{ name: 'Size', values: [{ v: 'S', stock: 0 }, { v: 'M', stock: 3 }, { v: 'L', stock: 3 }, { v: 'XL', stock: 0 }] }],
+          tags: ['cotton'] },
+
+        { id: 50, name: 'Handloom linen dupatta', brand: 'Meera Looms', vendor_id: 1,
+          category_id: 4, price: 899, mrp: 1199, rating: 4.2, ratings: 402, reviews: 61,
+          images: ['🧣'], assured: false, stock: 60, eta: '3–6 days', returnDays: 7, cod: true,
+          short: 'Slub linen, hand-knotted tassels',
+          description: 'Woven in slub linen with hand-knotted tassels along both edges. Softens with every wash.',
+          specs: { Fabric: 'Linen', Length: '2.3 m', Width: '0.9 m', Wash: 'Hand wash separately' },
+          options: [{ name: 'Colour', values: [{ v: 'Sand', stock: 30 }, { v: 'Olive', stock: 20 }, { v: 'Rust', stock: 10 }] }],
+          tags: ['linen'] },
+
+        { id: 49, name: 'Kashmiri wool shawl, hand-embroidered', brand: 'Meera Looms', vendor_id: 1,
+          category_id: 6, price: 3499, mrp: 4999, rating: 4.6, ratings: 221, reviews: 44,
+          images: ['🧶', '🧵'], assured: true, stock: 18, eta: '4–7 days', returnDays: 10, cod: false,
+          short: 'Merino wool, sozni embroidery',
+          description: 'Merino wool base with sozni hand embroidery along the border. Each piece takes about three weeks.',
+          specs: { Fabric: 'Merino wool', Work: 'Sozni hand embroidery', Size: '2.0 m × 1.0 m', Wash: 'Dry clean only' },
+          options: [], tags: ['wool', 'winter'] },
+
+        { id: 51, name: 'Block print cotton stole', brand: 'Meera Looms', vendor_id: 1,
+          category_id: 4, price: 1299, mrp: null, rating: 3.8, ratings: 90, reviews: 17,
+          images: ['🧵'], assured: false, stock: 0, eta: '4–7 days', returnDays: 7, cod: true,
+          short: 'Hand block print, natural dye',
+          description: 'Hand block printed with natural dyes in Bagru. Slight colour variation is part of the process.',
+          specs: { Fabric: 'Cotton mul', Print: 'Hand block, natural dye', Size: '2.1 m × 0.7 m' },
+          options: [], tags: ['cotton'] },
+
+        { id: 60, name: 'Jaipur cotton double bedsheet with 2 pillow covers', brand: 'Sharma Home', vendor_id: 2,
+          category_id: 9, price: 1499, mrp: 2499, rating: 4.3, ratings: 3120, reviews: 508,
+          images: ['🛏️', '🧵'], assured: true, stock: 120, eta: '2–4 days', returnDays: 7, cod: true,
+          short: '144 TC cotton, fits king size',
+          description: 'Screen printed in Sanganer on 144 TC cotton. Fits a king bed with room to tuck.',
+          specs: { Fabric: '100% cotton', Count: '144 TC', Size: '228 × 254 cm', Includes: '1 bedsheet, 2 pillow covers', Wash: 'Machine wash' },
+          options: [{ name: 'Colour', values: [{ v: 'Indigo', stock: 60 }, { v: 'Mustard', stock: 40 }, { v: 'Pink', stock: 20 }] }],
+          tags: ['cotton', 'bestseller'] },
+
+        { id: 61, name: 'Blackout door curtain, set of 2', brand: 'Sharma Home', vendor_id: 2,
+          category_id: 10, price: 1099, mrp: 1899, rating: 4.0, ratings: 870, reviews: 130,
+          images: ['🪟'], assured: false, stock: 45, eta: '3–6 days', returnDays: 7, cod: true,
+          short: '90% light blocking, eyelet top',
+          description: 'Triple-weave polyester that blocks about 90% of daylight. Eight rust-proof eyelets per panel.',
+          specs: { Fabric: 'Polyester, triple weave', Size: '7 ft × 4 ft each', Top: '8 eyelets', Includes: '2 panels' },
+          options: [{ name: 'Size', values: [{ v: '5 ft window', stock: 20 }, { v: '7 ft door', stock: 25 }] }],
+          tags: ['home'] },
+
+        { id: 70, name: 'Canvas high-top sneakers', brand: 'Bombay Kicks', vendor_id: 3,
+          category_id: 12, price: 1799, mrp: 2999, rating: 3.9, ratings: 1502, reviews: 288,
+          images: ['👟', '👞'], assured: true, stock: 80, eta: '2–5 days', returnDays: 14, cod: true,
+          short: 'Cotton canvas, vulcanised rubber sole',
+          description: 'Cotton canvas upper on a vulcanised rubber sole, with a padded collar and cotton laces.',
+          specs: { Upper: 'Cotton canvas', Sole: 'Vulcanised rubber', Closure: 'Lace-up', Care: 'Wipe with a damp cloth' },
+          options: [
+            { name: 'Size', values: [{ v: 'UK 6', stock: 10 }, { v: 'UK 7', stock: 22 }, { v: 'UK 8', stock: 30 }, { v: 'UK 9', stock: 0 }] },
+            { name: 'Colour', values: [{ v: 'White', stock: 40 }, { v: 'Black', stock: 22 }] }],
+          tags: ['footwear'] },
+
+        { id: 71, name: 'Kolhapuri leather sandals', brand: 'Bombay Kicks', vendor_id: 3,
+          category_id: 13, price: 1299, mrp: 1799, rating: 4.2, ratings: 640, reviews: 96,
+          images: ['🥿'], assured: false, stock: 33, eta: '3–6 days', returnDays: 10, cod: true,
+          short: 'Vegetable-tanned leather, hand-stitched',
+          description: 'Hand-stitched in Kolhapur from vegetable-tanned buffalo leather. Softens to your foot in a week.',
+          specs: { Material: 'Buffalo leather', Sole: 'Leather', Made: 'Kolhapur, hand-stitched' },
+          options: [{ name: 'Size', values: [{ v: 'UK 6', stock: 8 }, { v: 'UK 7', stock: 15 }, { v: 'UK 8', stock: 10 }] }],
+          tags: ['leather'] },
+
+        { id: 72, name: 'Quilted winter jacket', brand: 'Bombay Kicks', vendor_id: 3,
+          category_id: 7, price: 2299, mrp: 3999, rating: 4.0, ratings: 310, reviews: 51,
+          images: ['🧥'], assured: true, stock: 24, eta: '3–5 days', returnDays: 14, cod: true,
+          short: 'Water-resistant shell, hooded',
+          description: 'Water-resistant nylon shell over recycled poly fill, with a detachable hood and zip pockets.',
+          specs: { Shell: 'Nylon, water resistant', Fill: 'Recycled polyester', Hood: 'Detachable', Pockets: '2 zip' },
+          options: [{ name: 'Size', values: [{ v: 'M', stock: 8 }, { v: 'L', stock: 10 }, { v: 'XL', stock: 6 }] }],
+          tags: ['winter'] }
+    ];
+
+    const product = id => products.find(p => p.id === +id);
+
+    const reviewsFor = {
+        47: [
+            { name: 'Anita K.', stars: 5, title: 'Wedding-ready', body: 'The zari has not dulled after two wears. Blouse piece is generous.', when: 'Jul 2026', verified: true },
+            { name: 'Divya S.', stars: 4, title: 'Lovely, slightly heavy', body: 'Colour is exactly as photographed. Heavier than my other silks, which I expected.', when: 'Jun 2026', verified: true },
+            { name: 'Meenal R.', stars: 3, title: 'Delivery was slow', body: 'Saree is fine. Took nine days instead of five.', when: 'Jun 2026', verified: false }
+        ],
+        60: [
+            { name: 'Rahul S.', stars: 5, title: 'Bought a second set', body: 'Held colour through six washes. Pillow covers fit standard pillows.', when: 'Aug 2026', verified: true },
+            { name: 'Farah M.', stars: 4, title: 'Good for the price', body: 'Cotton is thin but soft. Fits our king bed with a little tuck.', when: 'Jul 2026', verified: true }
+        ]
+    };
+
+    const reviewsOf = id => reviewsFor[id] || [
+        { name: 'Verified buyer', stars: 4, title: 'Matches the listing', body: 'Arrived on time and looks like the photos.', when: 'Jul 2026', verified: true }
+    ];
+
+    let addresses = [
+        { id: 1, label: 'Home', first_name: 'Priya', last_name: 'Nair', phone: '98765 43210',
+          address_line1: '42 Beach Road, Besant Nagar', address_line2: 'Near the bus depot',
+          city: 'Chennai', state: 'Tamil Nadu', postcode: '600090', country: 'IN',
+          is_default_shipping: true, is_default_billing: true },
+        { id: 2, label: 'Work', first_name: 'Priya', last_name: 'Nair', phone: '98765 43210',
+          address_line1: 'Tidel Park, 4th floor', address_line2: 'Taramani',
+          city: 'Chennai', state: 'Tamil Nadu', postcode: '600113', country: 'IN',
+          is_default_shipping: false, is_default_billing: false }
+    ];
+
+    const addrLines = a => [a.address_line1, a.address_line2, `${a.city}, ${a.state} ${a.postcode}`].filter(Boolean);
+
+    /* GET /checkout/payment-methods — the admin's active list, in position order. */
+    const paymentMethods = [
+        { code: 'upi', name: 'UPI', description: 'GPay, PhonePe, Paytm or any UPI app', icon: '⚡' },
+        { code: 'card', name: 'Credit / debit card', description: 'Visa, Mastercard, RuPay', icon: '💳' },
+        { code: 'netbanking', name: 'Net banking', description: 'All major Indian banks', icon: '🏦' },
+        { code: 'cod', name: 'Cash on delivery', description: 'Pay the courier when it arrives', icon: '💵' }
+    ];
+
+    const deliveryPartners = [
+        { code: 'delhivery', name: 'Delhivery', support_phone: '1800 103 6354', tracking_url: 'delhivery.com/track' },
+        { code: 'bluedart', name: 'Blue Dart', support_phone: '1860 233 1234', tracking_url: 'bluedart.com/tracking' }
+    ];
+
+    const partner = code => deliveryPartners.find(p => p.code === code);
+
+    /* Shipping rates come from the seller's zones; the shopper sees the two
+       that apply to their pincode. */
+    const shippingOptions = [
+        { code: 'standard', name: 'Standard delivery', detail: 'Arrives 4–6 Sep', rate: 0, note: 'Free over ₹999' },
+        { code: 'express', name: 'Express delivery', detail: 'Arrives 2 Sep', rate: 99, note: 'Ships within 24 hours' }
+    ];
+
+    const coupons = [
+        { code: 'FIRST100', kind: 'flat', value: 100, min: 999, blurb: '₹100 off your first order over ₹999' },
+        { code: 'SILK15', kind: 'pct', value: 15, min: 2999, blurb: '15% off sarees and shawls over ₹2,999' },
+        { code: 'FREESHIP', kind: 'ship', value: 0, min: 499, blurb: 'Free express delivery over ₹499' }
+    ];
+
+    const banners = [
+        { k: 'Festive edit', h: 'Handloom, straight from the loom', d: 'Up to 40% off silk & cotton', bg: 'linear-gradient(120deg,#e01e57,#e2620f)', cat: 1 },
+        { k: 'Home refresh', h: 'Bedsheets from ₹899', d: 'Sharma Home · Jaipur prints', bg: 'linear-gradient(120deg,#0f7d78,#04836b)', cat: 8 },
+        { k: 'New season', h: 'Winter wear is in', d: 'Shawls, jackets, layers', bg: 'linear-gradient(120deg,#282c3f,#535766)', cat: 5 }
+    ];
+
+    /*
+    | Orders as the customer app reads them: GET /orders returns the whole
+    | basket, and the lines carry their own vendor. A basket that spans two
+    | sellers is normal here — never treat the first line's vendor as "the
+    | store" for the order.
+    */
+    let orders = [
+        { number: '#1043', status: 'shipped', payment_status: 'paid', fulfillment_status: 'fulfilled',
+          payment_method: 'UPI', transaction_id: 'UPI-99213048', carrier: 'delhivery', tracking_number: 'TRK-88213',
+          placed_at: '28 Aug, 9:12 am', paid_at: '28 Aug, 9:12 am', shipped_at: '29 Aug, 6:40 pm',
+          delivered_at: null, eta: 'Arriving Mon, 1 Sep',
+          address_id: 1, shipping_method: 'Standard delivery',
+          items: [
+            { product_id: 60, name: 'Jaipur cotton double bedsheet with 2 pillow covers', vendor_id: 2, emoji: '🛏️',
+              options: { Colour: 'Indigo' }, unit_price: 1499, quantity: 1, total: 1499, fulfillment_status: 'fulfilled' },
+            { product_id: 61, name: 'Blackout door curtain, set of 2', vendor_id: 2, emoji: '🪟',
+              options: { Size: '7 ft door' }, unit_price: 1099, quantity: 2, total: 2198, fulfillment_status: 'fulfilled' }],
+          subtotal: 3697, discount_total: 100, shipping_total: 0, tax_total: 185, grand_total: 3782, coupon_code: 'FIRST100' },
+
+        { number: '#1039', status: 'processing', payment_status: 'paid', fulfillment_status: 'unfulfilled',
+          payment_method: 'Cash on delivery', transaction_id: null, carrier: null, tracking_number: null,
+          placed_at: '30 Aug, 7:55 pm', paid_at: null, shipped_at: null, delivered_at: null,
+          eta: 'Arriving by Thu, 4 Sep',
+          address_id: 1, shipping_method: 'Standard delivery',
+          items: [
+            { product_id: 47, name: 'Kanchipuram pure silk saree with gold zari border', vendor_id: 1, emoji: '🥻',
+              options: { Colour: 'Ruby red' }, unit_price: 4999, quantity: 1, total: 4999, fulfillment_status: 'unfulfilled' },
+            { product_id: 70, name: 'Canvas high-top sneakers', vendor_id: 3, emoji: '👟',
+              options: { Size: 'UK 7', Colour: 'White' }, unit_price: 1799, quantity: 1, total: 1799, fulfillment_status: 'unfulfilled' }],
+          subtotal: 6798, discount_total: 0, shipping_total: 0, tax_total: 340, grand_total: 7138, coupon_code: null },
+
+        { number: '#1024', status: 'completed', payment_status: 'paid', fulfillment_status: 'fulfilled',
+          payment_method: 'Card', transaction_id: 'CARD-77120', carrier: 'bluedart', tracking_number: 'BD-40021',
+          placed_at: '12 Aug, 11:02 am', paid_at: '12 Aug, 11:02 am', shipped_at: '13 Aug, 4:10 pm',
+          delivered_at: '16 Aug, 1:25 pm', eta: null,
+          address_id: 2, shipping_method: 'Express delivery',
+          items: [
+            { product_id: 49, name: 'Kashmiri wool shawl, hand-embroidered', vendor_id: 1, emoji: '🧶',
+              options: {}, unit_price: 3499, quantity: 1, total: 3499, fulfillment_status: 'fulfilled', rated: false }],
+          subtotal: 3499, discount_total: 0, shipping_total: 99, tax_total: 420, grand_total: 4018, coupon_code: null },
+
+        { number: '#1011', status: 'cancelled', payment_status: 'refunded', fulfillment_status: 'unfulfilled',
+          payment_method: 'UPI', transaction_id: 'UPI-88110', carrier: null, tracking_number: null,
+          placed_at: '2 Aug, 8:30 pm', paid_at: '2 Aug, 8:30 pm', shipped_at: null, delivered_at: null,
+          cancelled_at: '3 Aug, 10:15 am', eta: null,
+          address_id: 1, shipping_method: 'Standard delivery',
+          items: [
+            { product_id: 48, name: 'Cotton kurta and pyjama set', vendor_id: 1, emoji: '👕',
+              options: { Size: 'M' }, unit_price: 1999, quantity: 1, total: 1999, fulfillment_status: 'unfulfilled' }],
+          subtotal: 1999, discount_total: 0, shipping_total: 0, tax_total: 100, grand_total: 2099, coupon_code: null }
+    ];
+
+    const order = num => orders.find(o => o.number === num);
+
+    /* Cancellation::REASONS and Refund::REASONS, verbatim. */
+    const cancelReasons = [
+        ['customer_changed_mind', 'I changed my mind'],
+        ['ordered_by_mistake', 'Ordered by mistake'],
+        ['found_cheaper', 'Found a better price elsewhere'],
+        ['delivery_too_slow', 'Delivery is taking too long'],
+        ['address_issue', 'Delivery address is wrong'],
+        ['duplicate_order', 'Duplicate order'],
+        ['other', 'Something else']
+    ];
+
+    const refundReasons = [
+        ['damaged', 'Item arrived damaged'],
+        ['wrong_item', 'Wrong item delivered'],
+        ['not_as_described', 'Not as described'],
+        ['size_issue', 'Size or fit issue'],
+        ['quality_issue', 'Quality not satisfactory'],
+        ['late_delivery', 'Delivered too late'],
+        ['other', 'Something else']
+    ];
+
+    /* Requests the shopper has raised — cancellations and refunds share this
+       list in the app, because to a shopper they are one queue. */
+    let requests = [
+        { number: 'REF-00009', kind: 'refund', order: '#1024', status: 'approved',
+          reason: 'damaged', note: 'Pallu had a tear near the border.',
+          items: ['Kashmiri wool shawl, hand-embroidered'], amount: 3499, method: 'Original payment method',
+          raised: '18 Aug', updated: '19 Aug', eta: 'Back in your account by 24 Aug' },
+        { number: 'CAN-00012', kind: 'cancellation', order: '#1011', status: 'approved',
+          reason: 'ordered_by_mistake', note: '', items: ['Cotton kurta and pyjama set'],
+          amount: 2099, method: 'Original payment method',
+          raised: '3 Aug', updated: '3 Aug', eta: 'Refunded on 5 Aug' }
+    ];
+
+    let notifications = [
+        { t: 'Your order #1043 has shipped', b: 'Delhivery · TRK-88213 · arriving Mon, 1 Sep', w: '2h ago', read: false, go: 'track:#1043' },
+        { t: 'Price drop on your wishlist', b: 'Quilted winter jacket is now ₹2,299', w: 'Yesterday', read: false, go: 'product:72' },
+        { t: 'Refund REF-00009 approved', b: '₹3,499 back to your UPI by 24 Aug', w: '2d ago', read: false, go: 'request:REF-00009' },
+        { t: 'Rate the wool shawl', b: 'Delivered on 16 Aug — how was it?', w: '5d ago', read: true, go: 'rate:49' }
+    ];
+
+    let pushOn = true, dealAlerts = true, orderAlerts = true;
+
+    /* --------------------------------------------------------- app state */
+
+    let stack = ['login'];
+    let signedIn = false;
+
+    let cart = [
+        { pid: 47, opts: { Colour: 'Ruby red' }, qty: 1 },
+        { pid: 60, opts: { Colour: 'Indigo' }, qty: 2 }
+    ];
+
+    let wishlist = [72, 49];
+    let recent = [60, 47, 70];
+
+    let query = '';
+    let ordersFilter = 'all';
+    let plp = { category_id: null, sort: 'relevance', maxPrice: null, minRating: null, minOff: null, vendor_id: null, assured: false, cod: false };
+    let sheet = null;                 // 'sort' | 'filter' | null
+    let pdp = { image: 0, opts: {} }; // selection on the open product page
+    let checkout = { address_id: 1, shipping: 'standard', payment: 'upi', coupon: null };
+    let cancelDraft = null, returnDraft = null, ratingDraft = null, addrDraft = null;
+    let nextCancellation = 13, nextRefund = 10;
+    let lastOrder = null;
+
+    const $ = id => document.getElementById(id);
+    const stage = $('stage'), tabbar = $('tabbar'), toastEl = $('toast');
+    const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+    function toast(msg) {
+        toastEl.textContent = msg;
+        toastEl.classList.add('on');
+        clearTimeout(toast._t);
+        toast._t = setTimeout(() => toastEl.classList.remove('on'), 2200);
+    }
+
+    /* ---------------------------------------------------------- shopping */
+
+    const discount = p => p.mrp ? Math.round((1 - p.price / p.mrp) * 100) : 0;
+    const inStock = p => p.stock > 0;
+
+    /** Cart lines are keyed by product + chosen options, the way an order
+        item is: the same shirt in two sizes is two lines, not one. */
+    const lineKey = (pid, opts) => pid + '|' + Object.keys(opts).sort().map(k => k + '=' + opts[k]).join(',');
+    const cartKeyOf = l => lineKey(l.pid, l.opts);
+    const cartCount = () => cart.reduce((n, l) => n + l.qty, 0);
+    const cartSubtotal = () => cart.reduce((n, l) => n + product(l.pid).price * l.qty, 0);
+    const cartMrp = () => cart.reduce((n, l) => n + (product(l.pid).mrp || product(l.pid).price) * l.qty, 0);
+
+    function couponCut() {
+        const c = checkout.coupon;
+        if (!c) return 0;
+        const sub = cartSubtotal();
+        if (sub < c.min) return 0;
+        if (c.kind === 'flat') return c.value;
+        if (c.kind === 'pct') return Math.round(sub * c.value / 100);
+        return 0;                        // 'ship' takes its discount off delivery
+    }
+
+    function shipCost() {
+        const opt = shippingOptions.find(o => o.code === checkout.shipping);
+        if (checkout.coupon?.kind === 'ship' && cartSubtotal() >= checkout.coupon.min) return 0;
+        if (opt.code === 'standard') return cartSubtotal() >= 999 ? 0 : 49;
+        return opt.rate;
+    }
+
+    const cartTax = () => Math.round((cartSubtotal() - couponCut()) * 0.05);
+    const cartTotal = () => cartSubtotal() - couponCut() + shipCost() + cartTax();
+
+    function addToCart(pid, opts, qty) {
+        const key = lineKey(pid, opts);
+        const line = cart.find(l => cartKeyOf(l) === key);
+        if (line) line.qty += qty; else cart.push({ pid, opts, qty });
+    }
+
+    const wished = id => wishlist.includes(id);
+    const unread = () => notifications.filter(n => !n.read).length;
+
+    /** Sellers on a basket, in the order their first line appears — the cart
+        and the order summary both group by this, never by "the" vendor. */
+    function groupByVendor(lines) {
+        const out = [];
+        lines.forEach(l => {
+            const vid = l.vendor_id ?? product(l.pid).vendor_id;
+            let g = out.find(x => x.vendor_id === vid);
+            if (!g) out.push(g = { vendor_id: vid, lines: [] });
+            g.lines.push(l);
+        });
+        return out;
+    }
+
+    /* ------------------------------------------------------------ search */
+
+    function matches(p) {
+        const q = query.trim().toLowerCase();
+        if (q && !(p.name + ' ' + p.brand + ' ' + p.tags.join(' ') + ' ' + category(p.category_id).name).toLowerCase().includes(q)) return false;
+        if (plp.category_id) {
+            const wanted = [plp.category_id, ...childrenOf(plp.category_id).map(c => c.id)];
+            if (!wanted.includes(p.category_id)) return false;
+        }
+        if (plp.maxPrice && p.price > plp.maxPrice) return false;
+        if (plp.minRating && p.rating < plp.minRating) return false;
+        if (plp.minOff && discount(p) < plp.minOff) return false;
+        if (plp.vendor_id && p.vendor_id !== plp.vendor_id) return false;
+        if (plp.assured && !p.assured) return false;
+        if (plp.cod && !p.cod) return false;
+        return true;
+    }
+
+    function results() {
+        const list = products.filter(matches);
+        const by = {
+            relevance: (a, b) => b.ratings - a.ratings,
+            low: (a, b) => a.price - b.price,
+            high: (a, b) => b.price - a.price,
+            rating: (a, b) => b.rating - a.rating,
+            discount: (a, b) => discount(b) - discount(a)
+        }[plp.sort];
+        return [...list].sort(by);
+    }
+
+    const activeFilters = () =>
+        [plp.maxPrice, plp.minRating, plp.minOff, plp.vendor_id, plp.assured || null, plp.cod || null].filter(Boolean).length;
+
+    /* -------------------------------------------------------- partials */
+
+    const ratePill = p => `<span class="rate ${p.rating < 4 ? 'low' : ''}">${p.rating.toFixed(1)} ★</span>
+        <span class="ratecount">${p.ratings.toLocaleString('en-IN')} ratings</span>`;
+
+    const priceLine = p => `<div class="priceline">
+            <span class="price">${money(p.price)}</span>
+            ${p.mrp ? `<span class="mrp">${money(p.mrp)}</span><span class="off">${discount(p)}% off</span>` : ''}
+        </div>`;
+
+    function pcard(p, mini) {
+        return `<button class="pcard ${mini ? 'mini' : ''}" data-go="product:${p.id}">
+            <span class="shot">${p.images[0]}</span>
+            <span class="br">${esc(p.brand)}</span>
+            <span class="nm">${esc(p.name)}</span>
+            ${priceLine(p)}
+            <span>${ratePill(p)}</span>
+            ${p.assured ? '<span class="assured">✓ CFO Assured</span>' : ''}
+            ${inStock(p) ? '' : '<span class="pill crit">Out of stock</span>'}
+            <span class="heart ${wished(p.id) ? 'on' : ''}" data-act="wish:${p.id}" role="button" aria-label="Save for later">${wished(p.id) ? '♥' : '♡'}</span>
+        </button>`;
+    }
+
+    const statusPill = o => ({
+        pending: '<span class="pill warn">Payment pending</span>',
+        processing: '<span class="pill info">Packing</span>',
+        on_hold: '<span class="pill warn">On hold</span>',
+        shipped: '<span class="pill info">On the way</span>',
+        completed: '<span class="pill ok">Delivered</span>',
+        cancelled: '<span class="pill mute">Cancelled</span>',
+        refunded: '<span class="pill mute">Refunded</span>'
+    })[o.status];
+
+    const reqPill = r => ({
+        pending: '<span class="pill warn">Awaiting seller</span>',
+        approved: '<span class="pill ok">Approved</span>',
+        rejected: '<span class="pill crit">Declined</span>',
+        completed: '<span class="pill ok">Done</span>'
+    })[r.status];
+
+    const stars = n => '★★★★★'.slice(0, n) + '☆☆☆☆☆'.slice(0, 5 - n);
+
+    /* ------------------------------------------------------------ screens */
+
+    const screens = {
+
+        /* ------------------------------------------------------ getting in */
+
+        login: () => ({
+            bar: { title: 'Sign in' }, chrome: 'bare', plain: true,
+            html: `
+                <div class="spacer"></div>
+                <div style="text-align:center">
+                    <div class="brandmark">C</div>
+                    <div style="font-size:20px;font-weight:700;margin-top:14px;letter-spacing:-.02em">CFO Shop</div>
+                    <div style="font-size:12.5px;color:var(--ink-3);margin-top:3px">Handloom, home and more — from sellers you can name</div>
+                </div>
+                <div style="height:8px"></div>
+                <label class="field"><span class="lbl">Mobile number</span>
+                    <input type="tel" value="98765 43210" autocomplete="tel" inputmode="numeric"></label>
+                <button class="btn" data-go="otp">Continue</button>
+                <div style="display:flex;align-items:center;gap:10px;color:var(--ink-3);font-size:11px">
+                    <span class="divider" style="flex:1"></span>OR<span class="divider" style="flex:1"></span>
+                </div>
+                <button class="btn ghost" data-go="emailLogin">Sign in with email</button>
+                <div class="spacer"></div>
+                <p class="note" style="text-align:center">New to CFO Shop? Entering your number creates
+                    your account. By continuing you accept the terms and privacy policy.</p>`
+        }),
+
+        otp: () => ({
+            bar: { title: 'Verify your number', sub: 'Sent to +91 98765 43210' }, chrome: 'back', plain: true,
+            html: `
+                <p class="note" style="padding:0">Enter the 6-digit code we texted you. It expires in 10 minutes.</p>
+                <div class="otpbox">
+                    <input value="4" inputmode="numeric" maxlength="1" aria-label="Digit 1">
+                    <input value="8" inputmode="numeric" maxlength="1" aria-label="Digit 2">
+                    <input value="2" inputmode="numeric" maxlength="1" aria-label="Digit 3">
+                    <input value="0" inputmode="numeric" maxlength="1" aria-label="Digit 4">
+                    <input value="1" inputmode="numeric" maxlength="1" aria-label="Digit 5">
+                    <input value="7" inputmode="numeric" maxlength="1" aria-label="Digit 6">
+                </div>
+                <button class="btn" data-act="signin">Verify and continue</button>
+                <div style="text-align:center;font-size:12.5px;color:var(--ink-3)">Didn't get it?
+                    <button class="linkbtn" data-act="resend">Resend in 0:24</button></div>
+                <div class="spacer"></div>`
+        }),
+
+        emailLogin: () => ({
+            bar: { title: 'Sign in with email' }, chrome: 'back', plain: true,
+            html: `
+                <label class="field"><span class="lbl">Email</span>
+                    <input type="email" value="priya.nair@example.com" autocomplete="username"></label>
+                <label class="field"><span class="lbl">Password</span>
+                    <input type="password" value="a-good-password" autocomplete="current-password"></label>
+                <button class="btn" data-act="signin">Sign in</button>
+                <button class="linkbtn" data-go="forgot" style="justify-self:center">Forgot your password?</button>
+                <div class="spacer"></div>`
+        }),
+
+        forgot: () => ({
+            bar: { title: 'Reset your password' }, chrome: 'back', plain: true,
+            html: `
+                <p class="note" style="padding:0">We'll email you a link. It works once and expires in an hour.</p>
+                <label class="field"><span class="lbl">Email</span>
+                    <input type="email" value="priya.nair@example.com"></label>
+                <button class="btn" data-act="sentReset">Send the link</button>
+                <div class="spacer"></div>`
+        }),
+
+        /* ------------------------------------------------------------ home */
+
+        home: () => {
+            const deals = [...products].filter(p => discount(p) >= 30).slice(0, 4);
+            const top = [...products].sort((a, b) => b.rating - a.rating).slice(0, 4);
+            const seen = recent.map(product);
+            return {
+                bar: { search: true }, chrome: 'main', tab: 'home', icons: { wish: true, bell: true }, flush: true,
+                html: `
+                <div class="circles">
+                    ${topCategories().map(c => `<button data-go="category:${c.id}">
+                        <span class="ic">${c.icon}</span><span class="nm">${esc(c.name)}</span></button>`).join('')}
+                    <button data-go="offers"><span class="ic">🏷️</span><span class="nm">Offers</span></button>
+                    <button data-go="orders"><span class="ic">📦</span><span class="nm">My orders</span></button>
+                </div>
+
+                <div class="rail">
+                    ${banners.map(b => `<button class="banner" style="background:${b.bg}" data-go="category:${b.cat}">
+                        <span class="k">${esc(b.k)}</span><span class="h">${esc(b.h)}</span><span class="d">${esc(b.d)}</span></button>`).join('')}
+                </div>
+
+                <div class="sect" style="margin:0 6px">Deals of the day
+                    <button class="more" data-act="seeDeals">See all</button></div>
+                <div class="pgrid" style="margin:0 10px">${deals.map(p => pcard(p)).join('')}</div>
+
+                <div class="sect" style="margin:6px 6px 0">Top rated near you
+                    <button class="more" data-act="seeAll">See all</button></div>
+                <div class="rail" style="padding-left:10px">${top.map(p => pcard(p, true)).join('')}</div>
+
+                <div class="sect" style="margin:6px 6px 0">Sellers you bought from</div>
+                <div class="card flat" style="margin:0 10px">
+                    ${vendors.map(v => `<button class="row" data-go="seller:${v.id}">
+                        <span class="thumb">🏬</span>
+                        <span class="grow"><span class="t"><span class="txt">${esc(v.name)}</span></span>
+                            <span class="s">${esc(v.city)} · ${v.rating} ★ · ${v.products} products</span></span>
+                        <span class="chev">›</span></button>`).join('')}
+                </div>
+
+                ${seen.length ? `<div class="sect" style="margin:6px 6px 0">Recently viewed</div>
+                <div class="rail" style="padding-left:10px">${seen.map(p => pcard(p, true)).join('')}</div>` : ''}`
+            };
+        },
+
+        /* ------------------------------------------------------ browsing */
+
+        categories: () => ({
+            bar: { search: true }, chrome: 'main', tab: 'categories', icons: { wish: true, bell: true },
+            html: topCategories().map(parent => `
+                <div class="sect">${esc(parent.name)}
+                    <button class="more" data-go="category:${parent.id}">Shop all</button></div>
+                <div class="card flat">
+                    ${childrenOf(parent.id).map(c => {
+                        const n = products.filter(p => p.category_id === c.id).length;
+                        return `<button class="row" data-go="category:${c.id}">
+                            <span class="thumb">${c.icon}</span>
+                            <span class="grow"><span class="t"><span class="txt">${esc(c.name)}</span></span>
+                                <span class="s">${n} product${n === 1 ? '' : 's'}</span></span>
+                            <span class="chev">›</span></button>`;
+                    }).join('')}
+                </div>`).join('')
+        }),
+
+        search: () => {
+            const suggestions = query.trim()
+                ? products.filter(matches).slice(0, 6)
+                : [];
+            return {
+                bar: { title: 'Search' }, chrome: 'back', plain: true, searchInput: true,
+                html: `
+                <label class="field">
+                    <input id="q" value="${esc(query)}" placeholder="Search for sarees, kurtas, bedsheets…" autocomplete="off" data-search>
+                </label>
+                ${query.trim() ? `
+                    <div class="sect"><span class="cap">${suggestions.length} match${suggestions.length === 1 ? '' : 'es'}</span></div>
+                    <div class="card flat">
+                        ${suggestions.length ? suggestions.map(p => `<button class="row" data-go="product:${p.id}">
+                            <span class="thumb">${p.images[0]}</span>
+                            <span class="grow"><span class="t"><span class="txt">${esc(p.name)}</span></span>
+                                <span class="s">${esc(p.brand)} · ${money(p.price)}</span></span></button>`).join('')
+                        : '<div class="row static"><span class="s">Nothing matched. Try a category name, or a fabric like “linen”.</span></div>'}
+                    </div>
+                    <button class="btn ghost" data-act="runSearch">See all results for “${esc(query.trim())}”</button>`
+                : `
+                    <div class="sect">Recent searches</div>
+                    <div class="chiprow">
+                        ${['silk saree', 'bedsheet', 'sneakers uk 7', 'linen dupatta'].map(t =>
+                            `<button class="chip" data-act="recall:${encodeURIComponent(t)}">${esc(t)}</button>`).join('')}
+                    </div>
+                    <div class="sect">Trending</div>
+                    <div class="chiprow">
+                        ${['kanchipuram', 'winter jacket', 'kolhapuri', 'blackout curtain'].map(t =>
+                            `<button class="chip" data-act="recall:${encodeURIComponent(t)}">${esc(t)}</button>`).join('')}
+                    </div>`}
+                <div class="spacer"></div>`
+            };
+        },
+
+        results: () => {
+            const list = results();
+            const cat = plp.category_id ? category(plp.category_id) : null;
+            const sortName = { relevance: 'Popularity', low: 'Price: low to high', high: 'Price: high to low', rating: 'Customer rating', discount: 'Discount' }[plp.sort];
+            return {
+                bar: { title: cat ? cat.name : (query.trim() ? `“${query.trim()}”` : 'All products'), sub: `${list.length} product${list.length === 1 ? '' : 's'}` },
+                chrome: 'back', icons: { wish: true }, flush: true,
+                html: `
+                <div style="display:flex;gap:0;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5">
+                    <button class="linkbtn mute" style="flex:1;padding:12px" data-act="sheet:sort">↕ ${esc(sortName)}</button>
+                    <span style="width:1px;background:var(--line)"></span>
+                    <button class="linkbtn ${activeFilters() ? '' : 'mute'}" style="flex:1;padding:12px" data-act="sheet:filter">
+                        ⚙ Filters${activeFilters() ? ' · ' + activeFilters() : ''}</button>
+                </div>
+                ${list.length ? `<div class="pgrid" style="margin:0 10px">${list.map(p => pcard(p)).join('')}</div>`
+                    : `<div class="empty"><span class="big">🔍</span>
+                        <span class="t">No products match</span>
+                        <span class="s">Try clearing a filter, or widening the price range.</span>
+                        <button class="btn ghost sm" data-act="clearFilters">Clear filters</button></div>`}`
+            };
+        },
+
+        seller: id => {
+            const v = vendor(+id);
+            const list = products.filter(p => p.vendor_id === v.id);
+            return {
+                bar: { title: v.name, sub: `${v.city} · seller since ${v.since}` }, chrome: 'back', flush: true,
+                html: `
+                <div class="card" style="margin:10px 10px 0;display:flex;gap:12px;align-items:center">
+                    <span class="thumb lg" style="height:56px;width:56px;font-size:26px">🏬</span>
+                    <span style="flex:1">
+                        <div style="font-size:15px;font-weight:700">${esc(v.name)}</div>
+                        <div style="font-size:12px;color:var(--ink-3);margin-top:3px">
+                            <span class="rate ${v.rating < 4 ? 'low' : ''}">${v.rating} ★</span>
+                            &nbsp;${v.products} products · ships from ${esc(v.city)}</div>
+                    </span>
+                </div>
+                <div class="sect" style="margin:0 6px">In this store</div>
+                <div class="pgrid" style="margin:0 10px">${list.map(p => pcard(p)).join('')}</div>`
+            };
+        },
+
+        /* --------------------------------------------------- product page */
+
+        product: id => {
+            const p = product(id);
+            const v = vendor(p.vendor_id);
+            const chosen = p.options.map(o => pdp.opts[o.name]).filter(Boolean).length === p.options.length;
+            const rv = reviewsOf(p.id);
+            const buckets = [5, 4, 3, 2, 1].map(s => ({ s, n: Math.max(0, Math.round(p.ratings * [.58, .24, .1, .05, .03][5 - s])) }));
+
+            return {
+                bar: { title: p.name, sub: esc(v.name) }, chrome: 'back', icons: { wish: true, cart: true }, flush: true,
+                bottom: inStock(p)
+                    ? `<button class="add" data-act="addCart:${p.id}">ADD TO CART</button>
+                       <button class="now" data-act="buyNow:${p.id}">BUY NOW</button>`
+                    : `<button class="add" style="background:var(--ink-3)" data-act="notifyMe:${p.id}">NOTIFY ME</button>
+                       <button class="now" style="background:var(--brand)" data-act="wish:${p.id}">SAVE FOR LATER</button>`,
+                html: `
+                <div class="gallery" style="margin:10px 10px 0">
+                    <div class="shotbig">${p.images[pdp.image] || p.images[0]}</div>
+                    ${p.images.length > 1 ? `<div class="shots">${p.images.map((im, i) =>
+                        `<button class="${i === pdp.image ? 'on' : ''}" data-act="shot:${i}" aria-label="Photo ${i + 1}">${im}</button>`).join('')}</div>` : ''}
+                </div>
+
+                <div class="card" style="margin:0 10px;display:grid;gap:7px">
+                    <div style="font-size:11px;color:var(--ink-3);font-weight:700">${esc(p.brand)}</div>
+                    <div style="font-size:15px;font-weight:500;line-height:1.4">${esc(p.name)}</div>
+                    <div>${ratePill(p)} <span class="ratecount">· ${p.reviews} reviews</span></div>
+                    <div class="priceline" style="align-items:baseline">
+                        <span class="price" style="font-size:23px">${money(p.price)}</span>
+                        ${p.mrp ? `<span class="mrp">${money(p.mrp)}</span><span class="off">${discount(p)}% off</span>` : ''}
+                    </div>
+                    <div style="font-size:11.5px;color:var(--ink-3)">Inclusive of all taxes</div>
+                    ${p.stock > 0 && p.stock <= 10 ? `<div class="pill crit" style="justify-self:start">Only ${p.stock} left</div>` : ''}
+                    ${inStock(p) ? '' : '<div class="pill crit" style="justify-self:start">Out of stock</div>'}
+                </div>
+
+                ${p.options.map(o => `
+                <div class="card" style="margin:0 10px;display:grid;gap:9px">
+                    <div style="font-size:12.5px;font-weight:700">${esc(o.name)}${pdp.opts[o.name] ? `<span style="color:var(--ink-3);font-weight:400"> · ${esc(pdp.opts[o.name])}</span>` : ''}</div>
+                    <div class="swatches">
+                        ${o.values.map(val => `<button class="swatch ${pdp.opts[o.name] === val.v ? 'on' : ''} ${val.stock === 0 ? 'out' : ''}"
+                            ${val.stock === 0 ? 'disabled' : ''} data-act="pick:${esc(o.name)}:${esc(val.v)}">${esc(val.v)}</button>`).join('')}
+                    </div>
+                </div>`).join('')}
+
+                <div class="card flat" style="margin:0 10px">
+                    <div class="row static">
+                        <span class="thumb">📍</span>
+                        <span class="grow"><span class="t"><span class="txt">Deliver to 600090, Chennai</span></span>
+                            <span class="s">${esc(p.eta)} · ${p.cod ? 'Cash on delivery available' : 'Prepaid only'}</span></span>
+                        <button class="linkbtn" data-act="pincode">Change</button>
+                    </div>
+                    <div class="row static">
+                        <span class="thumb">↩️</span>
+                        <span class="grow"><span class="t"><span class="txt">${p.returnDays}-day return</span></span>
+                            <span class="s">Free pickup if it arrives damaged or wrong</span></span>
+                    </div>
+                    <button class="row" data-go="seller:${v.id}">
+                        <span class="thumb">🏬</span>
+                        <span class="grow"><span class="t"><span class="txt">Sold by ${esc(v.name)}</span></span>
+                            <span class="s">${v.rating} ★ seller rating · ships from ${esc(v.city)}</span></span>
+                        <span class="chev">›</span></button>
+                </div>
+
+                <div class="sect" style="margin:0 6px">Offers</div>
+                <div class="card flat" style="margin:0 10px">
+                    ${coupons.map(c => `<div class="row static">
+                        <span class="thumb">🏷️</span>
+                        <span class="grow"><span class="t"><span class="txt">${esc(c.code)}</span></span>
+                            <span class="s">${esc(c.blurb)}</span></span></div>`).join('')}
+                </div>
+
+                <div class="sect" style="margin:0 6px">Product details</div>
+                <div class="card" style="margin:0 10px">
+                    <p style="font-size:12.5px;line-height:1.6;color:var(--ink-2);margin:0 0 10px">${esc(p.description)}</p>
+                    <table class="specs">
+                        ${Object.entries(p.specs).map(([k, val]) => `<tr><td>${esc(k)}</td><td>${esc(val)}</td></tr>`).join('')}
+                    </table>
+                </div>
+
+                <div class="sect" style="margin:0 6px">Ratings &amp; reviews
+                    <button class="more" data-go="reviews:${p.id}">All ${p.reviews}</button></div>
+                <div class="card" style="margin:0 10px;display:grid;gap:12px">
+                    <div style="display:flex;gap:16px;align-items:center">
+                        <div style="text-align:center">
+                            <div style="font-size:27px;font-weight:700;line-height:1">${p.rating.toFixed(1)}<span style="font-size:15px"> ★</span></div>
+                            <div style="font-size:10.5px;color:var(--ink-3);margin-top:4px">${p.ratings.toLocaleString('en-IN')} ratings</div>
+                        </div>
+                        <div class="bars" style="flex:1">
+                            ${buckets.map(b => `<div class="bar"><span>${b.s}★</span>
+                                <span class="track"><span class="fill" style="width:${Math.round(b.n / p.ratings * 100)}%"></span></span>
+                                <span class="n">${b.n.toLocaleString('en-IN')}</span></div>`).join('')}
+                        </div>
+                    </div>
+                    ${rv.slice(0, 2).map(r => `<div class="review">
+                        <div class="head"><span class="rate ${r.stars < 4 ? 'low' : ''}">${r.stars} ★</span>
+                            <span style="font-size:13px;font-weight:700">${esc(r.title)}</span></div>
+                        <div class="body">${esc(r.body)}</div>
+                        <div class="who">${esc(r.name)} · ${esc(r.when)}${r.verified ? ' · <span style="color:var(--deal)">Verified purchase</span>' : ''}</div>
+                    </div>`).join('')}
+                </div>
+
+                <div class="sect" style="margin:0 6px">Similar products</div>
+                <div class="rail" style="padding-left:10px">
+                    ${products.filter(x => x.id !== p.id && (x.category_id === p.category_id || x.vendor_id === p.vendor_id))
+                        .slice(0, 5).map(x => pcard(x, true)).join('')}
+                </div>`
+            };
+        },
+
+        reviews: id => {
+            const p = product(id);
+            return {
+                bar: { title: 'Ratings & reviews', sub: p.name }, chrome: 'back',
+                html: `
+                <div class="card">
+                    <div style="display:flex;align-items:center;gap:10px">
+                        <span class="rate" style="font-size:14px;padding:3px 8px">${p.rating.toFixed(1)} ★</span>
+                        <span style="font-size:12.5px;color:var(--ink-3)">${p.ratings.toLocaleString('en-IN')} ratings · ${p.reviews} reviews</span>
+                    </div>
+                </div>
+                <div class="chiprow">
+                    ${['All', '5 ★', '4 ★', '3 ★', 'With photos', 'Verified only'].map((f, i) =>
+                        `<button class="chip ${i === 0 ? 'on' : ''}" data-act="soon">${f}</button>`).join('')}
+                </div>
+                <div class="card">${reviewsOf(p.id).map(r => `<div class="review">
+                    <div class="head"><span class="rate ${r.stars < 4 ? 'low' : ''}">${r.stars} ★</span>
+                        <span style="font-size:13px;font-weight:700">${esc(r.title)}</span></div>
+                    <div class="body">${esc(r.body)}</div>
+                    <div class="who">${esc(r.name)} · ${esc(r.when)}${r.verified ? ' · <span style="color:var(--deal)">Verified purchase</span>' : ''}</div>
+                </div>`).join('')}</div>`
+            };
+        },
+
+        /* ------------------------------------------------------------ cart */
+
+        cart: () => {
+            if (!cart.length) return {
+                bar: { title: 'Cart' }, chrome: 'main', tab: 'cart', icons: { wish: true },
+                html: `<div class="empty"><span class="big">🛒</span>
+                    <span class="t">Your cart is empty</span>
+                    <span class="s">Saved items and wishlist picks are still waiting for you.</span>
+                    <button class="btn ghost sm" data-act="goHome">Start shopping</button>
+                    <button class="btn ghost sm" data-go="wishlist">Open wishlist (${wishlist.length})</button></div>`
+            };
+
+            const groups = groupByVendor(cart);
+            const saved = cartMrp() - cartSubtotal() + couponCut();
+
+            return {
+                bar: { title: 'Cart', sub: `${cartCount()} item${cartCount() === 1 ? '' : 's'}` },
+                chrome: 'main', tab: 'cart', icons: { wish: true },
+                bottom: `<button class="add" style="background:var(--surface);color:var(--ink);flex:0 0 42%;text-align:left;padding-left:16px">
+                        <span style="display:block;font-size:16px">${money(cartTotal())}</span>
+                        <span style="display:block;font-size:10.5px;color:var(--ink-3);font-weight:500">${cartCount()} items · view details</span>
+                    </button>
+                    <button class="now" data-act="startCheckout">PLACE ORDER</button>`,
+                html: `
+                <div class="card flat">
+                    <div class="row static" style="background:var(--info-bg)">
+                        <span class="thumb xs" style="background:transparent;border:0">📍</span>
+                        <span class="grow"><span class="t"><span class="txt">Deliver to 600090, Chennai</span></span>
+                            <span class="s">${esc(addresses.find(a => a.id === checkout.address_id).label)} · ${esc(customer.first_name)}</span></span>
+                        <button class="linkbtn" data-go="checkAddress">Change</button>
+                    </div>
+                </div>
+
+                ${groups.map(g => {
+                    const v = vendor(g.vendor_id);
+                    return `<div class="card flat">
+                        <div class="sellerhead">🏬 ${esc(v.name)}
+                            <span style="margin-left:auto;font-weight:400;color:var(--ink-3)">${g.lines.length} item${g.lines.length === 1 ? '' : 's'}</span></div>
+                        ${g.lines.map(l => {
+                            const p = product(l.pid);
+                            const key = cartKeyOf(l);
+                            return `<div class="line">
+                                <span class="thumb lg">${p.images[0]}</span>
+                                <span class="grow">
+                                    <span class="nm">${esc(p.name)}</span>
+                                    <span class="meta">${Object.entries(l.opts).map(([k, val]) => esc(k) + ': ' + esc(val)).join(' · ') || esc(p.brand)}</span>
+                                    <div class="priceline" style="margin-top:6px">
+                                        <span class="price">${money(p.price * l.qty)}</span>
+                                        ${p.mrp ? `<span class="mrp">${money(p.mrp * l.qty)}</span><span class="off">${discount(p)}% off</span>` : ''}
+                                    </div>
+                                    <div class="meta">${esc(p.eta)} · ${p.returnDays}-day return</div>
+                                    <div class="lineacts">
+                                        <span class="qty">
+                                            <button data-act="qty:${key}:-1" ${l.qty === 1 ? 'disabled' : ''} aria-label="Fewer">−</button>
+                                            <span class="n">${l.qty}</span>
+                                            <button data-act="qty:${key}:1" aria-label="More">+</button>
+                                        </span>
+                                        <button class="linkbtn mute" data-act="saveLater:${key}">Save for later</button>
+                                        <button class="linkbtn crit" data-act="removeLine:${key}">Remove</button>
+                                    </div>
+                                </span>
+                            </div>`;
+                        }).join('')}
+                    </div>`;
+                }).join('')}
+
+                <button class="card flat row" data-go="coupons" style="border-radius:8px">
+                    <span class="thumb">🏷️</span>
+                    <span class="grow"><span class="t"><span class="txt">${checkout.coupon ? esc(checkout.coupon.code) + ' applied' : 'Apply a coupon'}</span></span>
+                        <span class="s">${checkout.coupon ? '−' + money(couponCut()) + ' on this order' : coupons.length + ' offers available'}</span></span>
+                    <span class="chev">›</span>
+                </button>
+
+                <div class="sect">Price details</div>
+                <div class="card">
+                    <div class="totals">
+                        <div class="r"><span>Price (${cartCount()} items)</span><span>${money(cartMrp())}</span></div>
+                        <div class="r cut"><span>Discount</span><span>−${money(cartMrp() - cartSubtotal())}</span></div>
+                        ${checkout.coupon ? `<div class="r cut"><span>Coupon ${esc(checkout.coupon.code)}</span><span>−${money(couponCut())}</span></div>` : ''}
+                        <div class="r ${shipCost() === 0 ? 'free' : ''}"><span>Delivery</span><span>${shipCost() === 0 ? 'FREE' : money(shipCost())}</span></div>
+                        <div class="r"><span>GST</span><span>${money(cartTax())}</span></div>
+                        <div class="r grand"><span>Total payable</span><span>${money(cartTotal())}</span></div>
+                    </div>
+                </div>
+                <p class="note" style="color:var(--deal);font-weight:700">You save ${money(saved)} on this order</p>`
+            };
+        },
+
+        wishlist: () => ({
+            bar: { title: 'Wishlist', sub: `${wishlist.length} item${wishlist.length === 1 ? '' : 's'}` }, chrome: 'back', flush: true,
+            html: wishlist.length
+                ? `<div class="pgrid" style="margin:10px">${wishlist.map(id => pcard(product(id))).join('')}</div>`
+                : `<div class="empty"><span class="big">♡</span>
+                    <span class="t">Nothing saved yet</span>
+                    <span class="s">Tap the heart on any product to keep it here.</span>
+                    <button class="btn ghost sm" data-act="goHome">Browse products</button></div>`
+        }),
+
+        coupons: () => ({
+            bar: { title: 'Coupons' }, chrome: 'back',
+            html: `
+                <div class="card">
+                    <label class="field"><span class="lbl">Have a code?</span>
+                        <input id="couponIn" placeholder="FIRST100" style="text-transform:uppercase"></label>
+                    <div style="height:9px"></div>
+                    <button class="btn sm" style="width:100%" data-act="applyTyped">Apply</button>
+                </div>
+                <div class="sect">Available for you</div>
+                <div class="card flat">
+                    ${coupons.map(c => {
+                        const usable = cartSubtotal() >= c.min;
+                        const on = checkout.coupon?.code === c.code;
+                        return `<div class="row static">
+                            <span class="thumb">🏷️</span>
+                            <span class="grow"><span class="t"><span class="txt">${esc(c.code)}</span>${on ? '<span class="pill ok">Applied</span>' : ''}</span>
+                                <span class="s">${esc(c.blurb)}${usable ? '' : ` · add ${money(c.min - cartSubtotal())} more to use`}</span></span>
+                            <button class="linkbtn ${usable ? '' : 'mute'}" ${usable ? '' : 'disabled'}
+                                data-act="${on ? 'unapply' : 'apply:' + c.code}">${on ? 'Remove' : 'Apply'}</button>
+                        </div>`;
+                    }).join('')}
+                </div>
+                <p class="note">One coupon per order. Seller offers on the product page stack with these.</p>`
+        }),
+
+        offers: () => ({
+            bar: { title: 'Offers' }, chrome: 'back', flush: true,
+            html: `
+                <div class="rail" style="padding:10px">
+                    ${banners.map(b => `<button class="banner" style="background:${b.bg}" data-go="category:${b.cat}">
+                        <span class="k">${esc(b.k)}</span><span class="h">${esc(b.h)}</span><span class="d">${esc(b.d)}</span></button>`).join('')}
+                </div>
+                <div class="sect" style="margin:0 6px">Coupons</div>
+                <div class="card flat" style="margin:0 10px">
+                    ${coupons.map(c => `<div class="row static">
+                        <span class="thumb">🏷️</span>
+                        <span class="grow"><span class="t"><span class="txt">${esc(c.code)}</span></span>
+                            <span class="s">${esc(c.blurb)}</span></span></div>`).join('')}
+                </div>
+                <div class="sect" style="margin:6px 6px 0">Biggest discounts today</div>
+                <div class="pgrid" style="margin:0 10px">
+                    ${[...products].sort((a, b) => discount(b) - discount(a)).slice(0, 4).map(p => pcard(p)).join('')}
+                </div>`
+        }),
+
+        /* -------------------------------------------------------- checkout */
+
+        checkAddress: () => ({
+            bar: { title: 'Delivery address', sub: 'Step 1 of 3' }, chrome: 'back',
+            bottom: `<button class="now" style="background:var(--brand)" data-go="checkDelivery">DELIVER HERE</button>`,
+            html: `
+                <div class="steps"><i class="s on"></i><i class="s"></i><i class="s"></i></div>
+                ${addresses.map(a => `<button class="card" style="display:flex;gap:10px;text-align:left;width:100%;font-family:inherit;color:inherit;cursor:pointer;border-color:${a.id === checkout.address_id ? 'var(--action)' : 'var(--line)'}"
+                    data-act="pickAddr:${a.id}">
+                    <span class="mark ${a.id === checkout.address_id ? 'on' : ''}"></span>
+                    <span style="flex:1;min-width:0">
+                        <span style="display:flex;gap:7px;align-items:center">
+                            <b style="font-size:13.5px">${esc(customer.first_name)} ${esc(customer.last_name)}</b>
+                            <span class="pill mute">${esc(a.label)}</span>
+                            ${a.is_default_shipping ? '<span class="pill info">Default</span>' : ''}
+                        </span>
+                        <span style="display:block;font-size:12.5px;color:var(--ink-2);line-height:1.5;margin-top:5px">${addrLines(a).map(esc).join('<br>')}</span>
+                        <span style="display:block;font-size:12px;color:var(--ink-3);margin-top:5px">${esc(a.phone)}</span>
+                        ${a.id === checkout.address_id ? `<span class="lineacts">
+                            <span class="linkbtn" data-act="editAddr:${a.id}">Edit</span>
+                            <span class="linkbtn crit" data-act="delAddr:${a.id}">Delete</span></span>` : ''}
+                    </span>
+                </button>`).join('')}
+                <button class="btn ghost" data-act="newAddr">+ Add a new address</button>
+                <div class="spacer"></div>`
+        }),
+
+        addrForm: () => ({
+            bar: { title: addrDraft.id ? 'Edit address' : 'New address' }, chrome: 'back-save', plain: true,
+            html: `
+                <div class="two">
+                    <label class="field"><span class="lbl">First name</span><input value="${esc(addrDraft.first_name)}" data-bind="first_name"></label>
+                    <label class="field"><span class="lbl">Last name</span><input value="${esc(addrDraft.last_name)}" data-bind="last_name"></label>
+                </div>
+                <label class="field"><span class="lbl">Mobile number</span><input value="${esc(addrDraft.phone)}" inputmode="numeric" data-bind="phone"></label>
+                <label class="field"><span class="lbl">Flat, house no., building</span><input value="${esc(addrDraft.address_line1)}" data-bind="address_line1"></label>
+                <label class="field"><span class="lbl">Area, street, landmark</span><input value="${esc(addrDraft.address_line2)}" data-bind="address_line2"></label>
+                <div class="two">
+                    <label class="field"><span class="lbl">Pincode</span><input value="${esc(addrDraft.postcode)}" inputmode="numeric" data-bind="postcode"></label>
+                    <label class="field"><span class="lbl">City</span><input value="${esc(addrDraft.city)}" data-bind="city"></label>
+                </div>
+                <label class="field"><span class="lbl">State</span>
+                    <select data-bind="state">
+                        ${['Tamil Nadu', 'Karnataka', 'Maharashtra', 'Delhi', 'Rajasthan', 'West Bengal'].map(s =>
+                            `<option ${s === addrDraft.state ? 'selected' : ''}>${s}</option>`).join('')}
+                    </select></label>
+                <div class="field"><span class="lbl">Save this address as</span>
+                    <div class="swatches">
+                        ${['Home', 'Work', 'Other'].map(l => `<button class="swatch ${addrDraft.label === l ? 'on' : ''}" data-act="addrLabel:${l}">${l}</button>`).join('')}
+                    </div>
+                </div>
+                <button class="opt" data-act="addrDefault" style="border:0">
+                    <span class="mark sq ${addrDraft.is_default_shipping ? 'on' : ''}"></span>
+                    <span class="grow"><span class="t">Make this my default address</span>
+                        <span class="s">New orders will be sent here unless you change it.</span></span>
+                </button>
+                <div class="spacer"></div>
+                <button class="btn" data-act="saveAddr">Save address</button>`
+        }),
+
+        checkDelivery: () => ({
+            bar: { title: 'Delivery & summary', sub: 'Step 2 of 3' }, chrome: 'back',
+            bottom: `<button class="now" style="background:var(--brand)" data-go="checkPayment">CONTINUE TO PAYMENT</button>`,
+            html: `
+                <div class="steps"><i class="s on"></i><i class="s on"></i><i class="s"></i></div>
+                <div class="sect">How it should reach you</div>
+                <div class="card flat">
+                    ${shippingOptions.map(o => {
+                        const cost = o.code === 'standard' ? (cartSubtotal() >= 999 ? 0 : 49) : o.rate;
+                        return `<button class="opt" style="padding:12px" data-act="pickShip:${o.code}">
+                            <span class="mark ${checkout.shipping === o.code ? 'on' : ''}"></span>
+                            <span class="grow"><span class="t">${esc(o.name)} · ${cost === 0 ? '<span style="color:var(--deal)">FREE</span>' : money(cost)}</span>
+                                <span class="s">${esc(o.detail)} · ${esc(o.note)}</span></span>
+                        </button>`;
+                    }).join('')}
+                </div>
+
+                <div class="sect">Your items</div>
+                ${groupByVendor(cart).map(g => `
+                <div class="card flat">
+                    <div class="sellerhead">🏬 ${esc(vendor(g.vendor_id).name)}
+                        <span style="margin-left:auto;font-weight:400;color:var(--ink-3)">Ships separately</span></div>
+                    ${g.lines.map(l => { const p = product(l.pid); return `<div class="row static">
+                        <span class="thumb">${p.images[0]}</span>
+                        <span class="grow"><span class="t"><span class="txt">${esc(p.name)}</span></span>
+                            <span class="s">Qty ${l.qty}${Object.keys(l.opts).length ? ' · ' + Object.values(l.opts).map(esc).join(' · ') : ''}</span></span>
+                        <span class="amt">${money(p.price * l.qty)}</span></div>`; }).join('')}
+                </div>`).join('')}
+
+                <div class="sect">Price details</div>
+                <div class="card"><div class="totals">
+                    <div class="r"><span>Items</span><span>${money(cartSubtotal())}</span></div>
+                    ${checkout.coupon ? `<div class="r cut"><span>Coupon ${esc(checkout.coupon.code)}</span><span>−${money(couponCut())}</span></div>` : ''}
+                    <div class="r ${shipCost() === 0 ? 'free' : ''}"><span>Delivery</span><span>${shipCost() === 0 ? 'FREE' : money(shipCost())}</span></div>
+                    <div class="r"><span>GST</span><span>${money(cartTax())}</span></div>
+                    <div class="r grand"><span>Total payable</span><span>${money(cartTotal())}</span></div>
+                </div></div>
+                <div class="spacer"></div>`
+        }),
+
+        checkPayment: () => ({
+            bar: { title: 'Payment', sub: 'Step 3 of 3' }, chrome: 'back',
+            bottom: `<button class="add" style="background:var(--surface);color:var(--ink);flex:0 0 42%;text-align:left;padding-left:16px">
+                    <span style="display:block;font-size:16px">${money(cartTotal())}</span>
+                    <span style="display:block;font-size:10.5px;color:var(--ink-3);font-weight:500">payable now</span>
+                </button>
+                <button class="now" data-act="placeOrder">PAY ${esc(money(cartTotal()))}</button>`,
+            html: `
+                <div class="steps"><i class="s on"></i><i class="s on"></i><i class="s on"></i></div>
+                <div class="card flat">
+                    ${paymentMethods.map(m => `<button class="opt" style="padding:13px 12px" data-act="pickPay:${m.code}">
+                        <span class="mark ${checkout.payment === m.code ? 'on' : ''}"></span>
+                        <span class="grow"><span class="t">${m.icon} ${esc(m.name)}</span>
+                            <span class="s">${esc(m.description)}</span></span>
+                    </button>`).join('')}
+                </div>
+                ${checkout.payment === 'upi' ? `
+                <div class="card">
+                    <label class="field"><span class="lbl">UPI ID</span><input value="priya@okhdfcbank"></label>
+                    <p class="note" style="padding:8px 0 0">You'll approve a request in your UPI app. Nothing is charged until you do.</p>
+                </div>` : ''}
+                ${checkout.payment === 'card' ? `
+                <div class="card" style="display:grid;gap:10px">
+                    <label class="field"><span class="lbl">Card number</span><input value="4242 4242 4242 4242" inputmode="numeric"></label>
+                    <div class="two">
+                        <label class="field"><span class="lbl">Expiry</span><input value="09/29" inputmode="numeric"></label>
+                        <label class="field"><span class="lbl">CVV</span><input value="•••" inputmode="numeric" type="password"></label>
+                    </div>
+                    <button class="opt" style="border:0;padding:2px" data-act="soon">
+                        <span class="mark sq on"></span>
+                        <span class="grow"><span class="t">Save this card for next time</span></span></button>
+                </div>` : ''}
+                ${checkout.payment === 'cod' ? `
+                <div class="card"><p class="note" style="padding:0">Keep ${money(cartTotal())} ready. The courier accepts UPI at the door too.
+                    Cash on delivery is not available on some sellers' items.</p></div>` : ''}
+                <div class="sect">Delivering to</div>
+                <div class="card">
+                    <div style="font-size:13px;font-weight:700">${esc(customer.first_name)} ${esc(customer.last_name)} · ${esc(addresses.find(a => a.id === checkout.address_id).label)}</div>
+                    <div style="font-size:12.5px;color:var(--ink-2);line-height:1.5;margin-top:5px">${addrLines(addresses.find(a => a.id === checkout.address_id)).map(esc).join('<br>')}</div>
+                </div>
+                <div class="spacer"></div>`
+        }),
+
+        success: () => {
+            const o = lastOrder;
+            return {
+                bar: { title: 'Order placed' }, chrome: 'none', plain: true,
+                html: `
+                <div class="spacer"></div>
+                <div style="text-align:center;display:grid;gap:9px;justify-items:center">
+                    <div style="width:64px;height:64px;border-radius:50%;background:var(--deal-soft);color:var(--deal);display:grid;place-items:center;font-size:32px">✓</div>
+                    <div style="font-size:19px;font-weight:700">Thank you, ${esc(customer.first_name)}</div>
+                    <div style="font-size:13px;color:var(--ink-2);line-height:1.55;max-width:280px">
+                        Order <b>${esc(o.number)}</b> is with ${groupByVendor(o.items).length === 1 ? 'the seller' : 'both sellers'}.
+                        ${esc(o.eta)}.</div>
+                    <div class="pill ${o.payment_status === 'paid' ? 'ok' : 'warn'}">${o.payment_status === 'paid' ? 'Paid · ' + esc(o.payment_method) : 'Pay on delivery'}</div>
+                </div>
+                <div class="card flat" style="width:100%">
+                    ${o.items.map(i => `<div class="row static">
+                        <span class="thumb">${i.emoji}</span>
+                        <span class="grow"><span class="t"><span class="txt">${esc(i.name)}</span></span>
+                            <span class="s">Qty ${i.quantity} · ${esc(vendor(i.vendor_id).name)}</span></span>
+                        <span class="amt">${money(i.total)}</span></div>`).join('')}
+                </div>
+                <div class="spacer"></div>
+                <button class="btn" data-act="trackNew">Track this order</button>
+                <button class="btn ghost" data-act="goHome">Keep shopping</button>`
+            };
+        },
+
+        /* ------------------------------------------------------------ orders */
+
+        orders: () => {
+            const filters = [['all', 'All'], ['open', 'On the way'], ['completed', 'Delivered'], ['cancelled', 'Cancelled & returned']];
+            const list = orders.filter(o =>
+                ordersFilter === 'all' ? true
+                : ordersFilter === 'open' ? ['pending', 'processing', 'on_hold', 'shipped'].includes(o.status)
+                : ordersFilter === 'completed' ? o.status === 'completed'
+                : ['cancelled', 'refunded'].includes(o.status));
+
+            return {
+                bar: { title: 'My orders', sub: `${orders.length} order${orders.length === 1 ? '' : 's'}` },
+                chrome: 'main', tab: 'orders', icons: { bell: true },
+                html: `
+                <div class="chiprow">
+                    ${filters.map(([k, label]) => `<button class="chip ${ordersFilter === k ? 'on' : ''}" data-act="ordersFilter:${k}">${label}</button>`).join('')}
+                </div>
+                ${requests.length ? `<div class="sect">Cancellations & returns</div>
+                <div class="card flat">
+                    ${requests.map(r => `<button class="row" data-go="request:${r.number}">
+                        <span class="thumb">${r.kind === 'refund' ? '↩️' : '✕'}</span>
+                        <span class="grow"><span class="t"><span class="txt">${esc(r.number)}</span>${reqPill(r)}</span>
+                            <span class="s">${esc(r.items[0])} · order ${esc(r.order)}</span></span>
+                        <span class="chev">›</span></button>`).join('')}
+                </div>` : ''}
+                <div class="sect">Orders</div>
+                ${list.length ? list.map(o => `
+                <div class="card flat">
+                    <button class="row" style="background:var(--surface-2)" data-go="order:${o.number}">
+                        <span class="grow"><span class="t"><span class="txt">Order ${esc(o.number)}</span>${statusPill(o)}</span>
+                            <span class="s">${esc(o.placed_at)} · ${money(o.grand_total)} · ${esc(o.payment_method)}</span></span>
+                        <span class="chev">›</span></button>
+                    ${o.items.map(i => `<button class="row" data-go="order:${o.number}">
+                        <span class="thumb lg">${i.emoji}</span>
+                        <span class="grow"><span class="t"><span class="txt">${esc(i.name)}</span></span>
+                            <span class="s">Qty ${i.quantity}${Object.keys(i.options).length ? ' · ' + Object.values(i.options).map(esc).join(' · ') : ''}
+                                · ${esc(vendor(i.vendor_id).name)}</span>
+                            <span class="s" style="color:${o.status === 'completed' ? 'var(--deal)' : 'var(--ink-2)'}">
+                                ${o.status === 'completed' ? 'Delivered ' + esc(o.delivered_at)
+                                  : o.status === 'cancelled' ? 'Cancelled ' + esc(o.cancelled_at || '')
+                                  : esc(o.eta || 'Being packed')}</span></span>
+                        <span class="chev">›</span></button>`).join('')}
+                    <div style="display:flex;gap:10px;padding:10px 12px;border-top:1px solid var(--line-soft)">
+                        ${o.status === 'shipped' ? `<button class="btn ghost sm" data-go="track:${o.number}">Track</button>` : ''}
+                        ${['pending', 'processing', 'on_hold'].includes(o.status) ? `<button class="btn ghost sm" data-act="startCancel:${o.number}">Cancel</button>` : ''}
+                        ${o.status === 'completed' ? `<button class="btn ghost sm" data-act="startReturn:${o.number}">Return</button>
+                            <button class="btn ghost sm" data-act="startRate:${o.items[0].product_id}">Rate</button>` : ''}
+                        <button class="btn ghost sm" data-act="reorder:${o.number}">Buy again</button>
+                    </div>
+                </div>`).join('')
+                : `<div class="empty"><span class="big">📦</span><span class="t">Nothing here</span>
+                    <span class="s">No orders in this filter yet.</span></div>`}`
+            };
+        },
+
+        order: num => {
+            const o = order(num);
+            const a = addresses.find(x => x.id === o.address_id) || addresses[0];
+            const canCancel = ['pending', 'processing', 'on_hold'].includes(o.status);
+            const delivered = o.status === 'completed';
+
+            return {
+                bar: { title: `Order ${o.number}`, sub: esc(o.placed_at) }, chrome: 'back',
+                html: `
+                <div class="card">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+                        ${statusPill(o)}
+                        <span style="font-size:12.5px;color:var(--ink-2)">${esc(o.eta || (delivered ? 'Delivered ' + o.delivered_at : o.status === 'cancelled' ? 'Cancelled ' + (o.cancelled_at || '') : ''))}</span>
+                    </div>
+                    <div class="track">
+                        ${[['Order placed', o.placed_at],
+                           [o.payment_method === 'Cash on delivery' ? 'Pay on delivery' : 'Payment confirmed', o.paid_at || 'Due at the door'],
+                           ['Shipped', o.shipped_at],
+                           ['Delivered', o.delivered_at]].map(([t, when], i, arr) => {
+                            const done = !!when && !(t === 'Delivered' && !o.delivered_at);
+                            const isNow = done && !arr.slice(i + 1).some(([, w]) => !!w);
+                            return `<div class="tnode ${done ? 'done' : ''} ${isNow ? 'now' : ''}">
+                                <span class="mark"><span class="bead"></span><span class="stem"></span></span>
+                                <span class="txt"><span class="t">${t}</span><span class="s">${when ? esc(when) : 'Pending'}</span></span>
+                            </div>`;
+                        }).join('')}
+                    </div>
+                    ${o.status === 'shipped' ? `<div style="height:11px"></div>
+                        <button class="btn ghost sm" style="width:100%" data-go="track:${o.number}">Track with ${esc(partner(o.carrier).name)}</button>` : ''}
+                </div>
+
+                ${groupByVendor(o.items).map(g => `
+                <div class="card flat">
+                    <div class="sellerhead">🏬 ${esc(vendor(g.vendor_id).name)}</div>
+                    ${g.lines.map(i => `<div class="line">
+                        <span class="thumb lg">${i.emoji}</span>
+                        <span class="grow">
+                            <span class="nm">${esc(i.name)}</span>
+                            <span class="meta">Qty ${i.quantity}${Object.keys(i.options).length ? ' · ' + Object.entries(i.options).map(([k, v]) => esc(k) + ': ' + esc(v)).join(' · ') : ''}</span>
+                            <div class="priceline" style="margin-top:5px"><span class="price">${money(i.total)}</span></div>
+                            <div class="lineacts">
+                                <button class="linkbtn" data-go="product:${i.product_id}">Buy again</button>
+                                ${canCancel ? `<button class="linkbtn crit" data-act="startCancel:${o.number}">Cancel</button>` : ''}
+                                ${delivered ? `<button class="linkbtn" data-act="startReturn:${o.number}">Return</button>
+                                    <button class="linkbtn" data-act="startRate:${i.product_id}">Rate</button>` : ''}
+                            </div>
+                        </span>
+                    </div>`).join('')}
+                </div>`).join('')}
+
+                <div class="sect">Delivery address</div>
+                <div class="card">
+                    <div style="font-size:13px;font-weight:700">${esc(customer.first_name)} ${esc(customer.last_name)} · ${esc(a.label)}</div>
+                    <div style="font-size:12.5px;color:var(--ink-2);line-height:1.5;margin-top:5px">${addrLines(a).map(esc).join('<br>')}</div>
+                    <div style="font-size:12px;color:var(--ink-3);margin-top:5px">${esc(a.phone)}</div>
+                </div>
+
+                <div class="sect">Payment</div>
+                <div class="card"><div class="totals">
+                    <div class="r"><span>Items</span><span>${money(o.subtotal)}</span></div>
+                    ${o.discount_total ? `<div class="r cut"><span>Discount${o.coupon_code ? ' (' + esc(o.coupon_code) + ')' : ''}</span><span>−${money(o.discount_total)}</span></div>` : ''}
+                    <div class="r ${o.shipping_total === 0 ? 'free' : ''}"><span>Delivery</span><span>${o.shipping_total === 0 ? 'FREE' : money(o.shipping_total)}</span></div>
+                    <div class="r"><span>GST</span><span>${money(o.tax_total)}</span></div>
+                    <div class="r grand"><span>${o.payment_status === 'paid' ? 'Paid' : 'Payable'}</span><span>${money(o.grand_total)}</span></div>
+                    <div class="r"><span style="color:var(--ink-3);font-size:11.5px">${esc(o.payment_method)}${o.transaction_id ? ' · ' + esc(o.transaction_id) : ''}</span><span></span></div>
+                </div></div>
+
+                <div class="card flat">
+                    <button class="row" data-act="invoice:${o.number}">
+                        <span class="thumb">🧾</span>
+                        <span class="grow"><span class="t"><span class="txt">Download invoice</span></span>
+                            <span class="s">PDF, one per seller on this order</span></span><span class="chev">›</span></button>
+                    <button class="row" data-go="help">
+                        <span class="thumb">💬</span>
+                        <span class="grow"><span class="t"><span class="txt">Need help with this order</span></span>
+                            <span class="s">Chat, or call the seller</span></span><span class="chev">›</span></button>
+                </div>`
+            };
+        },
+
+        track: num => {
+            const o = order(num);
+            const dp = partner(o.carrier) || deliveryPartners[0];
+            const nodes = [
+                { t: 'Picked up from the seller', s: `${vendor(o.items[0].vendor_id).name}, ${vendor(o.items[0].vendor_id).city}`, when: o.shipped_at, done: true },
+                { t: 'In transit', s: 'Left the Chennai sorting hub', when: '30 Aug, 4:15 am', done: true },
+                { t: 'Out for delivery', s: 'Assigned to a rider near you', when: 'Expected 1 Sep, morning', done: false },
+                { t: 'Delivered', s: 'Signature or OTP at the door', when: o.delivered_at || 'Expected 1 Sep', done: !!o.delivered_at }
+            ];
+            return {
+                bar: { title: 'Track order', sub: `${o.number} · ${dp.name}` }, chrome: 'back',
+                html: `
+                <div class="card" style="display:grid;gap:6px">
+                    <div style="font-size:15px;font-weight:700">${esc(o.eta || 'Delivered ' + o.delivered_at)}</div>
+                    <div style="font-size:12.5px;color:var(--ink-3)">${esc(dp.name)} · ${esc(o.tracking_number)}</div>
+                    <div class="steps" style="margin-top:6px">
+                        <i class="s on"></i><i class="s on"></i><i class="s ${o.delivered_at ? 'on' : ''}"></i><i class="s ${o.delivered_at ? 'on' : ''}"></i>
+                    </div>
+                </div>
+                <div class="card"><div class="track">
+                    ${nodes.map((n, i) => `<div class="tnode ${n.done ? 'done' : ''} ${n.done && !nodes[i + 1]?.done ? 'now' : ''}">
+                        <span class="mark"><span class="bead"></span><span class="stem"></span></span>
+                        <span class="txt"><span class="t">${esc(n.t)}</span><span class="s">${esc(n.s)}<br>${esc(n.when)}</span></span>
+                    </div>`).join('')}
+                </div></div>
+                <div class="card flat">
+                    ${o.items.map(i => `<div class="row static">
+                        <span class="thumb">${i.emoji}</span>
+                        <span class="grow"><span class="t"><span class="txt">${esc(i.name)}</span></span>
+                            <span class="s">Qty ${i.quantity} · ${esc(vendor(i.vendor_id).name)}</span></span></div>`).join('')}
+                </div>
+                <div class="card flat">
+                    <button class="row" data-act="copyTracking:${esc(o.tracking_number)}">
+                        <span class="thumb">🔗</span>
+                        <span class="grow"><span class="t"><span class="txt">Copy tracking number</span></span>
+                            <span class="s">${esc(dp.tracking_url)}</span></span><span class="chev">›</span></button>
+                    <button class="row" data-act="callPartner:${esc(dp.support_phone)}">
+                        <span class="thumb">📞</span>
+                        <span class="grow"><span class="t"><span class="txt">Call ${esc(dp.name)}</span></span>
+                            <span class="s">${esc(dp.support_phone)}</span></span><span class="chev">›</span></button>
+                </div>`
+            };
+        },
+
+        /* ------------------------------------------- cancellations & returns */
+
+        cancelForm: () => {
+            const o = order(cancelDraft.order);
+            return {
+                bar: { title: 'Cancel order', sub: o.number }, chrome: 'back',
+                bottom: `<button class="now" style="background:var(--critical)" data-act="submitCancel">REQUEST CANCELLATION</button>`,
+                html: `
+                <div class="sect">What are you cancelling?</div>
+                <div class="card flat">
+                    ${o.items.map((i, idx) => `<button class="opt" style="padding:12px" data-act="cancelItem:${idx}">
+                        <span class="mark sq ${cancelDraft.items.includes(idx) ? 'on' : ''}"></span>
+                        <span class="grow"><span class="t">${esc(i.name)}</span>
+                            <span class="s">Qty ${i.quantity} · ${money(i.total)} · ${esc(vendor(i.vendor_id).name)}</span></span>
+                    </button>`).join('')}
+                </div>
+                <div class="sect">Why?</div>
+                <div class="card flat">
+                    ${cancelReasons.map(([k, label]) => `<button class="opt" style="padding:11px 12px" data-act="cancelReason:${k}">
+                        <span class="mark ${cancelDraft.reason === k ? 'on' : ''}"></span>
+                        <span class="grow"><span class="t">${esc(label)}</span></span>
+                    </button>`).join('')}
+                </div>
+                <div class="card">
+                    <label class="field"><span class="lbl">Anything the seller should know? (optional)</span>
+                        <textarea placeholder="Ordered the wrong colour, please cancel before it ships." data-bind="note">${esc(cancelDraft.note)}</textarea></label>
+                </div>
+                <div class="card" style="background:var(--info-bg);border-color:transparent">
+                    <div style="font-size:12.5px;font-weight:700;color:var(--info-ink)">Refund of ${money(cancelDraft.amount)}</div>
+                    <p class="note" style="padding:6px 0 0;color:var(--info-ink)">
+                        ${o.payment_status === 'paid'
+                            ? 'Goes back to your ' + esc(o.payment_method) + ' within 5–7 working days once the seller accepts.'
+                            : 'Nothing was charged — there is nothing to refund.'}</p>
+                </div>
+                <p class="note">The seller has 24 hours to accept. Items already handed to the courier
+                    have to be returned instead.</p>
+                <div class="spacer"></div>`
+            };
+        },
+
+        returnForm: () => {
+            const o = order(returnDraft.order);
+            return {
+                bar: { title: 'Return items', sub: o.number }, chrome: 'back',
+                bottom: `<button class="now" style="background:var(--brand)" data-act="submitReturn">REQUEST RETURN</button>`,
+                html: `
+                <div class="sect">What are you sending back?</div>
+                <div class="card flat">
+                    ${o.items.map((i, idx) => `<button class="opt" style="padding:12px" data-act="returnItem:${idx}">
+                        <span class="mark sq ${returnDraft.items.includes(idx) ? 'on' : ''}"></span>
+                        <span class="grow"><span class="t">${esc(i.name)}</span>
+                            <span class="s">Qty ${i.quantity} · ${money(i.total)} · returns close ${esc(product(i.product_id).returnDays)} days after delivery</span></span>
+                    </button>`).join('')}
+                </div>
+                <div class="sect">What went wrong?</div>
+                <div class="card flat">
+                    ${refundReasons.map(([k, label]) => `<button class="opt" style="padding:11px 12px" data-act="returnReason:${k}">
+                        <span class="mark ${returnDraft.reason === k ? 'on' : ''}"></span>
+                        <span class="grow"><span class="t">${esc(label)}</span></span>
+                    </button>`).join('')}
+                </div>
+                <div class="card">
+                    <label class="field"><span class="lbl">Tell the seller what happened</span>
+                        <textarea placeholder="The pallu had a tear near the border." data-bind="note">${esc(returnDraft.note)}</textarea></label>
+                    <div style="height:10px"></div>
+                    <button class="btn ghost sm" style="width:100%" data-act="addPhoto">📷 Add a photo (${returnDraft.photos})</button>
+                </div>
+                <div class="sect">Where should the money go?</div>
+                <div class="card flat">
+                    ${[['original', 'Back to my ' + o.payment_method, 'Usually 5–7 working days'],
+                       ['store_credit', 'CFO Shop credit', 'Instant, spend it on any seller'],
+                       ['upi', 'UPI', 'priya@okhdfcbank']].map(([k, t, s]) =>
+                        `<button class="opt" style="padding:11px 12px" data-act="returnMethod:${k}">
+                            <span class="mark ${returnDraft.method === k ? 'on' : ''}"></span>
+                            <span class="grow"><span class="t">${esc(t)}</span><span class="s">${esc(s)}</span></span>
+                        </button>`).join('')}
+                </div>
+                <p class="note">A courier picks the item up from your delivery address, free.
+                    Keep the packaging and the tags on.</p>
+                <div class="spacer"></div>`
+            };
+        },
+
+        request: num => {
+            const r = requests.find(x => x.number === num);
+            const label = (r.kind === 'refund' ? refundReasons : cancelReasons).find(([k]) => k === r.reason)?.[1] || r.reason;
+            const steps = r.kind === 'refund'
+                ? [['Return requested', r.raised, true], ['Seller approved', r.updated, r.status === 'approved'],
+                   ['Item picked up', 'Scheduled 22 Aug', r.status === 'approved'], ['Refund issued', r.eta, false]]
+                : [['Cancellation requested', r.raised, true], ['Seller approved', r.updated, r.status === 'approved'],
+                   ['Refund issued', r.eta, r.status === 'approved']];
+            return {
+                bar: { title: r.number, sub: r.kind === 'refund' ? 'Return & refund' : 'Cancellation' }, chrome: 'back',
+                html: `
+                <div class="card" style="display:grid;gap:8px">
+                    <div style="display:flex;gap:8px;align-items:center">${reqPill(r)}
+                        <span style="font-size:12.5px;color:var(--ink-2)">Raised ${esc(r.raised)} on order ${esc(r.order)}</span></div>
+                    <div style="font-size:14px;font-weight:700">${money(r.amount)} to ${esc(r.method).toLowerCase()}</div>
+                    <div style="font-size:12.5px;color:var(--ink-3)">${esc(r.eta)}</div>
+                </div>
+                <div class="card"><div class="track">
+                    ${steps.map(([t, when, done], i) => `<div class="tnode ${done ? 'done' : ''} ${done && !steps[i + 1]?.[2] ? 'now' : ''}">
+                        <span class="mark"><span class="bead"></span><span class="stem"></span></span>
+                        <span class="txt"><span class="t">${esc(t)}</span><span class="s">${esc(when)}</span></span></div>`).join('')}
+                </div></div>
+                <div class="sect">What you told us</div>
+                <div class="card">
+                    <div style="font-size:13px;font-weight:500">${esc(label)}</div>
+                    ${r.note ? `<p style="font-size:12.5px;color:var(--ink-2);line-height:1.55;margin:8px 0 0">${esc(r.note)}</p>` : ''}
+                </div>
+                <div class="sect">Items</div>
+                <div class="card flat">
+                    ${r.items.map(n => `<div class="row static">
+                        <span class="thumb">📦</span>
+                        <span class="grow"><span class="t"><span class="txt">${esc(n)}</span></span></span></div>`).join('')}
+                </div>
+                <button class="btn ghost" data-go="order:${esc(r.order)}">Open order ${esc(r.order)}</button>
+                ${r.status === 'pending' ? `<button class="btn danger" data-act="withdraw:${esc(r.number)}">Withdraw this request</button>` : ''}`
+            };
+        },
+
+        rate: id => {
+            const p = product(id);
+            return {
+                bar: { title: 'Rate this product', sub: p.name }, chrome: 'back',
+                bottom: `<button class="now" style="background:var(--brand)" data-act="submitRating">SUBMIT REVIEW</button>`,
+                html: `
+                <div class="card" style="display:flex;gap:12px;align-items:center">
+                    <span class="thumb lg">${p.images[0]}</span>
+                    <span><span style="display:block;font-size:13.5px;font-weight:500;line-height:1.4">${esc(p.name)}</span>
+                        <span style="display:block;font-size:11.5px;color:var(--ink-3);margin-top:4px">${esc(vendor(p.vendor_id).name)}</span></span>
+                </div>
+                <div class="card" style="display:grid;gap:10px;justify-items:center">
+                    <div style="font-size:13px;font-weight:700">How was it?</div>
+                    <div class="stars">${[1, 2, 3, 4, 5].map(n =>
+                        `<button class="${ratingDraft.stars >= n ? 'on' : ''}" data-act="setStars:${n}" aria-label="${n} star">★</button>`).join('')}</div>
+                    <div style="font-size:12px;color:var(--ink-3)">${['Tap to rate', 'Poor', 'Not great', 'Fine', 'Good', 'Excellent'][ratingDraft.stars]}</div>
+                </div>
+                <div class="card" style="display:grid;gap:11px">
+                    <label class="field"><span class="lbl">Headline</span>
+                        <input placeholder="Wedding-ready" value="${esc(ratingDraft.title)}" data-bind="title"></label>
+                    <label class="field"><span class="lbl">Your review</span>
+                        <textarea placeholder="What did you like, and what would you tell the next buyer?" data-bind="body">${esc(ratingDraft.body)}</textarea></label>
+                    <button class="btn ghost sm" style="width:100%" data-act="addPhoto">📷 Add photos (${ratingDraft.photos})</button>
+                </div>
+                <p class="note">Reviews show your first name and last initial. Only people who
+                    bought the item can rate it.</p>
+                <div class="spacer"></div>`
+            };
+        },
+
+        /* ---------------------------------------------------------- account */
+
+        account: () => ({
+            bar: { title: 'My account' }, chrome: 'main', tab: 'account', icons: { bell: true },
+            html: `
+            <div class="card" style="display:flex;gap:12px;align-items:center">
+                <span class="thumb lg" style="width:52px;height:52px;font-size:22px;border-radius:50%;background:var(--info-bg);color:var(--action);font-weight:700">
+                    ${esc(customer.first_name[0])}${esc(customer.last_name[0])}</span>
+                <span style="flex:1;min-width:0">
+                    <span style="display:block;font-size:15px;font-weight:700">${esc(customer.first_name)} ${esc(customer.last_name)}</span>
+                    <span style="display:block;font-size:12px;color:var(--ink-3);margin-top:3px">${esc(customer.phone)} · ${esc(customer.email)}</span>
+                </span>
+                <button class="linkbtn" data-go="profile">Edit</button>
+            </div>
+
+            <div class="card flat">
+                <button class="row" data-act="goOrders">
+                    <span class="thumb">📦</span>
+                    <span class="grow"><span class="t"><span class="txt">My orders</span></span>
+                        <span class="s">${customer.orders_count} orders · ${money(customer.total_spent)} spent</span></span><span class="chev">›</span></button>
+                <button class="row" data-go="wishlist">
+                    <span class="thumb">♥</span>
+                    <span class="grow"><span class="t"><span class="txt">Wishlist</span></span>
+                        <span class="s">${wishlist.length} saved</span></span><span class="chev">›</span></button>
+                <button class="row" data-go="coupons">
+                    <span class="thumb">🏷️</span>
+                    <span class="grow"><span class="t"><span class="txt">Coupons</span></span>
+                        <span class="s">${coupons.length} available</span></span><span class="chev">›</span></button>
+                <button class="row" data-go="reviewsMine">
+                    <span class="thumb">⭐</span>
+                    <span class="grow"><span class="t"><span class="txt">My reviews</span></span>
+                        <span class="s">3 written · 1 waiting</span></span><span class="chev">›</span></button>
+            </div>
+
+            <div class="sect">Account</div>
+            <div class="card flat">
+                <button class="row" data-go="addresses">
+                    <span class="thumb">📍</span>
+                    <span class="grow"><span class="t"><span class="txt">Saved addresses</span></span>
+                        <span class="s">${addresses.length} saved</span></span><span class="chev">›</span></button>
+                <button class="row" data-go="payments">
+                    <span class="thumb">💳</span>
+                    <span class="grow"><span class="t"><span class="txt">Payments</span></span>
+                        <span class="s">Cards, UPI, store credit</span></span><span class="chev">›</span></button>
+                <button class="row" data-go="notifSettings">
+                    <span class="thumb">🔔</span>
+                    <span class="grow"><span class="t"><span class="txt">Notifications</span></span>
+                        <span class="s">${pushOn ? 'Push on' : 'Push off'} · order and deal alerts</span></span><span class="chev">›</span></button>
+                <button class="row" data-go="devices">
+                    <span class="thumb">📱</span>
+                    <span class="grow"><span class="t"><span class="txt">Signed-in devices</span></span>
+                        <span class="s">2 active</span></span><span class="chev">›</span></button>
+                <button class="row" data-go="changePw">
+                    <span class="thumb">🔒</span>
+                    <span class="grow"><span class="t"><span class="txt">Change password</span></span></span><span class="chev">›</span></button>
+            </div>
+
+            <div class="sect">More</div>
+            <div class="card flat">
+                <button class="row" data-go="help">
+                    <span class="thumb">💬</span>
+                    <span class="grow"><span class="t"><span class="txt">Help centre</span></span>
+                        <span class="s">Orders, refunds, payments</span></span><span class="chev">›</span></button>
+                <button class="row" data-go="about">
+                    <span class="thumb">ℹ️</span>
+                    <span class="grow"><span class="t"><span class="txt">About &amp; legal</span></span>
+                        <span class="s">Terms, privacy, licences</span></span><span class="chev">›</span></button>
+                <button class="row" data-act="sellOnCfo">
+                    <span class="thumb">🏬</span>
+                    <span class="grow"><span class="t"><span class="txt">Sell on CFO</span></span>
+                        <span class="s">Open a store — takes 5 minutes</span></span><span class="chev">›</span></button>
+            </div>
+            <button class="btn danger" data-act="signout">Sign out</button>
+            <p class="note" style="text-align:center">CFO Shop · prototype build</p>`
+        }),
+
+        profile: () => ({
+            bar: { title: 'Your details' }, chrome: 'back-save', plain: true,
+            html: `
+            <div class="two">
+                <label class="field"><span class="lbl">First name</span><input value="${esc(customer.first_name)}"></label>
+                <label class="field"><span class="lbl">Last name</span><input value="${esc(customer.last_name)}"></label>
+            </div>
+            <label class="field"><span class="lbl">Email</span><input type="email" value="${esc(customer.email)}">
+                <span class="hint">${customer.email_verified ? '✓ Verified' : 'Not verified yet'}</span></label>
+            <label class="field"><span class="lbl">Mobile number</span><input type="tel" value="${esc(customer.phone)}"></label>
+            <label class="field"><span class="lbl">Date of birth</span><input type="date" value="${esc(customer.date_of_birth)}"></label>
+            <label class="field"><span class="lbl">Gender</span>
+                <select><option ${customer.gender === 'female' ? 'selected' : ''}>female</option>
+                    <option ${customer.gender === 'male' ? 'selected' : ''}>male</option>
+                    <option>prefer not to say</option></select></label>
+            <div class="opt" style="border:0;padding:2px 0">
+                <span class="grow"><span class="t">Offers and new arrivals by email</span>
+                    <span class="s">Order updates are sent either way.</span></span>
+                <button class="switch ${customer.accepts_marketing ? 'on' : ''}" data-act="toggleMarketing" aria-label="Marketing emails"></button>
+            </div>
+            <div class="spacer"></div>
+            <button class="btn danger" data-act="soon">Delete my account</button>`
+        }),
+
+        addresses: () => ({
+            bar: { title: 'Saved addresses' }, chrome: 'back',
+            html: `
+            ${addresses.map(a => `<div class="card">
+                <div style="display:flex;gap:7px;align-items:center">
+                    <b style="font-size:13.5px">${esc(customer.first_name)} ${esc(customer.last_name)}</b>
+                    <span class="pill mute">${esc(a.label)}</span>
+                    ${a.is_default_shipping ? '<span class="pill info">Default</span>' : ''}
+                </div>
+                <div style="font-size:12.5px;color:var(--ink-2);line-height:1.5;margin-top:6px">${addrLines(a).map(esc).join('<br>')}</div>
+                <div style="font-size:12px;color:var(--ink-3);margin-top:5px">${esc(a.phone)}</div>
+                <div class="lineacts">
+                    <button class="linkbtn" data-act="editAddr:${a.id}">Edit</button>
+                    ${a.is_default_shipping ? '' : `<button class="linkbtn mute" data-act="makeDefault:${a.id}">Make default</button>`}
+                    <button class="linkbtn crit" data-act="delAddr:${a.id}">Delete</button>
+                </div>
+            </div>`).join('')}
+            <button class="btn ghost" data-act="newAddr">+ Add a new address</button>
+            <div class="spacer"></div>`
+        }),
+
+        payments: () => ({
+            bar: { title: 'Payments' }, chrome: 'back',
+            html: `
+            <div class="card" style="background:var(--info-bg);border-color:transparent">
+                <div style="font-size:11px;font-weight:700;color:var(--info-ink);text-transform:uppercase;letter-spacing:.07em">Store credit</div>
+                <div style="font-size:24px;font-weight:700;margin-top:4px;color:var(--info-ink)">${money(250)}</div>
+                <div style="font-size:11.5px;color:var(--info-ink);opacity:.85;margin-top:2px">From refund REF-00009 · no expiry</div>
+            </div>
+            <div class="sect">Saved cards</div>
+            <div class="card flat">
+                <div class="row static">
+                    <span class="thumb">💳</span>
+                    <span class="grow"><span class="t"><span class="txt">HDFC •••• 4821</span></span>
+                        <span class="s">Visa · expires 09/29</span></span>
+                    <button class="linkbtn crit" data-act="soon">Remove</button></div>
+            </div>
+            <div class="sect">UPI</div>
+            <div class="card flat">
+                <div class="row static">
+                    <span class="thumb">⚡</span>
+                    <span class="grow"><span class="t"><span class="txt">priya@okhdfcbank</span></span>
+                        <span class="s">Verified</span></span>
+                    <button class="linkbtn crit" data-act="soon">Remove</button></div>
+            </div>
+            <button class="btn ghost" data-act="soon">+ Add a payment method</button>
+            <p class="note">Card numbers are held by the payment gateway, never by CFO Shop.</p>`
+        }),
+
+        notifications: () => ({
+            bar: { title: 'Notifications' }, chrome: 'back',
+            html: `
+            <div class="card flat">
+                ${notifications.map((n, i) => `<button class="row" data-act="openNotif:${i}">
+                    <span class="thumb xs" style="background:${n.read ? 'transparent' : 'var(--info-bg)'};border-color:${n.read ? 'var(--line-soft)' : 'transparent'}">${n.read ? '' : '●'}</span>
+                    <span class="grow"><span class="t"><span class="txt">${esc(n.t)}</span></span>
+                        <span class="s">${esc(n.b)}</span>
+                        <span class="s" style="color:var(--ink-3)">${esc(n.w)}</span></span>
+                    <span class="chev">›</span></button>`).join('')}
+            </div>
+            <button class="btn ghost" data-act="readAll">Mark all as read</button>
+            <button class="btn ghost" data-go="notifSettings">Notification settings</button>`
+        }),
+
+        notifSettings: () => ({
+            bar: { title: 'Notifications' }, chrome: 'back',
+            html: `
+            <div class="card flat">
+                <div class="row static"><span class="grow"><span class="t">Push notifications</span>
+                    <span class="s">On this device</span></span>
+                    <button class="switch ${pushOn ? 'on' : ''}" data-act="togglePush" aria-label="Push"></button></div>
+                <div class="row static"><span class="grow"><span class="t">Order updates</span>
+                    <span class="s">Packed, shipped, out for delivery, refunds</span></span>
+                    <button class="switch ${orderAlerts ? 'on' : ''}" data-act="toggleOrderAlerts" aria-label="Order updates"></button></div>
+                <div class="row static"><span class="grow"><span class="t">Deals and price drops</span>
+                    <span class="s">Only for things on your wishlist</span></span>
+                    <button class="switch ${dealAlerts ? 'on' : ''}" data-act="toggleDeals" aria-label="Deals"></button></div>
+            </div>
+            <p class="note">Order updates also arrive by SMS and email. Turning push off here
+                doesn't stop those.</p>`
+        }),
+
+        devices: () => ({
+            bar: { title: 'Signed-in devices' }, chrome: 'back',
+            html: `
+            <div class="card flat">
+                <div class="row static">
+                    <span class="thumb">📱</span>
+                    <span class="grow"><span class="t"><span class="txt">Pixel 8</span><span class="pill ok">This device</span></span>
+                        <span class="s">Chennai · active now</span></span></div>
+                <div class="row static">
+                    <span class="thumb">💻</span>
+                    <span class="grow"><span class="t"><span class="txt">Chrome on Windows</span></span>
+                        <span class="s">Chennai · 2 days ago</span></span>
+                    <button class="linkbtn crit" data-act="revoke">Sign out</button></div>
+            </div>
+            <button class="btn danger" data-act="signoutAll">Sign out everywhere</button>`
+        }),
+
+        changePw: () => ({
+            bar: { title: 'Change password' }, chrome: 'back', plain: true,
+            html: `
+            <label class="field"><span class="lbl">Current password</span><input type="password" value="a-good-password"></label>
+            <label class="field"><span class="lbl">New password</span><input type="password" placeholder="At least 8 characters">
+                <span class="hint">Use something you don't use anywhere else.</span></label>
+            <label class="field"><span class="lbl">Confirm new password</span><input type="password"></label>
+            <div class="spacer"></div>
+            <button class="btn" data-act="changedPw">Change password</button>`
+        }),
+
+        reviewsMine: () => ({
+            bar: { title: 'My reviews' }, chrome: 'back',
+            html: `
+            <div class="sect">Waiting for your rating</div>
+            <div class="card flat">
+                <button class="row" data-act="startRate:49">
+                    <span class="thumb">🧶</span>
+                    <span class="grow"><span class="t"><span class="txt">Kashmiri wool shawl</span></span>
+                        <span class="s">Delivered 16 Aug · order #1024</span></span>
+                    <span class="pill warn">Rate</span></button>
+            </div>
+            <div class="sect">Written</div>
+            <div class="card">
+                ${[{ p: 'Jaipur cotton double bedsheet', stars: 5, body: 'Held colour through six washes.', when: 'Aug 2026' },
+                   { p: 'Canvas high-top sneakers', stars: 4, body: 'Comfortable, runs half a size small.', when: 'Jul 2026' },
+                   { p: 'Handloom linen dupatta', stars: 4, body: 'Softer after the first wash, as promised.', when: 'Jun 2026' }]
+                  .map(r => `<div class="review">
+                    <div class="head"><span class="rate ${r.stars < 4 ? 'low' : ''}">${r.stars} ★</span>
+                        <span style="font-size:13px;font-weight:700">${esc(r.p)}</span></div>
+                    <div class="body">${esc(r.body)}</div>
+                    <div class="who">${esc(r.when)} · <span class="linkbtn" data-act="soon">Edit</span></div>
+                </div>`).join('')}
+            </div>`
+        }),
+
+        help: () => ({
+            bar: { title: 'Help centre' }, chrome: 'back',
+            html: `
+            <div class="card flat">
+                <button class="row" data-act="chat">
+                    <span class="thumb">💬</span>
+                    <span class="grow"><span class="t"><span class="txt">Chat with us</span></span>
+                        <span class="s">Usually answers in under 2 minutes</span></span><span class="chev">›</span></button>
+                <button class="row" data-act="callUs">
+                    <span class="thumb">📞</span>
+                    <span class="grow"><span class="t"><span class="txt">Call support</span></span>
+                        <span class="s">1800 200 4455 · 8am–10pm</span></span><span class="chev">›</span></button>
+            </div>
+            <div class="sect">Common questions</div>
+            <div class="card flat">
+                ${[['Where is my order?', 'Track it from My orders — the courier updates it every few hours.'],
+                   ['How do refunds work?', 'Approved refunds go back the way you paid, in 5–7 working days.'],
+                   ['Can I change my address after ordering?', 'Only before the seller packs it. Cancel and reorder otherwise.'],
+                   ['An item arrived damaged', 'Raise a return within the return window and add a photo.'],
+                   ['Two sellers, two parcels?', 'Yes — each seller ships their own items, so parcels can arrive on different days.']]
+                  .map(([q, a]) => `<div class="row static">
+                    <span class="grow"><span class="t"><span class="txt">${esc(q)}</span></span>
+                        <span class="s" style="white-space:normal">${esc(a)}</span></span></div>`).join('')}
+            </div>`
+        }),
+
+        about: () => ({
+            bar: { title: 'About & legal' }, chrome: 'back',
+            html: `
+            <div class="card" style="text-align:center;display:grid;gap:8px;justify-items:center">
+                <div class="brandmark">C</div>
+                <div style="font-size:15px;font-weight:700">CFO Shop</div>
+                <div style="font-size:12px;color:var(--ink-3)">Prototype build · not a released app</div>
+            </div>
+            <div class="card flat">
+                ${['Terms of use', 'Privacy policy', 'Returns and refunds policy', 'Open-source licences', 'Grievance officer']
+                  .map(t => `<button class="row" data-act="soon">
+                    <span class="grow"><span class="t"><span class="txt">${t}</span></span></span><span class="chev">›</span></button>`).join('')}
+            </div>`
+        })
+    };
+
+    /* ------------------------------------------------------ bottom sheets */
+
+    function sheetHtml() {
+        if (sheet === 'sort') {
+            const opts = [['relevance', 'Popularity'], ['low', 'Price: low to high'], ['high', 'Price: high to low'],
+                          ['rating', 'Customer rating'], ['discount', 'Discount']];
+            return `<div class="sheet" data-act="closeSheet"><div class="panel" data-stop>
+                <div class="hd">Sort by <button class="iconbtn" style="color:var(--ink)" data-act="closeSheet">✕</button></div>
+                ${opts.map(([k, label]) => `<button class="opt" data-act="sort:${k}">
+                    <span class="mark ${plp.sort === k ? 'on' : ''}"></span>
+                    <span class="grow"><span class="t">${label}</span></span></button>`).join('')}
+            </div></div>`;
+        }
+
+        if (sheet === 'filter') {
+            return `<div class="sheet" data-act="closeSheet"><div class="panel" data-stop>
+                <div class="hd">Filters <button class="iconbtn" style="color:var(--ink)" data-act="closeSheet">✕</button></div>
+
+                <div class="sect" style="padding:0">Price</div>
+                <div class="chiprow" style="padding:0 0 4px">
+                    ${[1000, 2000, 3500, 5000].map(v => `<button class="chip ${plp.maxPrice === v ? 'on' : ''}" data-act="fPrice:${v}">Under ${money(v)}</button>`).join('')}
+                </div>
+
+                <div class="sect" style="padding:0">Customer rating</div>
+                <div class="chiprow" style="padding:0 0 4px">
+                    ${[4, 3].map(v => `<button class="chip ${plp.minRating === v ? 'on' : ''}" data-act="fRating:${v}">${v} ★ &amp; above</button>`).join('')}
+                </div>
+
+                <div class="sect" style="padding:0">Discount</div>
+                <div class="chiprow" style="padding:0 0 4px">
+                    ${[20, 30, 40].map(v => `<button class="chip ${plp.minOff === v ? 'on' : ''}" data-act="fOff:${v}">${v}% or more</button>`).join('')}
+                </div>
+
+                <div class="sect" style="padding:0">Seller</div>
+                <div class="chiprow" style="padding:0 0 4px">
+                    ${vendors.map(v => `<button class="chip ${plp.vendor_id === v.id ? 'on' : ''}" data-act="fVendor:${v.id}">${esc(v.name)}</button>`).join('')}
+                </div>
+
+                <button class="opt" data-act="fAssured">
+                    <span class="mark sq ${plp.assured ? 'on' : ''}"></span>
+                    <span class="grow"><span class="t">CFO Assured only</span>
+                        <span class="s">Checked by us before it ships</span></span></button>
+                <button class="opt" data-act="fCod">
+                    <span class="mark sq ${plp.cod ? 'on' : ''}"></span>
+                    <span class="grow"><span class="t">Cash on delivery</span></span></button>
+
+                <div class="btnrow">
+                    <button class="btn ghost" data-act="clearFilters">Clear all</button>
+                    <button class="btn" data-act="closeSheet">Show ${results().length} result${results().length === 1 ? '' : 's'}</button>
+                </div>
+            </div></div>`;
+        }
+
+        return '';
+    }
+
+    /* --------------------------------------------------------- rendering */
+
+    function render() {
+        const key = stack[stack.length - 1];
+        const cut = key.indexOf(':');
+        const name = cut === -1 ? key : key.slice(0, cut);
+        const arg = cut === -1 ? undefined : key.slice(cut + 1);
+        const s = screens[name](arg);
+        const c = s.chrome;
+        const icons = s.icons || {};
+
+        $('barTitle').textContent = s.bar.title || '';
+        const sub = $('barSub');
+        sub.textContent = s.bar.sub || '';
+        sub.hidden = !s.bar.sub;
+        $('barTitles').hidden = !!s.bar.search;
+        $('searchBtn').hidden = !s.bar.search;
+
+        $('backBtn').hidden = !(c === 'back' || c === 'back-save');
+        $('saveBtn').hidden = c !== 'back-save';
+        $('wishBtn').hidden = !icons.wish;
+        $('bellBtn').hidden = !icons.bell;
+        $('cartBtn').hidden = !icons.cart;
+        $('wishDot').textContent = wishlist.length;
+        $('wishDot').hidden = wishlist.length === 0;
+        $('bellDot').textContent = unread();
+        $('bellDot').hidden = unread() === 0;
+        $('cartDot2').textContent = cartCount();
+        $('cartDot2').hidden = cartCount() === 0;
+        $('cartDot').textContent = cartCount();
+        $('cartDot').hidden = cartCount() === 0;
+
+        tabbar.classList.toggle('hide', c !== 'main');
+        tabbar.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.tab === s.tab));
+
+        stage.innerHTML =
+            `<div class="screen on ${s.plain ? 'plain' : ''} ${s.flush ? 'flush' : ''} ${s.bottom ? 'haspad' : ''}">${s.html}</div>`
+            + (s.bottom ? `<div class="buybar">${s.bottom}</div>` : '')
+            + sheetHtml();
+
+        // Typing in the search box re-renders the suggestions under the caret,
+        // so put the caret back where it was.
+        if (name === 'search') {
+            const box = document.getElementById('q');
+            if (box && document.activeElement !== box) {
+                box.focus();
+                box.setSelectionRange(box.value.length, box.value.length);
+            }
+        }
+    }
+
+    /** The product page is entered fresh, with the seller's first in-stock
+        value pre-selected for every option — the way a shopper expects. */
+    function go(key) {
+        // A category tap is a listing with one filter pre-set, not its own screen.
+        if (key.startsWith('category:')) {
+            plp = { ...plp, category_id: +key.slice(9) };
+            query = '';
+            key = 'results';
+        }
+
+        if (key.startsWith('product:')) {
+            const p = product(key.split(':')[1]);
+            pdp = { image: 0, opts: {} };
+            p.options.forEach(o => {
+                const first = o.values.find(v => v.stock > 0);
+                if (first) pdp.opts[o.name] = first.v;
+            });
+            recent = [p.id, ...recent.filter(id => id !== p.id)].slice(0, 6);
+        }
+        stack.push(key);
+        render();
+    }
+
+    function back() { if (stack.length > 1) { stack.pop(); sheet = null; render(); } }
+    function root(key) { stack = [key]; sheet = null; render(); }
+
+    /* ----------------------------------------------------------- actions */
+
+    const blankAddr = () => ({
+        id: null, label: 'Home', first_name: customer.first_name, last_name: customer.last_name,
+        phone: customer.phone, address_line1: '', address_line2: '', city: '', state: 'Tamil Nadu',
+        postcode: '', country: 'IN', is_default_shipping: false, is_default_billing: false
+    });
+
+    const actions = {
+
+        /* ------------------------------------------------------ getting in */
+
+        signin() { signedIn = true; root('home'); toast('Signed in as ' + customer.first_name); },
+        resend() { toast('New code sent to 98765 43210'); },
+        sentReset() { back(); toast('Reset link sent to ' + customer.email); },
+        signout() { signedIn = false; cart = []; root('login'); },
+        signoutAll() { signedIn = false; root('login'); toast('Signed out everywhere'); },
+        revoke() { toast('Chrome on Windows signed out'); },
+        changedPw() { back(); toast('Password changed. Other devices were signed out.'); },
+
+        /* ----------------------------------------------------- getting around */
+
+        goHome() { root('home'); },
+        goOrders() { root('orders'); },
+        seeDeals() { query = ''; plp = { ...plp, category_id: null, minOff: 30 }; go('results'); },
+        seeAll() { query = ''; plp = { ...plp, category_id: null, minOff: null }; go('results'); },
+        runSearch() { back(); go('results'); },
+        'recall': t => { query = decodeURIComponent(t); render(); },
+
+        /* --------------------------------------------------- listing & filters */
+
+        'sheet': which => { sheet = which; render(); },
+        closeSheet() { sheet = null; render(); },
+        'sort': k => { plp.sort = k; sheet = null; render(); },
+        'fPrice': v => { plp.maxPrice = plp.maxPrice === +v ? null : +v; render(); },
+        'fRating': v => { plp.minRating = plp.minRating === +v ? null : +v; render(); },
+        'fOff': v => { plp.minOff = plp.minOff === +v ? null : +v; render(); },
+        'fVendor': v => { plp.vendor_id = plp.vendor_id === +v ? null : +v; render(); },
+        fAssured() { plp.assured = !plp.assured; render(); },
+        fCod() { plp.cod = !plp.cod; render(); },
+        clearFilters() {
+            plp = { ...plp, maxPrice: null, minRating: null, minOff: null, vendor_id: null, assured: false, cod: false };
+            render();
+        },
+
+        /* -------------------------------------------------------- product page */
+
+        'shot': i => { pdp.image = +i; render(); },
+        'pick': rest => {
+            const [name, ...val] = rest.split(':');
+            pdp.opts[name] = val.join(':');
+            render();
+        },
+        'wish': id => {
+            id = +id;
+            wishlist = wished(id) ? wishlist.filter(x => x !== id) : [id, ...wishlist];
+            toast(wished(id) ? 'Saved to your wishlist' : 'Removed from your wishlist');
+            render();
+        },
+        pincode() { toast('Delivering to 600090 — pincode picker is not in this prototype'); },
+        'notifyMe': id => toast('We\'ll text you when ' + product(id).name.split(' ').slice(0, 3).join(' ') + ' is back'),
+
+        'addCart': id => {
+            const p = product(id);
+            const missing = p.options.find(o => !pdp.opts[o.name]);
+            if (missing) return toast('Pick a ' + missing.name.toLowerCase() + ' first');
+            addToCart(p.id, { ...pdp.opts }, 1);
+            render();
+            toast('Added to cart');
+        },
+
+        'buyNow': id => {
+            actions.addCart(id);
+            const p = product(id);
+            if (p.options.every(o => pdp.opts[o.name])) root('cart');
+        },
+
+        /* --------------------------------------------------------------- cart */
+
+        'qty': arg => {
+            const [key, delta] = [arg.slice(0, arg.lastIndexOf(':')), +arg.slice(arg.lastIndexOf(':') + 1)];
+            const line = cart.find(l => cartKeyOf(l) === key);
+            line.qty = Math.max(1, Math.min(10, line.qty + delta));
+            render();
+        },
+        'removeLine': key => { cart = cart.filter(l => cartKeyOf(l) !== key); render(); toast('Removed from cart'); },
+        'saveLater': key => {
+            const line = cart.find(l => cartKeyOf(l) === key);
+            if (!wished(line.pid)) wishlist = [line.pid, ...wishlist];
+            cart = cart.filter(l => cartKeyOf(l) !== key);
+            render();
+            toast('Moved to your wishlist');
+        },
+        'apply': code => {
+            checkout.coupon = coupons.find(c => c.code === code);
+            back();
+            toast(code + ' applied — you save ' + money(couponCut()));
+        },
+        unapply() { checkout.coupon = null; render(); toast('Coupon removed'); },
+        applyTyped() {
+            const typed = ($('couponIn')?.value || '').trim().toUpperCase();
+            const found = coupons.find(c => c.code === typed);
+            if (!found) return toast('That code isn\'t valid on this order');
+            if (cartSubtotal() < found.min) return toast('Add ' + money(found.min - cartSubtotal()) + ' more to use ' + typed);
+            actions.apply(found.code);
+        },
+
+        /* ----------------------------------------------------------- checkout */
+
+        startCheckout() { go('checkAddress'); },
+        'pickAddr': id => { checkout.address_id = +id; render(); },
+        'pickShip': code => { checkout.shipping = code; render(); },
+        'pickPay': code => { checkout.payment = code; render(); },
+        newAddr() { addrDraft = blankAddr(); go('addrForm'); },
+        'editAddr': id => { addrDraft = { ...addresses.find(a => a.id === +id) }; go('addrForm'); },
+        'addrLabel': l => { addrDraft.label = l; render(); },
+        addrDefault() { addrDraft.is_default_shipping = !addrDraft.is_default_shipping; render(); },
+
+        saveAddr() {
+            if (!addrDraft.address_line1 || !addrDraft.city || !addrDraft.postcode)
+                return toast('Add the street, city and pincode');
+
+            if (addrDraft.is_default_shipping) addresses.forEach(a => a.is_default_shipping = false);
+
+            if (addrDraft.id) {
+                addresses = addresses.map(a => a.id === addrDraft.id ? { ...addrDraft } : a);
+            } else {
+                addrDraft.id = Math.max(0, ...addresses.map(a => a.id)) + 1;
+                addresses.push({ ...addrDraft });
+                checkout.address_id = addrDraft.id;
+            }
+            back();
+            toast('Address saved');
+        },
+
+        'makeDefault': id => {
+            addresses.forEach(a => a.is_default_shipping = a.id === +id);
+            checkout.address_id = +id;
+            render();
+            toast('Default address updated');
+        },
+
+        'delAddr': id => {
+            if (addresses.length === 1) return toast('Keep at least one address');
+            addresses = addresses.filter(a => a.id !== +id);
+            if (checkout.address_id === +id) checkout.address_id = addresses[0].id;
+            render();
+            toast('Address deleted');
+        },
+
+        /*
+        | POST /orders. The basket goes over as it stands — lines keep their own
+        | vendor, so an order across two sellers stays one order with two
+        | shipments, which is what the seller app and the payouts expect.
+        */
+        placeOrder() {
+            const pay = paymentMethods.find(m => m.code === checkout.payment);
+            const next = '#' + (Math.max(...orders.map(o => +o.number.slice(1))) + 1);
+
+            const o = {
+                number: next,
+                status: 'processing',
+                payment_status: pay.code === 'cod' ? 'pending' : 'paid',
+                fulfillment_status: 'unfulfilled',
+                payment_method: pay.name,
+                transaction_id: pay.code === 'cod' ? null : pay.code.toUpperCase() + '-' + Math.floor(Math.random() * 900000 + 100000),
+                carrier: null, tracking_number: null,
+                placed_at: '31 Aug, 9:41 am',
+                paid_at: pay.code === 'cod' ? null : '31 Aug, 9:41 am',
+                shipped_at: null, delivered_at: null,
+                eta: shippingOptions.find(s => s.code === checkout.shipping).detail.replace('Arrives', 'Arriving'),
+                address_id: checkout.address_id,
+                shipping_method: shippingOptions.find(s => s.code === checkout.shipping).name,
+                items: cart.map(l => {
+                    const p = product(l.pid);
+                    return { product_id: p.id, name: p.name, vendor_id: p.vendor_id, emoji: p.images[0],
+                             options: { ...l.opts }, unit_price: p.price, quantity: l.qty,
+                             total: p.price * l.qty, fulfillment_status: 'unfulfilled' };
+                }),
+                subtotal: cartSubtotal(), discount_total: couponCut(),
+                shipping_total: shipCost(), tax_total: cartTax(), grand_total: cartTotal(),
+                coupon_code: checkout.coupon?.code || null
+            };
+
+            orders = [o, ...orders];
+            lastOrder = o;
+            customer.orders_count += 1;
+            customer.total_spent += o.grand_total;
+            notifications = [{ t: 'Order ' + o.number + ' placed', b: money(o.grand_total) + ' · ' + o.payment_method, w: 'just now', read: false, go: 'order:' + o.number }, ...notifications];
+            cart = [];
+            checkout.coupon = null;
+            root('success');
+        },
+
+        trackNew() { root('orders'); go('order:' + lastOrder.number); },
+
+        /* ------------------------------------------------------------- orders */
+
+        'ordersFilter': k => { ordersFilter = k; render(); },
+        'invoice': num => toast('Invoice for ' + num + ' emailed to ' + customer.email),
+        'copyTracking': n => toast(n + ' copied'),
+        'callPartner': phone => toast('Calling ' + phone + '…'),
+
+        'reorder': num => {
+            order(num).items.forEach(i => addToCart(i.product_id, { ...i.options }, i.quantity));
+            root('cart');
+            toast('Added ' + order(num).items.length + ' item(s) back to your cart');
+        },
+
+        /* ---------------------------------------------- cancellations & returns */
+
+        'startCancel': num => {
+            const o = order(num);
+            cancelDraft = { order: num, items: o.items.map((_, i) => i), reason: null, note: '', amount: o.grand_total };
+            go('cancelForm');
+        },
+        'cancelItem': idx => {
+            idx = +idx;
+            const o = order(cancelDraft.order);
+            cancelDraft.items = cancelDraft.items.includes(idx)
+                ? cancelDraft.items.filter(x => x !== idx) : [...cancelDraft.items, idx];
+            cancelDraft.amount = cancelDraft.items.reduce((s, i) => s + o.items[i].total, 0);
+            render();
+        },
+        'cancelReason': k => { cancelDraft.reason = k; render(); },
+
+        submitCancel() {
+            if (!cancelDraft.items.length) return toast('Pick at least one item');
+            if (!cancelDraft.reason) return toast('Tell the seller why');
+
+            const o = order(cancelDraft.order);
+            const whole = cancelDraft.items.length === o.items.length;
+            const num = 'CAN-' + String(nextCancellation++).padStart(5, '0');
+
+            requests = [{
+                number: num, kind: 'cancellation', order: o.number, status: 'pending',
+                reason: cancelDraft.reason, note: cancelDraft.note,
+                items: cancelDraft.items.map(i => o.items[i].name),
+                amount: cancelDraft.amount, method: 'Original payment method',
+                raised: '31 Aug', updated: '31 Aug',
+                eta: o.payment_status === 'paid' ? 'Refund starts once the seller accepts' : 'Nothing was charged'
+            }, ...requests];
+
+            if (whole) { o.status = 'cancelled'; o.cancelled_at = '31 Aug, 9:44 am'; }
+
+            root('orders');
+            go('request:' + num);
+            toast('Cancellation requested');
+        },
+
+        'startReturn': num => {
+            const o = order(num);
+            returnDraft = { order: num, items: [0], reason: null, note: '', method: 'original', photos: 0 };
+            go('returnForm');
+        },
+        'returnItem': idx => {
+            idx = +idx;
+            returnDraft.items = returnDraft.items.includes(idx)
+                ? returnDraft.items.filter(x => x !== idx) : [...returnDraft.items, idx];
+            render();
+        },
+        'returnReason': k => { returnDraft.reason = k; render(); },
+        'returnMethod': k => { returnDraft.method = k; render(); },
+        addPhoto() {
+            const d = returnDraft && stack[stack.length - 1] === 'returnForm' ? returnDraft : ratingDraft;
+            if (d.photos >= 5) return toast('Five photos is the limit');
+            d.photos += 1;
+            render();
+        },
+
+        submitReturn() {
+            if (!returnDraft.items.length) return toast('Pick at least one item');
+            if (!returnDraft.reason) return toast('Tell the seller what went wrong');
+
+            const o = order(returnDraft.order);
+            const num = 'REF-' + String(nextRefund++).padStart(5, '0');
+            const amount = returnDraft.items.reduce((s, i) => s + o.items[i].total, 0);
+            const method = { original: 'Original payment method', store_credit: 'Store credit', upi: 'UPI' }[returnDraft.method];
+
+            requests = [{
+                number: num, kind: 'refund', order: o.number, status: 'pending',
+                reason: returnDraft.reason, note: returnDraft.note,
+                items: returnDraft.items.map(i => o.items[i].name),
+                amount, method, raised: '31 Aug', updated: '31 Aug',
+                eta: 'Pickup is booked once the seller accepts'
+            }, ...requests];
+
+            root('orders');
+            go('request:' + num);
+            toast('Return requested');
+        },
+
+        'withdraw': num => {
+            requests = requests.filter(r => r.number !== num);
+            root('orders');
+            toast(num + ' withdrawn');
+        },
+
+        /* ------------------------------------------------------------ reviews */
+
+        'startRate': id => { ratingDraft = { pid: +id, stars: 0, title: '', body: '', photos: 0 }; go('rate:' + id); },
+        'setStars': n => { ratingDraft.stars = +n; render(); },
+        submitRating() {
+            if (!ratingDraft.stars) return toast('Tap a star first');
+            back();
+            toast('Thanks — your review is live');
+        },
+
+        /* ------------------------------------------------------ notifications */
+
+        'openNotif': i => {
+            const n = notifications[+i];
+            n.read = true;
+            if (n.go) go(n.go); else render();
+        },
+        readAll() { notifications.forEach(n => n.read = true); render(); },
+        togglePush() { pushOn = !pushOn; render(); toast(pushOn ? 'Push notifications on' : 'Push notifications off'); },
+        toggleDeals() { dealAlerts = !dealAlerts; render(); },
+        toggleOrderAlerts() { orderAlerts = !orderAlerts; render(); },
+        toggleMarketing() { customer.accepts_marketing = !customer.accepts_marketing; render(); },
+
+        /* --------------------------------------------------------------- misc */
+
+        chat() { toast('Opening chat with support…'); },
+        callUs() { toast('Calling 1800 200 4455…'); },
+        sellOnCfo() { toast('Opens the seller app — see docs/seller-app.html'); },
+        soon() { toast('Not part of this prototype'); }
+    };
+
+    /* ------------------------------------------------------------- events */
+
+    document.addEventListener('click', e => {
+        const t = e.target.closest('[data-act], [data-go]');
+        if (!t) return;
+
+        // The scrim closes the sheet; a tap that merely lands inside the
+        // panel bubbles up to it, so only a hit on the scrim itself counts.
+        if (t.classList.contains('sheet') && e.target !== t) return;
+
+        if (t.dataset.go) { go(t.dataset.go); return; }
+
+        const raw = t.dataset.act;
+        const cut = raw.indexOf(':');
+        const name = cut === -1 ? raw : raw.slice(0, cut);
+        const arg = cut === -1 ? undefined : raw.slice(cut + 1);
+        if (actions[name]) actions[name](arg);
+    });
+
+    /* Search types straight into `query`; drafts type straight into the draft,
+       so a re-render never loses a keystroke. */
+    document.addEventListener('input', e => {
+        if (e.target.matches('[data-search]')) { query = e.target.value; render(); return; }
+
+        const el = e.target.closest('[data-bind]');
+        if (!el) return;
+
+        const key = stack[stack.length - 1];
+        const draft = key === 'addrForm' ? addrDraft
+            : key === 'cancelForm' ? cancelDraft
+            : key === 'returnForm' ? returnDraft
+            : key.startsWith('rate:') ? ratingDraft : null;
+
+        if (draft) draft[el.dataset.bind] = el.value;
+    });
+
+    $('backBtn').addEventListener('click', back);
+    $('saveBtn').addEventListener('click', () => {
+        if (stack[stack.length - 1] === 'addrForm') return actions.saveAddr();
+        back();
+        toast('Saved');
+    });
+    $('searchBtn').addEventListener('click', () => {
+        // Searching leaves whatever category the shopper was browsing — the
+        // field is marketplace-wide, and a stuck filter reads as "no results".
+        query = '';
+        plp = { ...plp, category_id: null };
+        go('search');
+    });
+    $('wishBtn').addEventListener('click', () => go('wishlist'));
+    $('bellBtn').addEventListener('click', () => go('notifications'));
+    $('cartBtn').addEventListener('click', () => root('cart'));
+
+    tabbar.querySelectorAll('button').forEach(b =>
+        b.addEventListener('click', () => root(b.dataset.tab)));
+
+    render();
+})();
+</script>
+
+</body>
+</html>
