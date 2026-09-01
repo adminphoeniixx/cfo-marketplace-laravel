@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Customer;
 use App\Models\User;
 
 return [
@@ -42,6 +43,12 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+
+        // Deliberately no `customer` guard: shoppers never hold a session, they
+        // arrive with a Sanctum token, and Sanctum resolves the token's own
+        // model. A guard here would also tell static analysis that every
+        // `$request->user()` in the panels might be a Customer, which is false.
+        // The provider below is enough for the password broker.
     ],
 
     /*
@@ -65,6 +72,12 @@ return [
         'users' => [
             'driver' => 'eloquent',
             'model' => env('AUTH_MODEL', User::class),
+        ],
+
+        // Shoppers are their own table, and their own model.
+        'customers' => [
+            'driver' => 'eloquent',
+            'model' => env('AUTH_CUSTOMER_MODEL', Customer::class),
         ],
 
         // 'users' => [
@@ -95,6 +108,12 @@ return [
     'passwords' => [
         'users' => [
             'provider' => 'users',
+            'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
+            'expire' => 60,
+            'throttle' => 60,
+        ],
+        'customers' => [
+            'provider' => 'customers',
             'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
             'expire' => 60,
             'throttle' => 60,

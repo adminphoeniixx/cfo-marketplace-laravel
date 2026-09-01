@@ -39,6 +39,22 @@ class Product extends Model
 
     protected $guarded = [];
 
+    /**
+     * Whether the shopper asking has this saved. Set by the customer API when
+     * a token is present, left null when nobody is signed in — not a column,
+     * and never persisted.
+     */
+    public ?bool $is_wishlisted = null;
+
+    /**
+     * Five buckets, five stars down to one, each `['rating' => int,
+     * 'count' => int]`. Filled in by the product endpoint so the histogram is
+     * one query rather than five.
+     *
+     * @var array<int, array{rating: int, count: int}>|null
+     */
+    public ?array $rating_breakdown = null;
+
     protected function casts(): array
     {
         return [
@@ -133,6 +149,29 @@ class Product extends Model
     }
 
     /**
+     * @return HasMany<ProductReview, $this>
+     */
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(ProductReview::class);
+    }
+
+    /**
+     * Recalculate the cached `rating` column from published reviews.
+     *
+     * The column is what listing and search sort on, so it is written once
+     * here rather than averaged on every read.
+     */
+    public function refreshRating(): void
+    {
+        $published = $this->reviews()->published();
+
+        $this->forceFill([
+            'rating' => round((float) $published->avg('rating'), 2),
+        ])->save();
+    }
+
+    /**
      * @return HasMany<OrderItem, $this>
      */
     public function orderItems(): HasMany
@@ -147,6 +186,18 @@ class Product extends Model
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('status', 'active');
+    }
+
+    /**
+     * Can a shopper buy this right now?
+     *
+     * Backorders count as in stock: the seller has said they will make more.
+     */
+    public function isInStock(): bool
+    {
+        return ! $this->track_inventory
+            || $this->allow_backorder
+            || $this->stock_quantity > 0;
     }
 
     public function getStockStatusAttribute(): string

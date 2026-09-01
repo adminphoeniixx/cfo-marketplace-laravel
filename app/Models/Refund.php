@@ -23,6 +23,9 @@ class Refund extends Model
     /** @use HasFactory<RefundFactory> */
     use HasFactory;
 
+    /** As for cancellations: `withdrawn` is the shopper's own retraction. */
+    public const STATUSES = ['pending', 'approved', 'rejected', 'processed', 'withdrawn'];
+
     public const REASONS = [
         'damaged' => 'Item arrived damaged',
         'wrong_item' => 'Wrong item delivered',

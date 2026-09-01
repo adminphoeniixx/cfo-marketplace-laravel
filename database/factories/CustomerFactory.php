@@ -27,6 +27,12 @@ class CustomerFactory extends Factory
         ];
     }
 
+    /** A shopper who can sign in with an email and a password. */
+    public function withPassword(string $password = 'a-good-password'): static
+    {
+        return $this->state(fn () => ['password' => $password]);
+    }
+
     public function blocked(): static
     {
         return $this->state(fn () => ['status' => 'blocked']);

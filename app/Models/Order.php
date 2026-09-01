@@ -98,6 +98,38 @@ class Order extends Model
         return $this->hasMany(Refund::class);
     }
 
+    /**
+     * How long after delivery a shopper may still send something back.
+     *
+     * One window for the whole marketplace rather than a per-product one: the
+     * shopper app quotes it on the product page before there is an order, and
+     * two different windows on one basket would be unexplainable.
+     */
+    public const RETURN_WINDOW_DAYS = 7;
+
+    /**
+     * A shopper may call off an order the seller has not handed to a courier.
+     * Once any of it has shipped, the way back is a return.
+     */
+    public function canBeCancelledByCustomer(): bool
+    {
+        return in_array($this->status, ['pending', 'processing', 'on_hold'], true)
+            && $this->fulfillment_status === 'unfulfilled';
+    }
+
+    /**
+     * Returns open on delivery and close after the window — and only for an
+     * order that still has something on it that has not already gone back.
+     */
+    public function canBeReturnedByCustomer(): bool
+    {
+        if ($this->status !== 'completed' || ! $this->delivered_at) {
+            return false;
+        }
+
+        return $this->delivered_at->diffInDays(now()) <= self::RETURN_WINDOW_DAYS;
+    }
+
     public function getRefundableAmountAttribute(): float
     {
         return round((float) $this->grand_total - (float) $this->refunded_total, 2);
@@ -108,8 +140,14 @@ class Order extends Model
      */
     public function recordEvent(string $type, string $title, ?string $body = null, array $meta = []): OrderEvent
     {
+        $actor = auth()->user();
+
         return $this->events()->create([
-            'user_id' => auth()->id(),
+            // `user_id` points at staff and sellers. A shopper is a `Customer`
+            // — a different table with its own ids — so an event they caused
+            // is recorded with no actor rather than with an id that would land
+            // on whichever unrelated staff login shares that number.
+            'user_id' => $actor instanceof User ? $actor->getKey() : null,
             'type' => $type,
             'title' => $title,
             'body' => $body,

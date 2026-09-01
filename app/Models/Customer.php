@@ -4,26 +4,50 @@ namespace App\Models;
 
 use Database\Factories\CustomerFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Carbon;
+use Laravel\Sanctum\HasApiTokens;
 
-class Customer extends Model
+/**
+ * @property Carbon|null $date_of_birth
+ * @property Carbon|null $phone_verified_at
+ * @property Carbon|null $last_order_at
+ *
+ * A shopper.
+ *
+ * Staff have always been able to create these from the panel; since the
+ * shopper app they can also sign in as one. That is why this extends
+ * Authenticatable — the token on a customer request belongs to *this* model,
+ * never to a `User`, and every customer endpoint reads its subject from the
+ * token rather than from the payload.
+ */
+class Customer extends Authenticatable
 {
     /** @use HasFactory<CustomerFactory> */
-    use HasFactory, SoftDeletes;
+    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
     protected $guarded = [];
+
+    /**
+     * @var list<string>
+     */
+    protected $hidden = ['password', 'remember_token'];
 
     protected function casts(): array
     {
         return [
+            'password' => 'hashed',
             'total_spent' => 'decimal:2',
             'tags' => 'array',
             'accepts_marketing' => 'boolean',
             'email_verified' => 'boolean',
             'date_of_birth' => 'date',
             'last_order_at' => 'datetime',
+            'phone_verified_at' => 'datetime',
         ];
     }
 
@@ -41,6 +65,46 @@ class Customer extends Model
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class);
+    }
+
+    /**
+     * @return HasOne<Cart, $this>
+     */
+    public function cart(): HasOne
+    {
+        return $this->hasOne(Cart::class);
+    }
+
+    /**
+     * @return HasMany<WishlistItem, $this>
+     */
+    public function wishlistItems(): HasMany
+    {
+        return $this->hasMany(WishlistItem::class);
+    }
+
+    /**
+     * @return HasMany<ProductReview, $this>
+     */
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(ProductReview::class);
+    }
+
+    /**
+     * @return HasMany<Cancellation, $this>
+     */
+    public function cancellations(): HasMany
+    {
+        return $this->hasMany(Cancellation::class);
+    }
+
+    /**
+     * @return HasMany<Refund, $this>
+     */
+    public function refunds(): HasMany
+    {
+        return $this->hasMany(Refund::class);
     }
 
     public function getNameAttribute(): string

@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\DenyVendorAdminPanel;
 use App\Http\Middleware\EnsureAdmin;
+use App\Http\Middleware\EnsureCustomer;
 use App\Http\Middleware\EnsureRoleCan;
 use App\Http\Middleware\EnsureSeller;
 use App\Http\Middleware\EnsureSellerPanel;
@@ -36,6 +37,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role.can' => EnsureRoleCan::class,
             'admin.only' => EnsureAdmin::class,
             'deny.vendor' => DenyVendorAdminPanel::class,
+            'customer' => EnsureCustomer::class,
             'seller' => EnsureSeller::class,
             'seller.panel' => EnsureSellerPanel::class,
             'seller.section' => EnsureSellerSection::class,

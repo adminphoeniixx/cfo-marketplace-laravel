@@ -1,6 +1,8 @@
 <?php
 
+use App\Models\Customer;
 use App\Models\Order;
+use App\Models\Product;
 use App\Models\User;
 use App\Models\Vendor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -107,6 +109,49 @@ function actingAsSeller(array $vendorAttributes = []): array
     );
 
     return [$seller, $vendor];
+}
+
+/**
+ * Create an active shopper and act as them with a real Sanctum token.
+ *
+ * @param  array<string, mixed>  $attributes
+ */
+function actingAsCustomer(array $attributes = []): Customer
+{
+    $customer = Customer::factory()->create(['status' => 'active', ...$attributes]);
+
+    // A bearer token rather than `actingAs`, so the tests go through the same
+    // guard the app does — including the `customer` middleware.
+    test()->withHeader(
+        'Authorization',
+        'Bearer '.$customer->createToken('test device')->plainTextToken,
+    );
+
+    // The container lives across requests inside one test, and a guard caches
+    // whoever it resolved first. Production never sees that — every request is
+    // a fresh app — but a test that switches shoppers would otherwise stay
+    // signed in as the first one.
+    app('auth')->forgetGuards();
+
+    return $customer;
+}
+
+/**
+ * A sellable product belonging to an approved store.
+ *
+ * @param  array<string, mixed>  $attributes
+ */
+function sellableProduct(array $attributes = [], ?Vendor $vendor = null): Product
+{
+    return Product::factory()->create([
+        'vendor_id' => ($vendor ?? Vendor::factory()->create(['status' => 'approved']))->id,
+        'status' => 'active',
+        'price' => 1000,
+        'stock_quantity' => 10,
+        'track_inventory' => true,
+        'published_at' => now()->subDay(),
+        ...$attributes,
+    ]);
 }
 
 /**

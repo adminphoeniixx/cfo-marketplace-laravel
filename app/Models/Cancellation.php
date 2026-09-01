@@ -23,6 +23,10 @@ class Cancellation extends Model
     /** @use HasFactory<CancellationFactory> */
     use HasFactory;
 
+    /** The vocabulary both panels and the shopper app share. `withdrawn` is
+     * the shopper taking their own request back before anyone answered it. */
+    public const STATUSES = ['pending', 'approved', 'rejected', 'withdrawn'];
+
     public const REASONS = [
         'customer_changed_mind' => 'Customer changed their mind',
         'ordered_by_mistake' => 'Ordered by mistake',

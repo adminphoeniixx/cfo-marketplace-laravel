@@ -1,5 +1,17 @@
 <?php
 
+use App\Http\Controllers\Api\Customer\AddressController as CustomerAddressController;
+use App\Http\Controllers\Api\Customer\AuthController as CustomerAuthController;
+use App\Http\Controllers\Api\Customer\CartController;
+use App\Http\Controllers\Api\Customer\CatalogController as CustomerCatalogController;
+use App\Http\Controllers\Api\Customer\CheckoutController;
+use App\Http\Controllers\Api\Customer\NotificationController as CustomerNotificationController;
+use App\Http\Controllers\Api\Customer\OrderController as CustomerOrderController;
+use App\Http\Controllers\Api\Customer\ProfileController as CustomerProfileController;
+use App\Http\Controllers\Api\Customer\ReferenceController;
+use App\Http\Controllers\Api\Customer\RequestController;
+use App\Http\Controllers\Api\Customer\ReviewController;
+use App\Http\Controllers\Api\Customer\WishlistController;
 use App\Http\Controllers\Api\Seller\AnalyticsController;
 use App\Http\Controllers\Api\Seller\AuthController;
 use App\Http\Controllers\Api\Seller\CancellationController;
@@ -78,8 +90,12 @@ Route::prefix('seller')->name('api.seller.')->group(function () {
             Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
             Route::get('notifications/unread-count', [NotificationController::class, 'unreadCount'])->name('notifications.unread');
             Route::post('notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.read-all');
-            Route::post('notifications/{notification}/read', [NotificationController::class, 'read'])->name('notifications.read');
-            Route::delete('notifications/{notification}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
+            // Notification ids are uuids. Without this a malformed id reaches
+            // Postgres and comes back a 500 instead of a 404.
+            Route::post('notifications/{notification}/read', [NotificationController::class, 'read'])
+                ->whereUuid('notification')->name('notifications.read');
+            Route::delete('notifications/{notification}', [NotificationController::class, 'destroy'])
+                ->whereUuid('notification')->name('notifications.destroy');
 
             Route::get('push', [NotificationController::class, 'pushSettings'])->name('push.settings');
             Route::post('push', [NotificationController::class, 'subscribe'])->name('push.subscribe');
@@ -192,5 +208,117 @@ Route::prefix('seller')->name('api.seller.')->group(function () {
                 Route::get('payouts/{payout}', [PayoutController::class, 'show'])->name('payouts.show');
             });
         });
+    });
+});
+
+/*
+|--------------------------------------------------------------------------
+| Customer API
+|--------------------------------------------------------------------------
+|
+| Token-authenticated (Sanctum) endpoints for the shopper app. Three tiers:
+|
+|   public          — browsing, and getting in
+|   auth:sanctum    — nothing on its own; every route below adds `customer`
+|   customer        — an active shopper, proven by the token's own model
+|
+| The token's tokenable is a `Customer`, never a `User`, and the `customer`
+| middleware is what insists on that — a seller's token is a valid Sanctum
+| token and would otherwise walk straight in.
+|
+| Every list and lookup is scoped by `ScopesToCustomer`. No endpoint takes a
+| customer id from the caller.
+|
+*/
+
+Route::prefix('customer')->name('api.customer.')->group(function () {
+
+    /* -------------------------------------------------- browsing, signed out */
+
+    // These work with or without a token. Where one is present the catalogue
+    // resolves it through the `sanctum` guard by hand and stamps
+    // `is_wishlisted`; where it is not, the field is simply absent.
+    Route::get('home', [CustomerCatalogController::class, 'home'])->name('home');
+    Route::get('categories', [CustomerCatalogController::class, 'categories'])->name('categories');
+    Route::get('products', [CustomerCatalogController::class, 'products'])->name('products');
+    Route::get('products/suggestions', [CustomerCatalogController::class, 'suggestions'])->name('products.suggestions');
+    Route::get('products/{product}', [CustomerCatalogController::class, 'product'])->name('products.show');
+    Route::get('products/{product}/reviews', [ReviewController::class, 'index'])->name('products.reviews');
+    Route::get('sellers/{vendor}', [CustomerCatalogController::class, 'seller'])->name('sellers.show');
+    Route::get('reference', ReferenceController::class)->name('reference');
+
+    /* ------------------------------------------------------------ getting in */
+
+    Route::middleware('throttle:10,1')->group(function () {
+        Route::post('auth/otp', [CustomerAuthController::class, 'requestCode'])->name('auth.otp');
+        Route::post('auth/otp/verify', [CustomerAuthController::class, 'verifyCode'])->name('auth.otp.verify');
+        Route::post('auth/register', [CustomerAuthController::class, 'register'])->name('auth.register');
+        Route::post('auth/login', [CustomerAuthController::class, 'login'])->name('auth.login');
+        Route::post('auth/forgot-password', [CustomerAuthController::class, 'forgotPassword'])->name('auth.forgot-password');
+        Route::post('auth/reset-password', [CustomerAuthController::class, 'resetPassword'])->name('auth.reset-password');
+    });
+
+    /* ------------------------------------------------------------ signed in */
+
+    Route::middleware(['auth:sanctum', 'customer'])->group(function () {
+
+        Route::post('auth/refresh', [CustomerAuthController::class, 'refresh'])->name('auth.refresh');
+        Route::post('auth/logout', [CustomerAuthController::class, 'logout'])->name('auth.logout');
+        Route::post('auth/logout-all', [CustomerAuthController::class, 'logoutAll'])->name('auth.logout-all');
+        Route::get('auth/devices', [CustomerAuthController::class, 'devices'])->name('auth.devices');
+        Route::delete('auth/devices/{token}', [CustomerAuthController::class, 'revokeDevice'])->name('auth.devices.revoke');
+
+        Route::get('me', [CustomerProfileController::class, 'show'])->name('me');
+        Route::put('me', [CustomerProfileController::class, 'update'])->name('me.update');
+        Route::put('me/password', [CustomerProfileController::class, 'updatePassword'])->name('me.password');
+
+        Route::get('addresses', [CustomerAddressController::class, 'index'])->name('addresses.index');
+        Route::post('addresses', [CustomerAddressController::class, 'store'])->name('addresses.store');
+        Route::put('addresses/{address}', [CustomerAddressController::class, 'update'])->name('addresses.update');
+        Route::delete('addresses/{address}', [CustomerAddressController::class, 'destroy'])->name('addresses.destroy');
+        Route::patch('addresses/{address}/default', [CustomerAddressController::class, 'setDefault'])->name('addresses.default');
+
+        Route::get('cart', [CartController::class, 'show'])->name('cart');
+        Route::post('cart/items', [CartController::class, 'addItem'])->name('cart.items.store');
+        Route::patch('cart/items/{item}', [CartController::class, 'updateItem'])->name('cart.items.update');
+        Route::delete('cart/items/{item}', [CartController::class, 'removeItem'])->name('cart.items.destroy');
+        Route::post('cart/items/{item}/save-for-later', [CartController::class, 'saveForLater'])->name('cart.items.save');
+        Route::post('cart/items/{item}/move-to-cart', [CartController::class, 'moveToCart'])->name('cart.items.move');
+        Route::delete('cart', [CartController::class, 'clear'])->name('cart.clear');
+        Route::get('cart/coupons', [CartController::class, 'coupons'])->name('cart.coupons');
+        Route::post('cart/coupon', [CartController::class, 'applyCoupon'])->name('cart.coupon.apply');
+        Route::delete('cart/coupon', [CartController::class, 'removeCoupon'])->name('cart.coupon.remove');
+
+        Route::get('wishlist', [WishlistController::class, 'index'])->name('wishlist.index');
+        Route::post('wishlist', [WishlistController::class, 'store'])->name('wishlist.store');
+        Route::delete('wishlist/{product}', [WishlistController::class, 'destroy'])->name('wishlist.destroy');
+
+        Route::get('checkout', [CheckoutController::class, 'options'])->name('checkout');
+        Route::post('orders', [CheckoutController::class, 'store'])->name('orders.store');
+
+        Route::get('orders', [CustomerOrderController::class, 'index'])->name('orders.index');
+        // Before {order}, or an order numbered "requests" would win the match.
+        Route::get('requests', [RequestController::class, 'index'])->name('requests.index');
+        Route::get('requests/{number}', [RequestController::class, 'show'])->name('requests.show');
+        Route::post('requests/{number}/withdraw', [RequestController::class, 'withdraw'])->name('requests.withdraw');
+        Route::get('orders/{order}', [CustomerOrderController::class, 'show'])->name('orders.show');
+        Route::get('orders/{order}/track', [CustomerOrderController::class, 'track'])->name('orders.track');
+        Route::post('orders/{order}/reorder', [CustomerOrderController::class, 'reorder'])->name('orders.reorder');
+        Route::post('orders/{order}/cancellations', [RequestController::class, 'storeCancellation'])->name('orders.cancellations');
+        Route::post('orders/{order}/returns', [RequestController::class, 'storeRefund'])->name('orders.returns');
+
+        Route::get('reviews', [ReviewController::class, 'mine'])->name('reviews.mine');
+        Route::post('products/{product}/reviews', [ReviewController::class, 'store'])->name('reviews.store');
+        Route::delete('reviews/{review}', [ReviewController::class, 'destroy'])->name('reviews.destroy');
+
+        Route::get('notifications', [CustomerNotificationController::class, 'index'])->name('notifications.index');
+        Route::get('notifications/unread-count', [CustomerNotificationController::class, 'unreadCount'])->name('notifications.unread');
+        Route::post('notifications/read-all', [CustomerNotificationController::class, 'readAll'])->name('notifications.read-all');
+        Route::post('notifications/{notification}/read', [CustomerNotificationController::class, 'read'])
+            ->whereUuid('notification')->name('notifications.read');
+        Route::delete('notifications/{notification}', [CustomerNotificationController::class, 'destroy'])
+            ->whereUuid('notification')->name('notifications.destroy');
+        Route::post('push/device', [CustomerNotificationController::class, 'registerDevice'])->name('push.device.register');
+        Route::delete('push/device', [CustomerNotificationController::class, 'forgetDevice'])->name('push.device.forget');
     });
 });
