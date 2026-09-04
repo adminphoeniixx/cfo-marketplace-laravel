@@ -68,6 +68,11 @@ own source, plus the account screen's counts. 82 endpoints now.
   `withdrawn_at` (and `picked_up_at`, always null — no courier reports a
   return collection).
 - `cart_count` on `POST /orders/{number}/reorder`.
+- **`is_available` / `unavailable_reason` on every payment method** returned by
+  `GET /checkout`. A seller who does not take cash now greys cash on delivery
+  out with the reason beside it, and `POST /orders` refuses that method for
+  such a basket with a `422` rather than letting a courier find out at the
+  door.
 - Admin: an **App content** screen (banners, help answers, legal pages),
   **Marketplace Assured** and **cash on delivery** toggles per vendor, and
   support hours / chat provider / seller-onboarding link in settings.

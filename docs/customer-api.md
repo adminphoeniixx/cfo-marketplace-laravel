@@ -261,6 +261,17 @@ free-shipping code's worth arithmetic rather than a guess.
 list when the basket falls outside it. If nothing at all fits the address, free
 standard delivery (3–7 days) is the fallback, so an order can always be taken.
 
+### Ways to pay, and when cash is not one
+
+Each method carries `is_available` and, where it is false, an
+`unavailable_reason`. Today that has one cause: **a seller in the basket who
+does not handle cash**. Grey the option out and show the reason — an option
+that vanishes reads as a bug, one with a sentence beside it reads as an answer.
+
+The screen is not the rule: `POST /orders` refuses a pay-on-delivery method for
+such a basket with a `422` on `payment_method`, so an older build cannot place
+an order a seller will not accept cash for.
+
 ### Ways to pay
 
 Each method carries `icon` (an emoji — the admin's own, or one derived from the

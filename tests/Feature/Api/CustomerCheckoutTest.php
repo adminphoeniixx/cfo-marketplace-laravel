@@ -219,3 +219,37 @@ test('saved-for-later lines are not bought by accident', function () {
     // And it is still sitting there for next time.
     $this->getJson(route('api.customer.cart'))->assertJsonCount(1, 'data.saved_for_later');
 });
+
+test('a seller who will not take cash greys the option out and refuses the order', function () {
+    $noCash = Vendor::factory()->create(['status' => 'approved', 'name' => 'Woodline Furniture', 'cod_available' => false]);
+    addToCart(sellableProduct(['price' => 1000], $noCash)->id);
+
+    $methods = collect($this->getJson(route('api.customer.checkout'))->assertOk()->json('payment_methods'))
+        ->keyBy('code');
+
+    // Greyed out rather than missing: an option that vanishes reads as a bug.
+    expect($methods['cash-on-delivery']['is_available'])->toBeFalse()
+        ->and($methods['cash-on-delivery']['unavailable_reason'])
+        ->toBe('Woodline Furniture does not take cash on delivery')
+        ->and($methods['upi']['is_available'])->toBeTrue();
+
+    // And the screen is not the rule — an app that skipped it is still refused.
+    $this->postJson(route('api.customer.orders.store'), [
+        'address_id' => $this->address->id,
+        'payment_method' => 'cash-on-delivery',
+    ])->assertStatus(422)->assertJsonValidationErrors('payment_method');
+
+    $this->postJson(route('api.customer.orders.store'), [
+        'address_id' => $this->address->id,
+        'payment_method' => 'upi',
+    ])->assertCreated();
+});
+
+test('cash stays on offer where every seller in the basket takes it', function () {
+    addToCart(sellableProduct(['price' => 1000])->id);
+
+    $methods = collect($this->getJson(route('api.customer.checkout'))->json('payment_methods'))->keyBy('code');
+
+    expect($methods['cash-on-delivery']['is_available'])->toBeTrue()
+        ->and($methods['cash-on-delivery']['unavailable_reason'])->toBeNull();
+});
