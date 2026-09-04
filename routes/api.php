@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\Customer\ProfileController as CustomerProfileContro
 use App\Http\Controllers\Api\Customer\ReferenceController;
 use App\Http\Controllers\Api\Customer\RequestController;
 use App\Http\Controllers\Api\Customer\ReviewController;
+use App\Http\Controllers\Api\Customer\WalletController;
 use App\Http\Controllers\Api\Customer\WishlistController;
 use App\Http\Controllers\Api\Seller\AnalyticsController;
 use App\Http\Controllers\Api\Seller\AuthController;
@@ -307,6 +308,20 @@ Route::prefix('customer')->name('api.customer.')->group(function () {
         // profile update.
         Route::get('me/summary', [CustomerProfileController::class, 'summary'])->name('me.summary');
         Route::delete('me', [CustomerProfileController::class, 'destroy'])->name('me.destroy');
+
+        /*
+        | The payments screen. `payment-methods` here is personal — the cards
+        | and handles this shopper has saved — where `/reference` lists what
+        | the marketplace accepts from anybody.
+        */
+        Route::get('payment-methods', [WalletController::class, 'index'])->name('payment-methods.index');
+        Route::post('payment-methods', [WalletController::class, 'store'])->name('payment-methods.store');
+        Route::delete('payment-methods/{method}', [WalletController::class, 'destroy'])
+            ->whereNumber('method')->name('payment-methods.destroy');
+        Route::patch('payment-methods/{method}/default', [WalletController::class, 'makeDefault'])
+            ->whereNumber('method')->name('payment-methods.default');
+
+        Route::get('wallet', [WalletController::class, 'wallet'])->name('wallet');
 
         Route::get('notification-preferences', [CustomerProfileController::class, 'notificationPreferences'])
             ->name('notification-preferences');

@@ -5,6 +5,7 @@ use App\Models\Cancellation;
 use App\Models\Coupon;
 use App\Models\Customer;
 use App\Models\CustomerDeviceToken;
+use App\Models\CustomerPaymentMethod;
 use App\Models\Faq;
 use App\Models\LegalPage;
 use App\Models\Order;
@@ -14,6 +15,7 @@ use App\Models\Product;
 use App\Models\ProductReview;
 use App\Models\Refund;
 use App\Models\Vendor;
+use App\Models\WalletTransaction;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -215,6 +217,13 @@ function shopperFixture(): array
 
     $customer->wishlistItems()->create(['product_id' => $second->id]);
 
+    $saved = CustomerPaymentMethod::factory()->create([
+        'customer_id' => $customer->id, 'is_default' => true,
+    ]);
+    WalletTransaction::factory()->create([
+        'customer_id' => $customer->id, 'amount' => 500, 'description' => 'Refund for #1001',
+    ]);
+
     Banner::factory()->create(['title' => 'Festive edit']);
     Faq::factory()->create(['question' => 'When will my order arrive?']);
     LegalPage::where('slug', 'privacy')
@@ -229,6 +238,7 @@ function shopperFixture(): array
         'coupon' => $coupon,
         'line' => $line,
         'saved_line' => $savedLine,
+        'saved_method' => $saved,
         'delivered' => $delivered,
         'open' => $open,
         'unpaid' => $unpaid,
@@ -418,6 +428,15 @@ function shopperCalls(array $f): array
         ], 201],
         'api.customer.reviews.mine' => ['GET', route('api.customer.reviews.mine'), []],
         'api.customer.reviews.destroy' => ['DELETE', route('api.customer.reviews.destroy', $f['review']->id), []],
+
+        // The payments screen: what this shopper saved, and what they are owed.
+        'api.customer.payment-methods.index' => ['GET', route('api.customer.payment-methods.index'), []],
+        'api.customer.payment-methods.store' => ['POST', route('api.customer.payment-methods.store'), [
+            'type' => 'upi', 'label' => 'Google Pay', 'masked_value' => 'priya@okhdfc', 'provider' => 'gpay',
+        ], 201],
+        'api.customer.payment-methods.default' => ['PATCH', route('api.customer.payment-methods.default', $f['saved_method']->id), []],
+        'api.customer.payment-methods.destroy' => ['DELETE', route('api.customer.payment-methods.destroy', $f['saved_method']->id), []],
+        'api.customer.wallet' => ['GET', route('api.customer.wallet'), []],
 
         // The bell, and what rings it.
         'api.customer.notifications.index' => ['GET', route('api.customer.notifications.index'), []],

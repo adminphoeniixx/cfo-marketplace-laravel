@@ -64,6 +64,25 @@ class Customer extends Authenticatable
     }
 
     /**
+     * Ways this shopper has saved to pay — not the marketplace's own list of
+     * what it accepts, which is `PaymentMethod`.
+     *
+     * @return HasMany<CustomerPaymentMethod, $this>
+     */
+    public function paymentMethods(): HasMany
+    {
+        return $this->hasMany(CustomerPaymentMethod::class);
+    }
+
+    /**
+     * @return HasMany<WalletTransaction, $this>
+     */
+    public function walletTransactions(): HasMany
+    {
+        return $this->hasMany(WalletTransaction::class);
+    }
+
+    /**
      * @return HasMany<Order, $this>
      */
     public function orders(): HasMany

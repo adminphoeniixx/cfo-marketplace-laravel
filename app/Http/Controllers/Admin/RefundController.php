@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Refund;
+use App\Models\WalletTransaction;
 use App\Notifications\RefundDecided;
 use App\Notifications\RefundRequested;
 use App\Services\Notifier;
@@ -249,6 +250,23 @@ class RefundController extends Controller
                 'processed_at' => now(),
                 'reviewed_by' => $refund->reviewed_by ?? $request->user()?->id,
             ]);
+
+            /*
+            | A refund to store credit has to land somewhere the shopper can
+            | see it. Without this the panel said "refunded", the wallet said
+            | zero, and the difference was a support ticket.
+            */
+            if ($refund->method === 'store_credit' && $order->customer_id) {
+                WalletTransaction::create([
+                    'customer_id' => $order->customer_id,
+                    'amount' => (float) $refund->total_amount,
+                    'kind' => 'refund',
+                    'description' => "Refund for {$order->number}",
+                    'order_id' => $order->id,
+                    'refund_id' => $refund->id,
+                    'expires_at' => now()->addYear(),
+                ]);
+            }
 
             $order->recordEvent(
                 'refund',
