@@ -336,6 +336,27 @@ Fulfilment only moves your own lines. The order-level status is recomputed from
 **every** line, so a two-vendor order stays `partially_fulfilled` until the
 other seller ships too.
 
+### Delhivery books its own waybill
+
+Where the marketplace has Delhivery credentials configured, fulfilling with
+`carrier: "delhivery"` and **no** `tracking_number` books the parcel and puts
+the waybill on the order — so the app can leave the tracking field empty and
+read `tracking_number` back from the response.
+
+- Send a `tracking_number` and it is left alone. A seller who has a waybill
+  already knows something the marketplace does not, and booking a second one
+  puts two labels on one box.
+- A refusal is **not** an error. The fulfilment stands, `tracking_number` stays
+  null, and why it was refused is on the order timeline as a `shipment` event.
+  Show the field so a waybill can still be typed in.
+- With no credentials configured nothing is booked and nothing changes, which
+  is how this worked before.
+
+Once booked, `shipments:sync` follows the parcel every fifteen minutes: each
+courier scan becomes a timeline event, and `shipped_at` / `delivered_at` come
+from the courier rather than from a seller pressing a button. A cash-on-delivery
+order is marked paid when the courier records the delivery.
+
 That is why the "to pack" list is **`?needs_packing=1`**, not
 `?fulfillment_status=unfulfilled`. `needs_packing` asks whether any of *your*
 lines still has quantity outstanding, so an order you have finished drops off

@@ -57,6 +57,28 @@ return [
     ],
 
     /*
+    | Delhivery, for actually shipping things.
+    |
+    | Inert until `DELHIVERY_API_TOKEN` is set, exactly like the gateway: with
+    | no token the seller types a waybill in by hand, which is what happened
+    | before this existed. `DELHIVERY_PICKUP_NAME` must match a warehouse
+    | registered in the Delhivery panel, or every booking is refused.
+    |
+    | Point `DELHIVERY_BASE_URL` at https://staging-express.delhivery.com while
+    | testing; the default is production.
+    */
+    'delhivery' => [
+        'token' => env('DELHIVERY_API_TOKEN'),
+        'base_url' => env('DELHIVERY_BASE_URL', 'https://track.delhivery.com'),
+        // The registered warehouse parcels are collected from.
+        'pickup_name' => env('DELHIVERY_PICKUP_NAME'),
+        // Printed on the label as the sender.
+        'seller_name' => env('DELHIVERY_SELLER_NAME'),
+        'connect_timeout' => (int) env('DELHIVERY_CONNECT_TIMEOUT', 5),
+        'timeout' => (int) env('DELHIVERY_TIMEOUT', 30),
+    ],
+
+    /*
     | Text messages, which here means the sign-in code and nothing else.
     |
     | Leave `SMS_DRIVER` at `log` and codes go to the log and come back as

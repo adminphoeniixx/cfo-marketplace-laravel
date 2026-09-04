@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Seller;
 
 use App\Actions\CreateManualOrder;
+use App\Actions\Shipping\BookShipment;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Seller\OrderResource;
 use App\Models\Customer;
@@ -208,6 +209,11 @@ class OrderController extends Controller
                 ['vendor_id' => $storeId, 'source' => 'seller-api'],
             );
         });
+
+        // Outside the transaction on purpose: a courier refusing must not undo
+        // a fulfilment that is otherwise fine, and a booking is not something
+        // to hold a database lock open across.
+        app(BookShipment::class)->handle($model->fresh(['items']));
 
         return new OrderResource($this->findOwnedOrder($request, $order));
     }

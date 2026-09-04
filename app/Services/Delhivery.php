@@ -1,0 +1,278 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\Order;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use RuntimeException;
+
+/**
+ * Delhivery, spoken over HTTP.
+ *
+ * Three things happen here and nowhere else: a parcel is booked and a waybill
+ * comes back, a waybill is asked where it has got to, and a booking is called
+ * off. What that means for an order — the tracking number, the timeline, the
+ * status — belongs to `BookShipment` and `SyncShipments`, so this class never
+ * writes to the database.
+ *
+ * Inert without a token, like the payment gateway: the seller types a waybill
+ * in by hand and nothing else changes. That is what lets the demo and the test
+ * suite run without a courier account.
+ *
+ * Delhivery's own oddity, kept in one place: `create.json` wants a *form* body
+ * whose `data` field is JSON, not a JSON body. Sending it as JSON returns a
+ * cheerful 200 with `success: false` and no waybill, which is exactly the kind
+ * of failure that gets deployed.
+ */
+class Delhivery
+{
+    /** What Delhivery calls the state a parcel is in, in this marketplace's words. */
+    private const STATUS_MAP = [
+        'Manifested' => 'booked',
+        'Not Picked' => 'booked',
+        'In Transit' => 'in_transit',
+        'Pending' => 'in_transit',
+        'Dispatched' => 'out_for_delivery',
+        'Delivered' => 'delivered',
+        'RTO' => 'returning',
+        'DTO' => 'returning',
+        'Lost' => 'lost',
+        'Canceled' => 'cancelled',
+        'Cancelled' => 'cancelled',
+    ];
+
+    public static function enabled(): bool
+    {
+        return self::config('token') !== null && self::config('pickup_name') !== null;
+    }
+
+    /**
+     * Whether Delhivery delivers to a pincode, and on what terms.
+     *
+     * @return array{serviceable: bool, cod: bool, prepaid: bool, pickup: bool}|null
+     *                                                                               Null where the question could not be asked.
+     */
+    public static function serviceability(string $pincode): ?array
+    {
+        try {
+            $response = self::request()->get('/c/api/pin-codes/json/', ['filter_codes' => $pincode]);
+        } catch (ConnectionException $e) {
+            Log::warning('Delhivery unreachable for a serviceability check.', [
+                'pincode' => $pincode, 'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+
+        if ($response->failed()) {
+            return null;
+        }
+
+        $codes = (array) $response->json('delivery_codes', []);
+
+        if ($codes === []) {
+            return ['serviceable' => false, 'cod' => false, 'prepaid' => false, 'pickup' => false];
+        }
+
+        $postal = (array) ($codes[0]['postal_code'] ?? []);
+
+        return [
+            'serviceable' => true,
+            // Delhivery answers "Y"/"N" here, not booleans.
+            'cod' => ($postal['cod'] ?? 'N') === 'Y',
+            'prepaid' => ($postal['pre_paid'] ?? 'N') === 'Y',
+            'pickup' => ($postal['pickup'] ?? 'N') === 'Y',
+        ];
+    }
+
+    /**
+     * Book one order and hand back its waybill.
+     *
+     * @param  array<string, mixed>  $overrides  Weight, dimensions, seller name.
+     *
+     * @throws RuntimeException When Delhivery refuses or cannot be reached.
+     */
+    public static function createShipment(Order $order, array $overrides = []): string
+    {
+        $address = (array) $order->shipping_address;
+        $isCod = $order->isPayOnDelivery() && $order->payment_status !== 'paid';
+
+        $shipment = [
+            'name' => trim(($address['first_name'] ?? '').' '.($address['last_name'] ?? '')) ?: 'Customer',
+            'add' => trim(($address['address_line1'] ?? '').' '.($address['address_line2'] ?? '')),
+            'city' => $address['city'] ?? '',
+            'state' => $address['state'] ?? '',
+            'country' => $address['country'] ?? 'India',
+            'pin' => (string) ($address['postcode'] ?? ''),
+            'phone' => (string) ($address['phone'] ?? $order->phone ?? ''),
+            'order' => $order->number,
+            // "COD" or "Prepaid", and the amount only means anything for the
+            // first — sending a figure on a prepaid parcel is how a courier
+            // ends up collecting money twice.
+            'payment_mode' => $isCod ? 'COD' : 'Prepaid',
+            'cod_amount' => $isCod ? (float) $order->grand_total : 0,
+            'total_amount' => (float) $order->grand_total,
+            'products_desc' => $order->items->pluck('name')->take(3)->implode(', ') ?: 'Merchandise',
+            'quantity' => (string) $order->items->sum('quantity'),
+            'weight' => (string) ($overrides['weight'] ?? 500),
+            'shipment_width' => (string) ($overrides['width'] ?? 20),
+            'shipment_height' => (string) ($overrides['height'] ?? 15),
+            'seller_name' => $overrides['seller_name'] ?? self::config('seller_name') ?? config('app.name'),
+            'shipping_mode' => 'Surface',
+        ];
+
+        $payload = [
+            'shipments' => [$shipment],
+            'pickup_location' => ['name' => self::config('pickup_name')],
+        ];
+
+        try {
+            // Form-encoded with a JSON `data` field: Delhivery's own shape, and
+            // the reason this method exists rather than a one-line post.
+            $response = self::request()
+                ->asForm()
+                ->post('/api/cmu/create.json', [
+                    'format' => 'json',
+                    'data' => json_encode($payload, JSON_THROW_ON_ERROR),
+                ]);
+        } catch (ConnectionException $e) {
+            throw new RuntimeException('Delhivery could not be reached: '.$e->getMessage());
+        }
+
+        $packages = (array) $response->json('packages', []);
+        $waybill = $packages[0]['waybill'] ?? null;
+
+        if ($response->failed() || ! is_string($waybill) || $waybill === '') {
+            // Delhivery answers 200 with `success: false` on a refusal, so the
+            // status code alone is not the test.
+            $why = $packages[0]['remarks'][0]
+                ?? $response->json('rmk')
+                ?? mb_substr($response->body(), 0, 200);
+
+            Log::error('Delhivery refused a booking.', [
+                'order' => $order->number,
+                'status' => $response->status(),
+                'why' => $why,
+            ]);
+
+            throw new RuntimeException(is_string($why) ? $why : 'Delhivery would not book this parcel.');
+        }
+
+        return $waybill;
+    }
+
+    /**
+     * Where a parcel has got to.
+     *
+     * @return array{status: string, raw_status: string, location: string|null, updated_at: string|null, scans: list<array<string, mixed>>}|null
+     *                                                                                                                                           Null where Delhivery could not be asked, which is not the same as
+     *                                                                                                                                           "nothing has happened" and must not be treated as it.
+     */
+    public static function track(string $waybill): ?array
+    {
+        try {
+            $response = self::request()->get('/api/v1/packages/json/', ['waybill' => $waybill]);
+        } catch (ConnectionException $e) {
+            Log::warning('Delhivery unreachable while tracking.', [
+                'waybill' => $waybill, 'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+
+        if ($response->failed()) {
+            return null;
+        }
+
+        $shipment = (array) ($response->json('ShipmentData.0.Shipment') ?? []);
+
+        if ($shipment === []) {
+            return null;
+        }
+
+        $status = (array) ($shipment['Status'] ?? []);
+        $raw = (string) ($status['Status'] ?? '');
+
+        return [
+            'status' => self::STATUS_MAP[$raw] ?? 'in_transit',
+            'raw_status' => $raw,
+            'location' => is_string($status['StatusLocation'] ?? null) ? $status['StatusLocation'] : null,
+            'updated_at' => is_string($status['StatusDateTime'] ?? null) ? $status['StatusDateTime'] : null,
+            // `array_values` because Delhivery's scan list is keyed by
+            // position on the way in but not guaranteed to be one on the way
+            // out, and a list is what the caller iterates.
+            'scans' => array_values(array_map(fn (array $scan) => [
+                'status' => $scan['ScanDetail']['Scan'] ?? null,
+                'instructions' => $scan['ScanDetail']['Instructions'] ?? null,
+                'location' => $scan['ScanDetail']['ScannedLocation'] ?? null,
+                'at' => $scan['ScanDetail']['ScanDateTime'] ?? null,
+            ], (array) ($shipment['Scans'] ?? []))),
+        ];
+    }
+
+    /**
+     * Call a booking off. Only possible before the parcel is collected.
+     */
+    public static function cancel(string $waybill): bool
+    {
+        try {
+            $response = self::request()->post('/api/p/edit', [
+                'waybill' => $waybill,
+                'cancellation' => 'true',
+            ]);
+        } catch (ConnectionException $e) {
+            Log::warning('Delhivery unreachable while cancelling.', [
+                'waybill' => $waybill, 'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+
+        return $response->successful() && $response->json('status') !== false;
+    }
+
+    /**
+     * The label, as a URL the browser can open with the token attached by us
+     * rather than by the caller.
+     */
+    public static function packingSlip(string $waybill): ?string
+    {
+        try {
+            $response = self::request()->get('/api/p/packing_slip', ['wbns' => $waybill, 'pdf' => 'true']);
+        } catch (ConnectionException) {
+            return null;
+        }
+
+        $url = $response->json('packages.0.pdf_download_link');
+
+        return is_string($url) ? $url : null;
+    }
+
+    private static function request(): PendingRequest
+    {
+        $token = self::config('token');
+
+        if ($token === null) {
+            throw new RuntimeException('Delhivery is not configured.');
+        }
+
+        return Http::baseUrl((string) self::config('base_url'))
+            ->withHeaders([
+                // Their own scheme: "Token <key>", not Bearer.
+                'Authorization' => 'Token '.$token,
+                'Accept' => 'application/json',
+            ])
+            ->connectTimeout((int) self::config('connect_timeout', 5))
+            ->timeout((int) self::config('timeout', 30));
+    }
+
+    private static function config(string $key, mixed $default = null): mixed
+    {
+        $value = config("services.delhivery.{$key}", $default);
+
+        return is_string($value) && trim($value) === '' ? $default : $value;
+    }
+}

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Seller;
 
+use App\Actions\Shipping\BookShipment;
 use App\Http\Controllers\Api\Seller\ScopesToStore;
 use App\Http\Controllers\Controller;
 use App\Models\DeliveryPartner;
@@ -186,6 +187,9 @@ class OrderController extends Controller
                 ['vendor_id' => $storeId, 'source' => 'seller-panel'],
             );
         });
+
+        // Same as the token API: outside the transaction, and never fatal.
+        app(BookShipment::class)->handle($model->fresh(['items']));
 
         return back()->with('success', 'Fulfilment updated.');
     }

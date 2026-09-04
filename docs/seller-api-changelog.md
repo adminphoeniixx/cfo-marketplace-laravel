@@ -15,6 +15,22 @@ with both.
 
 ---
 
+## 2026-09-04
+
+### Added
+
+- **Delhivery books the waybill.** Fulfil with `carrier: "delhivery"` and no
+  `tracking_number` and the marketplace books the parcel, putting the waybill
+  on the order. **What an app must do:** nothing, but you can now leave the
+  tracking field empty and read `tracking_number` back from the response.
+  Sending one still wins, a refusal is not an error, and with no credentials
+  configured nothing changes at all.
+- `shipments:sync` follows booked parcels every fifteen minutes: courier scans
+  land on the order timeline, and `shipped_at` / `delivered_at` — and the
+  payment status of a cash-on-delivery order — come from the courier rather
+  than from a seller pressing a button.
+
+
 ## 2026-08-26
 
 ### Fixed
