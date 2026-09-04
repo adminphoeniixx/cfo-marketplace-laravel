@@ -6,6 +6,7 @@ use App\Http\Controllers\Seller\ManualOrderController;
 use App\Http\Controllers\Seller\NotificationController;
 use App\Http\Controllers\Seller\OrderController;
 use App\Http\Controllers\Seller\ProductController;
+use App\Http\Controllers\Seller\RegistrationController;
 use App\Http\Controllers\Seller\StoreController;
 use Illuminate\Support\Facades\Route;
 
@@ -27,6 +28,22 @@ use Illuminate\Support\Facades\Route;
 | the API: they belong to the person and their store, not to a section.
 |
 */
+
+/*
+| Selling here, before there is an account.
+|
+| Public on purpose: the shopper app's "Sell with us" link and the marketplace
+| home page both point at it, and neither can require a login for a page whose
+| whole job is that somebody does not have one yet.
+*/
+Route::get('sell', [RegistrationController::class, 'create'])->name('sell');
+Route::post('sell', [RegistrationController::class, 'store'])
+    ->middleware('throttle:10,1')->name('sell.store');
+
+// Reachable while the store is still pending, which is exactly when the panel
+// below is not.
+Route::get('seller/pending', [RegistrationController::class, 'pending'])
+    ->middleware('auth')->name('seller.pending');
 
 Route::middleware(['auth', 'verified', 'seller.panel'])
     ->prefix('seller')

@@ -2,16 +2,13 @@
 
 namespace App\Http\Controllers\Api\Seller;
 
+use App\Actions\Seller\RegisterStore;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Seller\ProfileResource;
 use App\Models\DeviceToken;
 use App\Models\User;
-use App\Models\Vendor;
-use App\Notifications\VendorRegistered;
-use App\Services\Notifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
@@ -39,35 +36,9 @@ class AuthController extends Controller
             'device_name' => ['required', 'string', 'max:120'],
         ]);
 
-        [$user, $vendor] = DB::transaction(function () use ($data) {
-            $vendor = Vendor::create([
-                'name' => $data['store_name'],
-                'store_email' => $data['store_email'] ?? $data['email'],
-                'phone' => $data['phone'] ?? null,
-                'gst_number' => $data['gst_number'] ?? null,
-                'contact_name' => $data['name'],
-                'status' => 'pending',
-            ]);
-
-            $user = new User;
-            $user->forceFill([
-                'name' => $data['name'],
-                'email' => $data['email'],
-                'password' => $data['password'],
-                'phone' => $data['phone'] ?? null,
-                'role' => 'vendor',
-                'vendor_id' => $vendor->id,
-                'is_active' => true,
-                // The seller proved the address by receiving nothing — there is
-                // no storefront to verify against, and admin approval is the
-                // real gate here.
-                'email_verified_at' => now(),
-            ])->save();
-
-            return [$user, $vendor];
-        });
-
-        Notifier::send(new VendorRegistered($vendor));
+        // Shared with the public `/sell` form, so the two doors into this
+        // marketplace cannot drift apart.
+        [$user] = app(RegisterStore::class)->handle($data);
 
         return response()->json([
             'token' => $user->createToken($data['device_name'])->plainTextToken,

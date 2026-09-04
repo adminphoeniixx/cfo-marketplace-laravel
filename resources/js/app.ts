@@ -15,6 +15,11 @@ createInertiaApp({
         switch (true) {
             case name === 'Welcome':
                 return null;
+            // Public seller signup and the "waiting for approval" screen. They
+            // stand alone: one is reached before there is an account and the
+            // other while the panel behind `SellerLayout` is still closed.
+            case name.startsWith('sell/'):
+                return null;
             case name.startsWith('admin/'):
                 return AdminLayout;
             case name.startsWith('seller/'):
