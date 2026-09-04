@@ -27,6 +27,15 @@
         <env name="DB_DATABASE" value=":memory:"/>
         <env name="DB_URL" value=""/>
         <env name="FIREBASE_PUSH_ENABLED" value="false"/>
+        <!--
+        | Pinned empty on purpose. Without these the suite reads whatever is in
+        | `.env`, and a run of the auth tests would text real sign-in codes to
+        | the fake phone numbers in the fixtures — which belong to somebody.
+        -->
+        <env name="SMS_DRIVER" value="log"/>
+        <env name="MSG91_AUTHKEY" value=""/>
+        <env name="SMS_API_KEY" value=""/>
+        <env name="DELHIVERY_API_TOKEN" value=""/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

@@ -86,11 +86,21 @@ return [
     | Production must set `http` and a provider, or a shopper cannot get in.
     */
     'sms' => [
-        'driver' => env('SMS_DRIVER', 'log'),
-        'key' => env('SMS_API_KEY'),
+        // `log` keeps codes in the log; `http` texts them. Set automatically
+        // to `http` where a key is present, so wiring a provider up is one
+        // variable rather than two that have to agree.
+        'driver' => env('SMS_DRIVER', env('MSG91_AUTHKEY') ? 'http' : 'log'),
+        // MSG91's own names are accepted, so a key copied straight out of
+        // their dashboard works without being renamed on the way in.
+        'key' => env('SMS_API_KEY', env('MSG91_AUTHKEY')),
         'url' => env('SMS_URL', 'https://control.msg91.com/api/v5/flow'),
-        'sender' => env('SMS_SENDER'),
-        'template_id' => env('SMS_TEMPLATE_ID'),
+        'sender' => env('SMS_SENDER', env('MSG91_SENDER')),
+        'template_id' => env('SMS_TEMPLATE_ID', env('MSG91_TEMPLATE_ID')),
+        // The variable the template substitutes the code into. MSG91 flow
+        // templates name their own; `##OTP##` in the template body is `otp`
+        // here, `##VAR1##` is `var1`, and getting it wrong sends a message
+        // with a hole in it rather than an error.
+        'code_variable' => env('SMS_CODE_VARIABLE', 'otp'),
         'country_code' => env('SMS_COUNTRY_CODE', '91'),
         'connect_timeout' => (int) env('SMS_CONNECT_TIMEOUT', 5),
         'timeout' => (int) env('SMS_TIMEOUT', 15),

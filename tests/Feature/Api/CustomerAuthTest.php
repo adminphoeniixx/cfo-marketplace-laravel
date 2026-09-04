@@ -172,9 +172,11 @@ test('a configured provider sends the code and stops handing it back', function 
     expect($response->json('debug_code'))->toBeNull();
 
     Http::assertSent(function ($request) {
+        $recipient = $request['recipients'][0];
+
         // Bare Indian numbers are stored without a country code; providers
         // want one.
-        return $request['mobiles'] === '919876543210' && $request['otp'] !== null;
+        return $recipient['mobiles'] === '919876543210' && $recipient['otp'] !== null;
     });
 });
 
@@ -193,4 +195,41 @@ test('a provider having a bad morning does not break the sign-in screen', functi
         ->assertOk()
         ->assertJsonPath('sent', true)
         ->assertJsonPath('delivered', false);
+});
+
+test('a provider answering 200 with an error is still a failure', function () {
+    config([
+        'services.sms.driver' => 'http',
+        'services.sms.key' => 'sms-key',
+        'services.sms.url' => 'https://control.msg91.com/api/v5/flow',
+        'services.sms.template_id' => 'wrong-template',
+    ]);
+
+    // MSG91's own shape for a bad template id, an unapproved sender or an
+    // empty balance: HTTP 200, and nothing sent.
+    Http::fake([
+        'control.msg91.com/*' => Http::response(['type' => 'error', 'message' => 'template not found']),
+    ]);
+
+    $this->postJson(route('api.customer.auth.otp'), ['phone' => '9876543210'])
+        ->assertOk()
+        ->assertJsonPath('sent', true)
+        ->assertJsonPath('delivered', false);
+});
+
+test('the template variable is whatever the template calls it', function () {
+    config([
+        'services.sms.driver' => 'http',
+        'services.sms.key' => 'sms-key',
+        'services.sms.url' => 'https://control.msg91.com/api/v5/flow',
+        'services.sms.code_variable' => 'var1',
+    ]);
+
+    Http::fake(['control.msg91.com/*' => Http::response(['type' => 'success'])]);
+
+    $this->postJson(route('api.customer.auth.otp'), ['phone' => '9876543210'])->assertOk();
+
+    // Naming it wrong sends a message with a hole in it rather than an error,
+    // so the name is configuration, not a constant.
+    Http::assertSent(fn ($request) => isset($request['recipients'][0]['var1']));
 });

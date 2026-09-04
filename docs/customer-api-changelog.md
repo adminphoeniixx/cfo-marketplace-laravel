@@ -82,8 +82,8 @@ own source, plus the account screen's counts. 82 endpoints now.
 - **Breaking — `skipped[].reason` on reorder is now a code**, not a sentence:
   `out_of_stock`, `inactive_product`, `variant_missing`, `seller_unavailable`.
   **Migration:** show `message`, which carries the old wording.
-- **Login codes are texted where a provider is configured** (`SMS_DRIVER=http`
-  with `SMS_API_KEY` / `SMS_URL` / `SMS_TEMPLATE_ID` / `SMS_SENDER`), and
+- **Login codes are texted where a provider is configured** (`MSG91_AUTHKEY`
+  plus `MSG91_TEMPLATE_ID`, which flips the driver to `http` on its own), and
   `debug_code` then stops coming back. `POST /auth/otp` gained `delivered`,
   which says whether the provider took it; `sent` stays `true` either way,
   because telling a caller which numbers are registered helps whoever is

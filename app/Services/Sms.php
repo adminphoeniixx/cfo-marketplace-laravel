@@ -65,10 +65,14 @@ class Sms
                     'template_id' => self::config('template_id'),
                     'sender' => self::config('sender'),
                     'short_url' => '0',
-                    'mobiles' => self::msisdn($phone),
-                    // MSG91 substitutes template variables by name; `otp` is
-                    // the one every OTP template on it uses.
-                    'otp' => $code,
+                    // MSG91 v5 flow: one entry per recipient, each carrying
+                    // its own template variables. The older shape put
+                    // `mobiles` at the root and is still accepted, but this is
+                    // the documented one.
+                    'recipients' => [[
+                        'mobiles' => self::msisdn($phone),
+                        (string) self::config('code_variable', 'otp') => $code,
+                    ]],
                 ], fn ($value) => $value !== null));
         } catch (ConnectionException $e) {
             Log::error('SMS provider unreachable.', ['phone' => $phone, 'error' => $e->getMessage()]);
@@ -76,7 +80,12 @@ class Sms
             return false;
         }
 
-        if ($response->failed()) {
+        // MSG91 answers 200 with `type: error` on a bad template id, an
+        // unapproved sender or an exhausted balance, so the status code alone
+        // is not the test — the same trap as the courier API.
+        $refused = $response->failed() || $response->json('type') === 'error';
+
+        if ($refused) {
             Log::error('SMS provider refused the message.', [
                 'phone' => $phone,
                 'status' => $response->status(),

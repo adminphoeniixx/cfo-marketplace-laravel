@@ -364,7 +364,11 @@ either way, because telling a caller which numbers are registered helps whoever
 is probing more than it helps the shopper. The code is no longer written to the
 production log.
 
-⚠️ **The provider is not configured yet** — see below.
+MSG91 is wired up: set `MSG91_AUTHKEY` and the driver flips to `http` on its
+own. `SMS_CODE_VARIABLE` must match the template's own variable — `##OTP##` in
+the body is `otp`, `##VAR1##` is `var1` — because naming it wrong sends a
+message with a hole in it rather than an error. `php artisan sms:test
+<number>` sends one deliberately, to a number you name.
 
 ---
 
@@ -390,9 +394,13 @@ Nothing below blocks the app; each is either a decision or a credential.
 
 **Configuration, before launch**
 
-- **SMS provider.** Until `SMS_DRIVER=http` plus `SMS_API_KEY` / `SMS_URL` /
-  `SMS_TEMPLATE_ID` / `SMS_SENDER` are set, login codes only reach the log —
-  **no shopper outside the server can sign in.** This is the one that matters.
+- **SMS provider.** `MSG91_AUTHKEY` and `MSG91_TEMPLATE_ID` are set locally;
+  they still have to be entered in Dokploy, and **one real test message should
+  be sent before launch** (`php artisan sms:test <your number>`). MSG91 answers
+  200 for a bad template, an unapproved sender and an empty balance alike, so
+  a message actually arriving is the only proof. Until this is done in
+  production, login codes only reach the log — **no shopper outside the server
+  can sign in.**
 - **Delhivery credentials** (`DELHIVERY_API_TOKEN`, `DELHIVERY_PICKUP_NAME`).
   Without them the seller types a waybill in by hand, as before.
 - **`support_chat_url`** is empty, so `chat_enabled` is `false`. Hide the chat
