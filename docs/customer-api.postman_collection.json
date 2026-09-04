@@ -1,1999 +1,2354 @@
 {
-  "info": {
-    "name": "CFO Customer API",
-    "description": "Shopper app endpoints. Set {{base_url}}, sign in, and paste the token into {{token}}. Reference: docs/customer-api.md",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-  },
-  "auth": {
-    "type": "bearer",
-    "bearer": [
-      {
-        "key": "token",
-        "value": "{{token}}",
-        "type": "string"
-      }
-    ]
-  },
-  "variable": [
-    {
-      "key": "base_url",
-      "value": "http://localhost:8000"
+    "info": {
+        "name": "CFO Customer API",
+        "description": "Shopper app endpoints. Set {{base_url}}, sign in, and paste the token into {{token}}. Reference: docs/customer-api.md",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
-    {
-      "key": "token",
-      "value": ""
+    "auth": {
+        "type": "bearer",
+        "bearer": [
+            {
+                "key": "token",
+                "value": "{{token}}",
+                "type": "string"
+            }
+        ]
     },
-    {
-      "key": "razorpay_webhook_signature",
-      "value": ""
-    }
-  ],
-  "item": [
-    {
-      "name": "Account",
-      "item": [
+    "variable": [
         {
-          "name": "addresses.index",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/addresses",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "addresses"
-              ]
-            }
-          }
+            "key": "base_url",
+            "value": "http://localhost:8000"
         },
         {
-          "name": "addresses.store",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/addresses",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "addresses"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"label\": \"Home\",\n  \"first_name\": \"Priya\",\n  \"last_name\": \"Nair\",\n  \"phone\": \"9876543210\",\n  \"address_line1\": \"42 Beach Road\",\n  \"address_line2\": \"Besant Nagar\",\n  \"city\": \"Chennai\",\n  \"state\": \"Tamil Nadu\",\n  \"postcode\": \"600090\",\n  \"country\": \"IN\",\n  \"is_default_shipping\": true\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          }
+            "key": "token",
+            "value": ""
         },
         {
-          "name": "addresses.update",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/addresses/{address}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "addresses",
-                "{address}"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"first_name\": \"Priya\",\n  \"address_line1\": \"42 Beach Road\",\n  \"city\": \"Chennai\",\n  \"state\": \"Tamil Nadu\",\n  \"postcode\": \"600090\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          }
-        },
-        {
-          "name": "addresses.destroy",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/addresses/{address}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "addresses",
-                "{address}"
-              ]
-            }
-          }
-        },
-        {
-          "name": "addresses.default",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/addresses/{address}/default",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "addresses",
-                "{address}",
-                "default"
-              ]
-            }
-          }
-        },
-        {
-          "name": "me",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/me",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "me"
-              ]
-            }
-          }
-        },
-        {
-          "name": "me.update",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/me",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "me"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"first_name\": \"Priya\",\n  \"gender\": \"female\",\n  \"accepts_marketing\": true\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          }
-        },
-        {
-          "name": "me.password",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/me/password",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "me",
-                "password"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"current_password\": \"a-good-password\",\n  \"password\": \"a-new-password\",\n  \"password_confirmation\": \"a-new-password\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          }
-        },
-        {
-          "name": "reviews.mine",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/reviews",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "reviews"
-              ]
-            }
-          }
-        },
-        {
-          "name": "reviews.destroy",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/reviews/{review}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "reviews",
-                "{review}"
-              ]
-            }
-          }
-        },
-        {
-          "name": "wishlist.index",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/wishlist",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "wishlist"
-              ]
-            }
-          }
-        },
-        {
-          "name": "wishlist.store",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/wishlist",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "wishlist"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"product_id\": 47\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          }
-        },
-        {
-          "name": "wishlist.destroy",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/wishlist/{product}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "wishlist",
-                "{product}"
-              ]
-            }
-          }
+            "key": "razorpay_webhook_signature",
+            "value": ""
         }
-      ]
-    },
-    {
-      "name": "Auth",
-      "item": [
+    ],
+    "item": [
         {
-          "name": "auth.devices",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/auth/devices",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "auth",
-                "devices"
-              ]
-            }
-          }
-        },
-        {
-          "name": "auth.devices.revoke",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/auth/devices/{token}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "auth",
-                "devices",
-                "{token}"
-              ]
-            }
-          }
-        },
-        {
-          "name": "auth.forgot-password",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/auth/forgot-password",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "auth",
-                "forgot-password"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"priya@example.com\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          }
-        },
-        {
-          "name": "auth.login",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/auth/login",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "auth",
-                "login"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"priya@example.com\",\n  \"password\": \"a-good-password\",\n  \"device_name\": \"Pixel 8\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          }
-        },
-        {
-          "name": "auth.logout",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/auth/logout",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "auth",
-                "logout"
-              ]
-            }
-          }
-        },
-        {
-          "name": "auth.logout-all",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/auth/logout-all",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "auth",
-                "logout-all"
-              ]
-            }
-          }
-        },
-        {
-          "name": "auth.otp",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/auth/otp",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "auth",
-                "otp"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"phone\": \"+91 98765 43210\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          }
-        },
-        {
-          "name": "auth.otp.verify",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/auth/otp/verify",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "auth",
-                "otp",
-                "verify"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"phone\": \"9876543210\",\n  \"code\": \"482017\",\n  \"device_name\": \"Pixel 8\",\n  \"first_name\": \"Priya\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          }
-        },
-        {
-          "name": "auth.refresh",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/auth/refresh",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "auth",
-                "refresh"
-              ]
-            }
-          }
-        },
-        {
-          "name": "auth.register",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/auth/register",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "auth",
-                "register"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"first_name\": \"Priya\",\n  \"last_name\": \"Nair\",\n  \"email\": \"priya@example.com\",\n  \"password\": \"a-good-password\",\n  \"password_confirmation\": \"a-good-password\",\n  \"device_name\": \"Pixel 8\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          }
-        },
-        {
-          "name": "auth.reset-password",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/auth/reset-password",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "auth",
-                "reset-password"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"token\": \"<from the email>\",\n  \"email\": \"priya@example.com\",\n  \"password\": \"a-new-password\",\n  \"password_confirmation\": \"a-new-password\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Browse",
-      "item": [
-        {
-          "name": "categories",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/categories",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "categories"
-              ]
-            }
-          }
-        },
-        {
-          "name": "home",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/home",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "home"
-              ]
-            }
-          }
-        },
-        {
-          "name": "products",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/products",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "products"
-              ]
-            }
-          }
-        },
-        {
-          "name": "products.suggestions",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/products/suggestions",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "products",
-                "suggestions"
-              ]
-            }
-          }
-        },
-        {
-          "name": "products.show",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/products/{product}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "products",
-                "{product}"
-              ]
-            }
-          }
-        },
-        {
-          "name": "products.reviews",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/products/{product}/reviews",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "products",
-                "{product}",
-                "reviews"
-              ]
-            }
-          }
-        },
-        {
-          "name": "reviews.store",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/products/{product}/reviews",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "products",
-                "{product}",
-                "reviews"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"rating\": 5,\n  \"title\": \"Wedding-ready\",\n  \"body\": \"Exactly as photographed.\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          }
-        },
-        {
-          "name": "reference",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/reference",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "reference"
-              ]
-            }
-          }
-        },
-        {
-          "name": "sellers.show",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/sellers/{vendor}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "sellers",
-                "{vendor}"
-              ]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Cancellations & returns",
-      "item": [
-        {
-          "name": "requests.index",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/requests",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "requests"
-              ]
-            }
-          }
-        },
-        {
-          "name": "requests.show",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/requests/{number}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "requests",
-                "{number}"
-              ]
-            }
-          }
-        },
-        {
-          "name": "requests.withdraw",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/requests/{number}/withdraw",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "requests",
-                "{number}",
-                "withdraw"
-              ]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Cart",
-      "item": [
-        {
-          "name": "cart",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/cart",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "cart"
-              ]
-            },
-            "description": "The whole basket, priced — plus selected_address (the address strip) and available_coupon_count (how many rows cart.coupons returns)."
-          }
-        },
-        {
-          "name": "cart.clear",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/cart",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "cart"
-              ]
-            }
-          }
-        },
-        {
-          "name": "cart.coupon.apply",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/cart/coupon",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "cart",
-                "coupon"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"code\": \"FIRST100\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "description": "Applies a code. 422 when the basket is under the minimum spend, and also when the code would take nothing off — a free-shipping coupon on a basket that already ships free. The response carries coupon.discount, coupon.shipping_discount and coupon.savings; savings is the figure to quote to the shopper."
-          }
-        },
-        {
-          "name": "cart.coupon.remove",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/cart/coupon",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "cart",
-                "coupon"
-              ]
-            }
-          }
-        },
-        {
-          "name": "cart.coupons",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/cart/coupons",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "cart",
-                "coupons"
-              ]
-            },
-            "description": "Every live code judged against this basket: discount, shipping_discount, savings, usable and the reason it is not. The row count is what GET /cart returns as available_coupon_count."
-          }
-        },
-        {
-          "name": "cart.items.store",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/cart/items",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "cart",
-                "items"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"product_id\": 47,\n  \"product_variant_id\": null,\n  \"quantity\": 1\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          }
-        },
-        {
-          "name": "cart.items.update",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/cart/items/{item}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "cart",
-                "items",
-                "{item}"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"quantity\": 2\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          }
-        },
-        {
-          "name": "cart.items.destroy",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/cart/items/{item}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "cart",
-                "items",
-                "{item}"
-              ]
-            }
-          }
-        },
-        {
-          "name": "cart.items.move",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/cart/items/{item}/move-to-cart",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "cart",
-                "items",
-                "{item}",
-                "move-to-cart"
-              ]
-            }
-          }
-        },
-        {
-          "name": "cart.items.save",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/cart/items/{item}/save-for-later",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "cart",
-                "items",
-                "{item}",
-                "save-for-later"
-              ]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Checkout",
-      "item": [
-        {
-          "name": "checkout",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/checkout?address_id=",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "checkout?address_id="
-              ]
-            },
-            "description": "The review screen. Passing address_id chooses that address and remembers it on the basket, so GET /cart shows the same one. Answers with selected_address, display-ready shipping options (price_label, eta_label, note) and payment methods carrying icon."
-          }
-        },
-        {
-          "name": "orders.store",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/orders",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "orders"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"address_id\": 1,\n  \"payment_method\": \"upi\",\n  \"shipping_code\": \"standard\",\n  \"note\": \"\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          }
-        },
-        {
-          "name": "orders.index",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/checkout?address_id=",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "checkout"
-              ],
-              "query": [
+            "name": "Account",
+            "item": [
                 {
-                  "key": "address_id",
-                  "value": "",
-                  "description": "Optional. Choosing one remembers it on the basket."
-                }
-              ]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Notifications",
-      "item": [
-        {
-          "name": "notifications.index",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/notifications",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "notifications"
-              ]
-            }
-          }
-        },
-        {
-          "name": "notifications.read-all",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/notifications/read-all",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "notifications",
-                "read-all"
-              ]
-            }
-          }
-        },
-        {
-          "name": "notifications.unread",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/notifications/unread-count",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "notifications",
-                "unread-count"
-              ]
-            }
-          }
-        },
-        {
-          "name": "notifications.destroy",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/notifications/{notification}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "notifications",
-                "{notification}"
-              ]
-            }
-          }
-        },
-        {
-          "name": "notifications.read",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/notifications/{notification}/read",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "notifications",
-                "{notification}",
-                "read"
-              ]
-            }
-          }
-        },
-        {
-          "name": "push.device.register",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/push/device",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "push",
-                "device"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"token\": \"<fcm token>\",\n  \"platform\": \"android\",\n  \"device_name\": \"Pixel 8\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          }
-        },
-        {
-          "name": "push.device.forget",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/push/device",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "push",
-                "device"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"token\": \"<fcm token>\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Orders",
-      "item": [
-        {
-          "name": "orders.show",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/orders/{order}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "orders",
-                "{order}"
-              ]
-            }
-          }
-        },
-        {
-          "name": "orders.cancellations",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/orders/{order}/cancellations",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "orders",
-                "{order}",
-                "cancellations"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"reason\": \"ordered_by_mistake\",\n  \"note\": \"Wrong colour.\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          }
-        },
-        {
-          "name": "orders.reorder",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/orders/{order}/reorder",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "orders",
-                "{order}",
-                "reorder"
-              ]
-            },
-            "description": "Puts an old order's lines back in the basket. Always 200: `added[]` says what went in (with status added/partial and a warning), `skipped[]` says what could not and why, and `cart` is the full GET /cart payload."
-          }
-        },
-        {
-          "name": "orders.returns",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/orders/{order}/returns",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "orders",
-                "{order}",
-                "returns"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"reason\": \"damaged\",\n  \"method\": \"original\",\n  \"note\": \"Torn near the border.\",\n  \"items\": [\n    {\n      \"order_item_id\": 1,\n      \"quantity\": 1\n    }\n  ]\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          }
-        },
-        {
-          "name": "orders.track",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/orders/{order}/track",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "orders",
-                "{order}",
-                "track"
-              ]
-            }
-          }
-        },
-        {
-          "name": "orders.invoice",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/orders/{order}/invoice",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "orders",
-                "{order}",
-                "invoice"
-              ]
-            },
-            "description": "A signed, seven-day URL to the order's printable HTML invoice. The URL itself needs no token."
-          }
-        },
-        {
-          "name": "invoices.show",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/invoices/{order}?expires=&signature=",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "invoices",
-                "{order}"
-              ],
-              "query": [
-                {
-                  "key": "expires",
-                  "value": ""
+                    "name": "addresses.default",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/addresses/{address}/default",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "addresses",
+                                "{address}",
+                                "default"
+                            ]
+                        }
+                    }
                 },
                 {
-                  "key": "signature",
-                  "value": ""
+                    "name": "addresses.destroy",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/addresses/{address}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "addresses",
+                                "{address}"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "addresses.index",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/addresses",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "addresses"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "addresses.store",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/addresses",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "addresses"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"label\": \"Home\",\n  \"first_name\": \"Priya\",\n  \"last_name\": \"Nair\",\n  \"phone\": \"9876543210\",\n  \"address_line1\": \"42 Beach Road\",\n  \"address_line2\": \"Besant Nagar\",\n  \"city\": \"Chennai\",\n  \"state\": \"Tamil Nadu\",\n  \"postcode\": \"600090\",\n  \"country\": \"IN\",\n  \"is_default_shipping\": true\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "name": "addresses.update",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/addresses/{address}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "addresses",
+                                "{address}"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"first_name\": \"Priya\",\n  \"address_line1\": \"42 Beach Road\",\n  \"city\": \"Chennai\",\n  \"state\": \"Tamil Nadu\",\n  \"postcode\": \"600090\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "name": "me",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/me",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "me"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "me.destroy",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/me",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "me"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "me.password",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/me/password",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "me",
+                                "password"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"current_password\": \"a-good-password\",\n  \"password\": \"a-new-password\",\n  \"password_confirmation\": \"a-new-password\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "name": "me.summary",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/me/summary",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "me",
+                                "summary"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "me.update",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/me",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "me"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"first_name\": \"Priya\",\n  \"gender\": \"female\",\n  \"accepts_marketing\": true\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "name": "notification-preferences",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/notification-preferences",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "notification-preferences"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "notification-preferences.update",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/notification-preferences",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "notification-preferences"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"push_enabled\": true,\n  \"order_updates\": true,\n  \"deals_price_drops\": false,\n  \"email_marketing\": true,\n  \"sms_order_updates\": true\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "name": "payment-methods.default",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/payment-methods/{method}/default",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "payment-methods",
+                                "{method}",
+                                "default"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "payment-methods.destroy",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/payment-methods/{method}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "payment-methods",
+                                "{method}"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "payment-methods.index",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/payment-methods",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "payment-methods"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "payment-methods.store",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/payment-methods",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "payment-methods"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"type\": \"upi\",\n  \"label\": \"Google Pay\",\n  \"masked_value\": \"priya@okhdfc\",\n  \"provider\": \"gpay\",\n  \"gateway_token\": \"token_from_the_gateway\",\n  \"is_default\": true\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "name": "reviews.destroy",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/reviews/{review}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "reviews",
+                                "{review}"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "reviews.mine",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/reviews",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "reviews"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "wallet",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/wallet",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "wallet"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "wishlist.destroy",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/wishlist/{product}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "wishlist",
+                                "{product}"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "wishlist.index",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/wishlist",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "wishlist"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "wishlist.store",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/wishlist",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "wishlist"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"product_id\": 47\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    }
                 }
-              ]
-            },
-            "description": "The invoice document. Reached with the signature from orders.invoice rather than a bearer token — paste the whole url it returned.",
-            "auth": {
-              "type": "noauth"
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Payments",
-      "item": [
-        {
-          "name": "payments.intent",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/payments/create-intent",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "payments",
-                "create-intent"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"order_number\": \"1043\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "description": "Opens a Razorpay order for an order whose `payment_required` is true. Repeating it returns the attempt already open."
-          }
+            ]
         },
         {
-          "name": "payments.verify",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/payments/verify",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "payments",
-                "verify"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"razorpay_order_id\": \"order_XXXXXXXXXXXX\",\n  \"razorpay_payment_id\": \"pay_XXXXXXXXXXXX\",\n  \"razorpay_signature\": \"hmac_sha256(order_id|payment_id, key_secret)\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
+            "name": "Auth",
+            "item": [
+                {
+                    "name": "auth.devices",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/auth/devices",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "auth",
+                                "devices"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "auth.devices.revoke",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/auth/devices/{token}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "auth",
+                                "devices",
+                                "{token}"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "auth.forgot-password",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/auth/forgot-password",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "auth",
+                                "forgot-password"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"priya@example.com\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "name": "auth.login",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/auth/login",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "auth",
+                                "login"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"priya@example.com\",\n  \"password\": \"a-good-password\",\n  \"device_name\": \"Pixel 8\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "name": "auth.logout",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/auth/logout",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "auth",
+                                "logout"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "auth.logout-all",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/auth/logout-all",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "auth",
+                                "logout-all"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "auth.otp",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/auth/otp",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "auth",
+                                "otp"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"phone\": \"+91 98765 43210\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "name": "auth.otp.verify",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/auth/otp/verify",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "auth",
+                                "otp",
+                                "verify"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"phone\": \"9876543210\",\n  \"code\": \"482017\",\n  \"device_name\": \"Pixel 8\",\n  \"first_name\": \"Priya\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "name": "auth.refresh",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/auth/refresh",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "auth",
+                                "refresh"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "auth.register",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/auth/register",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "auth",
+                                "register"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"first_name\": \"Priya\",\n  \"last_name\": \"Nair\",\n  \"email\": \"priya@example.com\",\n  \"password\": \"a-good-password\",\n  \"password_confirmation\": \"a-good-password\",\n  \"device_name\": \"Pixel 8\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "name": "auth.reset-password",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/auth/reset-password",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "auth",
+                                "reset-password"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"token\": \"<from the email>\",\n  \"email\": \"priya@example.com\",\n  \"password\": \"a-new-password\",\n  \"password_confirmation\": \"a-new-password\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    }
                 }
-              }
-            },
-            "description": "Settles the payment from what Razorpay Checkout handed the app. A signature that does not match is 422."
-          }
+            ]
         },
         {
-          "name": "payments.webhook.razorpay",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "X-Razorpay-Signature",
-                "value": "{{razorpay_webhook_signature}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/customer/payments/webhook/razorpay",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "customer",
-                "payments",
-                "webhook",
-                "razorpay"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"event\": \"payment.captured\",\n  \"payload\": {\n    \"payment\": {\n      \"entity\": {\n        \"id\": \"pay_XXXXXXXXXXXX\",\n        \"order_id\": \"order_XXXXXXXXXXXX\",\n        \"method\": \"upi\"\n      }\n    }\n  }\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
+            "name": "Browse",
+            "item": [
+                {
+                    "name": "app-config",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/app-config",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "app-config"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "categories",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/categories",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "categories"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "home",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/home",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "home"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "legal.index",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/legal",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "legal"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "legal.show",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/legal/privacy",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "legal",
+                                "privacy"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "products",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/products",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "products"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "products.filters",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/products/filters?category_id=1",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "products",
+                                "filters"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "products.reviews",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/products/{product}/reviews",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "products",
+                                "{product}",
+                                "reviews"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "products.show",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/products/{product}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "products",
+                                "{product}"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "products.suggestions",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/products/suggestions",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "products",
+                                "suggestions"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "reference",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/reference",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "reference"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "reviews.store",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/products/{product}/reviews",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "products",
+                                "{product}",
+                                "reviews"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"rating\": 5,\n  \"title\": \"Wedding-ready\",\n  \"body\": \"Exactly as photographed.\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "name": "sellers.show",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/sellers/{vendor}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "sellers",
+                                "{vendor}"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "support.config",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/support/config",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "support",
+                                "config"
+                            ]
+                        }
+                    }
                 }
-              }
-            },
-            "description": "Razorpay's own callback. Public, and believed only with a valid X-Razorpay-Signature header (HMAC of the raw body under RAZORPAY_WEBHOOK_SECRET). No bearer token.",
-            "auth": {
-              "type": "noauth"
-            }
-          }
+            ]
+        },
+        {
+            "name": "Cancellations & returns",
+            "item": [
+                {
+                    "name": "requests.index",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/requests",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "requests"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "requests.show",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/requests/{number}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "requests",
+                                "{number}"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "requests.withdraw",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/requests/{number}/withdraw",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "requests",
+                                "{number}",
+                                "withdraw"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Cart",
+            "item": [
+                {
+                    "name": "cart",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/cart",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "cart"
+                            ]
+                        },
+                        "description": "The whole basket, priced — plus selected_address (the address strip) and available_coupon_count (how many rows cart.coupons returns)."
+                    }
+                },
+                {
+                    "name": "cart.clear",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/cart",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "cart"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "cart.coupon.apply",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/cart/coupon",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "cart",
+                                "coupon"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"code\": \"FIRST100\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "Applies a code. 422 when the basket is under the minimum spend, and also when the code would take nothing off — a free-shipping coupon on a basket that already ships free. The response carries coupon.discount, coupon.shipping_discount and coupon.savings; savings is the figure to quote to the shopper."
+                    }
+                },
+                {
+                    "name": "cart.coupon.remove",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/cart/coupon",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "cart",
+                                "coupon"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "cart.coupons",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/cart/coupons",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "cart",
+                                "coupons"
+                            ]
+                        },
+                        "description": "Every live code judged against this basket: discount, shipping_discount, savings, usable and the reason it is not. The row count is what GET /cart returns as available_coupon_count."
+                    }
+                },
+                {
+                    "name": "cart.items.store",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/cart/items",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "cart",
+                                "items"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"product_id\": 47,\n  \"product_variant_id\": null,\n  \"quantity\": 1\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "name": "cart.items.update",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/cart/items/{item}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "cart",
+                                "items",
+                                "{item}"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"quantity\": 2\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "name": "cart.items.destroy",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/cart/items/{item}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "cart",
+                                "items",
+                                "{item}"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "cart.items.move",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/cart/items/{item}/move-to-cart",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "cart",
+                                "items",
+                                "{item}",
+                                "move-to-cart"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "cart.items.save",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/cart/items/{item}/save-for-later",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "cart",
+                                "items",
+                                "{item}",
+                                "save-for-later"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Checkout",
+            "item": [
+                {
+                    "name": "checkout",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/checkout?address_id=",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "checkout?address_id="
+                            ]
+                        },
+                        "description": "The review screen. Passing address_id chooses that address and remembers it on the basket, so GET /cart shows the same one. Answers with selected_address, display-ready shipping options (price_label, eta_label, note) and payment methods carrying icon."
+                    }
+                },
+                {
+                    "name": "orders.store",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/orders",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "orders"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"address_id\": 1,\n  \"payment_method\": \"upi\",\n  \"shipping_code\": \"standard\",\n  \"note\": \"\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "name": "orders.index",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/checkout?address_id=",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "checkout"
+                            ],
+                            "query": [
+                                {
+                                    "key": "address_id",
+                                    "value": "",
+                                    "description": "Optional. Choosing one remembers it on the basket."
+                                }
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Notifications",
+            "item": [
+                {
+                    "name": "notifications.index",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/notifications",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "notifications"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "notifications.read-all",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/notifications/read-all",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "notifications",
+                                "read-all"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "notifications.unread",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/notifications/unread-count",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "notifications",
+                                "unread-count"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "notifications.destroy",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/notifications/{notification}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "notifications",
+                                "{notification}"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "notifications.read",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/notifications/{notification}/read",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "notifications",
+                                "{notification}",
+                                "read"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "push.device.register",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/push/device",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "push",
+                                "device"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"token\": \"<fcm token>\",\n  \"platform\": \"android\",\n  \"device_name\": \"Pixel 8\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "name": "push.device.forget",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/push/device",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "push",
+                                "device"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"token\": \"<fcm token>\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Orders",
+            "item": [
+                {
+                    "name": "orders.show",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/orders/{order}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "orders",
+                                "{order}"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "orders.cancellations",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/orders/{order}/cancellations",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "orders",
+                                "{order}",
+                                "cancellations"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"reason\": \"ordered_by_mistake\",\n  \"note\": \"Wrong colour.\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "name": "orders.reorder",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/orders/{order}/reorder",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "orders",
+                                "{order}",
+                                "reorder"
+                            ]
+                        },
+                        "description": "Puts an old order's lines back in the basket. Always 200: `added[]` says what went in (with status added/partial and a warning), `skipped[]` says what could not and why, and `cart` is the full GET /cart payload."
+                    }
+                },
+                {
+                    "name": "orders.returns",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/orders/{order}/returns",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "orders",
+                                "{order}",
+                                "returns"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"reason\": \"damaged\",\n  \"method\": \"original\",\n  \"note\": \"Torn near the border.\",\n  \"items\": [\n    {\n      \"order_item_id\": 1,\n      \"quantity\": 1\n    }\n  ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "name": "orders.track",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/orders/{order}/track",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "orders",
+                                "{order}",
+                                "track"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "orders.invoice",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/orders/{order}/invoice",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "orders",
+                                "{order}",
+                                "invoice"
+                            ]
+                        },
+                        "description": "A signed, seven-day URL to the order's printable HTML invoice. The URL itself needs no token."
+                    }
+                },
+                {
+                    "name": "invoices.show",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/invoices/{order}?expires=&signature=",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "invoices",
+                                "{order}"
+                            ],
+                            "query": [
+                                {
+                                    "key": "expires",
+                                    "value": ""
+                                },
+                                {
+                                    "key": "signature",
+                                    "value": ""
+                                }
+                            ]
+                        },
+                        "description": "The invoice document. Reached with the signature from orders.invoice rather than a bearer token — paste the whole url it returned.",
+                        "auth": {
+                            "type": "noauth"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Payments",
+            "item": [
+                {
+                    "name": "payments.intent",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/payments/create-intent",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "payments",
+                                "create-intent"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"order_number\": \"1043\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "Opens a Razorpay order for an order whose `payment_required` is true. Repeating it returns the attempt already open."
+                    }
+                },
+                {
+                    "name": "payments.verify",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/payments/verify",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "payments",
+                                "verify"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"razorpay_order_id\": \"order_XXXXXXXXXXXX\",\n  \"razorpay_payment_id\": \"pay_XXXXXXXXXXXX\",\n  \"razorpay_signature\": \"hmac_sha256(order_id|payment_id, key_secret)\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "Settles the payment from what Razorpay Checkout handed the app. A signature that does not match is 422."
+                    }
+                },
+                {
+                    "name": "payments.webhook.razorpay",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "X-Razorpay-Signature",
+                                "value": "{{razorpay_webhook_signature}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/payments/webhook/razorpay",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "payments",
+                                "webhook",
+                                "razorpay"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"event\": \"payment.captured\",\n  \"payload\": {\n    \"payment\": {\n      \"entity\": {\n        \"id\": \"pay_XXXXXXXXXXXX\",\n        \"order_id\": \"order_XXXXXXXXXXXX\",\n        \"method\": \"upi\"\n      }\n    }\n  }\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "Razorpay's own callback. Public, and believed only with a valid X-Razorpay-Signature header (HMAC of the raw body under RAZORPAY_WEBHOOK_SECRET). No bearer token.",
+                        "auth": {
+                            "type": "noauth"
+                        }
+                    }
+                }
+            ]
         }
-      ]
-    }
-  ]
+    ]
 }

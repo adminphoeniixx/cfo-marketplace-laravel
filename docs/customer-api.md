@@ -64,17 +64,37 @@ another shopper's order, address, request or cart line is a **404**, never a
 
 | Method | Path | What it does |
 |---|---|---|
-| GET | `/home` | Everything the home screen draws: categories, deals, top-rated, new arrivals, sellers. One call, because three round trips to paint one screen is two too many. |
+| GET | `/home` | Everything the home screen draws: `banners`, categories, deals, top-rated, new arrivals, sellers. One call, because three round trips to paint one screen is two too many. |
 | GET | `/categories` | The tree — parents with their children and product counts. |
 | GET | `/products` | The listing. Search, filter, sort, paginate. |
 | GET | `/products/suggestions?q=` | Type-ahead. Silent under two characters. |
 | GET | `/products/{id-or-slug}` | The product page. |
 | GET | `/products/{id}/reviews` | Published reviews, newest first. |
 | GET | `/sellers/{vendor}` | A storefront and its listings. Approved stores only. |
+| GET | `/products/filters` | The filter sheet, counted against the catalogue this search actually leaves. |
 | GET | `/reference` | Payment methods, couriers, cancellation/refund reasons, refund methods, return window. |
+| GET | `/app-config` | Store name, currency, support contacts, the "sell with us" link, and which legal pages exist. |
+| GET | `/support/config` | Chat, phone, hours and the answered questions. |
+| GET | `/legal`, `/legal/{slug}` | `terms`, `privacy`, `returns`, `licenses`, `grievance-officer`. |
 
 **Only `active`, published products are visible** — by id, by slug, by search
 or by category. A draft is a 404 however it is reached.
+
+### Banners, and the words around the shopping
+
+`banners` on `/home` carries `title`, `subtitle`, `image_url`,
+`deeplink_route`, `deeplink_params` and `sort_order`. The route name is the
+**app's own** — the marketplace carries the instruction without pretending to
+know the app's navigation. A banner with dates takes itself down; the list is
+empty until an admin adds one.
+
+`/support/config` gives `chat_enabled` (true only where there is a URL behind
+it), `chat_provider`, `chat_session_url`, `phone`, `email`, `hours` and
+`faq[]`. `/legal/{slug}` gives `title`, `body` and `updated_at` for one of
+`terms`, `privacy`, `returns`, `licenses`, `grievance-officer` — and **404s
+until somebody has written it**, which is better than a blank screen under a
+legal title. `/legal` lists the ones that exist, and `/app-config` carries the
+same list plus `seller_onboarding_url`.
 
 ### Tiles without a photograph
 
@@ -96,12 +116,30 @@ field is ever null.
 | `min_rating` | 0–5. |
 | `min_discount` | Percent off the compare-at price. |
 | `in_stock` | Counts backorderable products as in stock. |
-| `sort` | `relevance` (default), `price_low`, `price_high`, `rating`, `discount`, `newest`. |
+| `assured` | Products from a store the marketplace has vouched for. |
+| `cod` | Products from a store that takes cash — **and** only while the marketplace still offers a pay-on-delivery method. With it switched off in the panel this matches nothing, rather than promising cash it will not take. |
+| `sort` | `relevance` (default), `price_low`, `price_high`, `rating`, `discount`, `newest`. An unknown value is a `422`, not a silent fallback. |
 | `per_page` | 1–60, default 20. |
 
-Paginated in Laravel's standard envelope. Send a token and every card gains
+Paginated in Laravel's standard envelope — `total`, `per_page`, `current_page`,
+`last_page` alongside `data`. Send a token and every card gains
 `is_wishlisted`; without one the field is absent rather than a misleading
 `false`.
+
+Every card carries `id`, `slug`, `name`, `brand`, `image`, `emoji`, `price`,
+`mrp`, `discount_percent`, `rating`, `ratings_count`, `in_stock`, `assured`,
+`cod_available` and `vendor`.
+
+### `GET /products/filters` — the sheet, not a guess
+
+Takes **every parameter `/products` takes** and answers what the filter sheet
+should offer for that search: `price_ranges`, `rating_ranges`,
+`discount_ranges`, `sellers`, `brands`, `boolean_filters` and `sorts`, each
+option carrying a `count`, plus the `total` the current filters leave.
+
+Each facet is counted with every filter **except its own**. Picking one seller
+narrows the listing but not the seller list — otherwise the sheet would close
+around a single choice with no way back.
 
 ### `GET /products/{id}` — options vs variants
 
@@ -349,9 +387,22 @@ Everything the courier screen draws, so it no longer needs this call *and*
                     "subtitle": "Meera Textiles, Chennai",
                     "at": "2026-08-31T09:41:00+00:00",
                     "done": true, "current": false } ],
+  "support_phone": "1800 103 6354",
+  "eta_label": "Arriving Mon, 1 Sep",
+  "events": [ { "key": "picked_up", "label": "Picked up from the seller",
+                "description": "Meera Textiles, Chennai", "location": "Chennai",
+                "happened_at": "2026-08-31T09:41:00+00:00", "state": "done" } ],
   "items": [ … ], "sellers": [ … ], "steps": [ … ]
 } }
 ```
+
+- `events` is `milestones` in the shape a timeline draws: one `state` per row —
+  `done`, `current` or `pending` — instead of a flag to combine with a
+  position, plus the `location` the parcel was in where the marketplace knows
+  it. Use whichever fits; they describe the same steps.
+- `support_phone` is lifted out of `carrier` as well, because "call courier" is
+  one tap and should not have to walk an object that is `null` until somebody
+  collects the parcel.
 
 - `done` is only ever true of something that actually happened. The courier does
   not report its own scans to this marketplace, so **"Out for delivery" is shown
@@ -373,17 +424,21 @@ itself is a 404.
                  "name": "Kashmiri wool shawl", "requested_quantity": 2,
                  "quantity": 1, "status": "partial",
                  "warning": "Only 1 of 2 could be added." } ],
-  "skipped": [ { "product_id": 77, "name": "Old item", "reason": "Out of stock" } ],
-  "cart":    { … exactly what GET /cart returns … } }
+  "skipped": [ { "product_id": 77, "product_variant_id": 18, "variant_id": 18,
+                 "name": "Old item", "reason": "out_of_stock",
+                 "message": "Out of stock" } ],
+  "cart":    { … exactly what GET /cart returns … },
+  "cart_count": 3 }
 ```
 
 - The original variant is restored, not just the product.
 - Quantity is kept where the shelf allows it and trimmed where it does not;
   `status` is then `partial` and `warning` says so.
-- Reasons: `No longer sold`, `This seller is not trading right now`,
-  `That option is no longer available`, `Out of stock`.
-- **The whole basket comes back**, so the cart badge and totals are right the
-  moment the call returns.
+- `reason` is a **code** to branch on — `out_of_stock`, `inactive_product`,
+  `variant_missing`, `seller_unavailable` — and `message` is the sentence to
+  show. Show `message`; matching on English is how this went wrong before.
+- **The whole basket comes back**, plus `cart_count` for a client that only
+  wants the badge, so the cart is right the moment the call returns.
 
 ### Invoices
 
@@ -427,6 +482,12 @@ requested → reviewed → refunded with a `done` flag on each, and `eta` — "B
 your account by 24 Aug" once approved, "Usually 3–5 working days once it is
 approved" before that, and `null` where no money is coming back at all.
 
+`events` carries the same steps with one `state` each (`done`, `current`,
+`pending`), and the moments are named individually too: `seller_approved_at`,
+`refund_issued_at`, `cancelled_at`, `withdrawn_at`. `picked_up_at` is always
+`null` — no courier reports a return collection to this marketplace, and a
+field that says so beats a step that never fills.
+
 ---
 
 ## Account
@@ -441,6 +502,13 @@ approved" before that, and `null` where no money is coming back at all.
 | GET | `/reviews` | What you wrote, and what is still waiting to be rated. |
 | POST | `/products/{id}/reviews` | Buyers of a delivered order only. Rating again edits the first one. |
 | DELETE | `/reviews/{id}` | |
+| GET | `/me/summary` | Every count the account screen draws, in one call. |
+| DELETE | `/me` | Closes the account. |
+| GET/PUT | `/notification-preferences` | `push_enabled`, `order_updates`, `deals_price_drops`, `email_marketing`, `sms_order_updates`. |
+| GET/POST | `/payment-methods` | The shopper's **own** saved cards, handles and wallets. |
+| DELETE | `/payment-methods/{id}` | |
+| PATCH | `/payment-methods/{id}/default` | |
+| GET | `/wallet` | Store credit: balance, currency, when it lapses, and every movement behind it. |
 | GET | `/notifications`, `/notifications/unread-count` | The list carries `unread_count` with it. |
 | POST | `/notifications/{id}/read`, `/notifications/read-all` | |
 | POST/DELETE | `/push/device` | FCM tokens, keyed by the token's hash. |
@@ -453,6 +521,35 @@ somewhere.
 Reviews show a first name and a last initial. Only someone who received the
 item can write one, and the product's cached `rating` is rewritten on every
 change because that column is what listing and search sort on.
+
+### Saved ways to pay
+
+`/payment-methods` is personal — what this shopper saved. `/reference` stays
+the marketplace's list of what it accepts from anybody. Do not confuse them.
+
+**A card number never reaches this API.** Tokenise with the gateway and post
+back `masked_value` ("•••• 4242", "priya@okhdfc"), a `type`
+(`card`, `upi`, `wallet`, `netbanking`), an optional `label`/`provider`, and
+the gateway's own token as `gateway_token`. Twelve digits in a row in
+`masked_value` is a `422`, whatever the field was called on the way in. A row
+counts as `verified` only where a `gateway_token` came with it — saying
+`verified` in the payload does not make it one.
+
+The first method saved becomes the default. Deleting the default promotes
+another, so checkout never opens on nothing.
+
+### Closing an account
+
+`DELETE /me` revokes every token and registered device, releases the email and
+phone so the same person can sign up again, and soft-deletes the row — the
+orders behind it are a seller's sales history as much as the shopper's. An
+order still in flight is a `422`: there is nobody left to deliver to.
+
+### Notification preferences
+
+Four switches on the marketplace rather than in the phone, so a reinstall does
+not turn them all back on and two devices agree. `email_marketing` is the same
+flag as the profile's `accepts_marketing`.
 
 ---
 
@@ -477,7 +574,15 @@ Said plainly, so nobody plans around a hole:
 - **One gateway, Razorpay.** Cards, UPI and net banking all go through it, and
   with no credentials configured a non-COD order is still marked paid on
   placement. No other provider is wired up.
-- **No SMS.** Login codes are logged, and returned outside production.
+- **SMS needs a provider.** The path is wired (`SMS_DRIVER=http` plus
+  `SMS_API_KEY`, `SMS_URL`, `SMS_TEMPLATE_ID`, `SMS_SENDER`), and until one is
+  configured codes are logged and returned as `debug_code` outside production.
+  Configure one before launch, or a shopper cannot sign in.
+- **Store credit cannot be spent yet.** `GET /wallet` is truthful and a refund
+  settled to store credit lands in it, but checkout does not offer the balance
+  as a way to pay.
+- **Saved payment methods are stored, not charged.** They are display and
+  tokens; `POST /payments/create-intent` still opens a fresh intent.
 - **No push delivery to shoppers.** Tokens are stored and the feed works, but
   nothing sends to them yet; the seller app's FCM path is not shared.
 - **Customers are not notified of seller-side status changes.** The order

@@ -15,6 +15,85 @@ step with both.
 
 ---
 
+## 2026-09-04 (later)
+
+The app team's second gap list: everything the app was still drawing from its
+own source, plus the account screen's counts. 82 endpoints now.
+
+### Added
+
+- **`GET /products/filters`.** The filter sheet, counted against the catalogue
+  the current search actually leaves: price bands, star ranges, discount
+  ranges, sellers, brands, the boolean chips and the sort list, each option
+  with a `count`. Each facet is counted with every filter *except its own*, so
+  picking one seller narrows the listing but not the seller list. **What an app
+  must do:** stop shipping filter chips; draw whatever this returns.
+- **`assured` and `cod` filters, and they are real.** Both live on the store —
+  "Assured" is the marketplace's badge, granted in the panel, and a seller who
+  will not take cash says so once. `cod` also asks whether the marketplace is
+  still offering a pay-on-delivery method: with it switched off the chip
+  matches nothing rather than promising cash nobody will take. Product cards
+  gained `assured` and `cod_available`, and `vendor.is_assured`.
+- **`banners[]` on `GET /home`** — `title`, `subtitle`, `image_url`,
+  `deeplink_route`, `deeplink_params`, `sort_order`. Dated, so a sale takes
+  itself down. Managed in the panel under **App content**.
+- **`GET /app-config`, `GET /support/config`, `GET /legal`,
+  `GET /legal/{slug}`.** All open, no token. Support config offers chat only
+  where there is a URL behind it; a legal page 404s until somebody writes it,
+  and carries `updated_at`, which is half the point of a policy.
+- **`GET /me/summary`** — every count the account screen draws, in one call:
+  orders, spend, wishlist, usable coupons, reviews written and still to write,
+  addresses, devices, requests.
+- **`GET`/`PUT /notification-preferences`** — `push_enabled`, `order_updates`,
+  `deals_price_drops`, `email_marketing`, `sms_order_updates`. Kept on the
+  marketplace, so a reinstall no longer turns them all back on.
+  `email_marketing` is the profile's `accepts_marketing` under the name the
+  screen uses.
+- **`DELETE /me`.** Revokes every token and device, releases the email and
+  phone, soft-deletes the row. An order still in flight is a `422`.
+- **Saved ways to pay**: `GET`/`POST /payment-methods`,
+  `DELETE /payment-methods/{id}`, `PATCH /payment-methods/{id}/default`. **The
+  card number never reaches this API** — tokenise with the gateway and post
+  back a masked value plus the token; twelve digits in a row is a `422`. Not to
+  be confused with `/reference`, which is what the marketplace accepts from
+  anybody.
+- **`GET /wallet`** — store credit as a ledger: balance, currency, when it
+  lapses, and every movement behind it. A refund settled to store credit now
+  lands here; the panel used to say "refunded" while the wallet said zero.
+- **`events[]` on `GET /orders/{number}/track` and `GET /requests/{number}`** —
+  the same steps with one `state` each (`done`, `current`, `pending`) instead
+  of a flag to combine with a position. Tracking events carry `location`; the
+  track payload also gained `support_phone` and `eta_label`, and a request
+  gained `seller_approved_at`, `refund_issued_at`, `cancelled_at`,
+  `withdrawn_at` (and `picked_up_at`, always null — no courier reports a
+  return collection).
+- `cart_count` on `POST /orders/{number}/reorder`.
+- Admin: an **App content** screen (banners, help answers, legal pages),
+  **Marketplace Assured** and **cash on delivery** toggles per vendor, and
+  support hours / chat provider / seller-onboarding link in settings.
+
+### Changed
+
+- **Breaking — `skipped[].reason` on reorder is now a code**, not a sentence:
+  `out_of_stock`, `inactive_product`, `variant_missing`, `seller_unavailable`.
+  **Migration:** show `message`, which carries the old wording.
+- **Login codes are texted where a provider is configured** (`SMS_DRIVER=http`
+  with `SMS_API_KEY` / `SMS_URL` / `SMS_TEMPLATE_ID` / `SMS_SENDER`), and
+  `debug_code` then stops coming back. `POST /auth/otp` gained `delivered`,
+  which says whether the provider took it; `sent` stays `true` either way,
+  because telling a caller which numbers are registered helps whoever is
+  probing more than it helps the shopper.
+
+### Fixed
+
+- **`POST /auth/reset-password` was a 500, always.** The reset wrote a
+  `remember_token` and `customers` has no such column, so every password reset
+  died on the one screen a locked-out user cannot retry their way out of.
+- The login code was written to the **production** log in plaintext. It no
+  longer is.
+
+---
+
 ## 2026-09-04
 
 Closing the gap list the app team raised: everywhere the shopper app was
