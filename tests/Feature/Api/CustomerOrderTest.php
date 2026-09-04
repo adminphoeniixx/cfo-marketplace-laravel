@@ -124,8 +124,11 @@ test('buying again fills the basket and says what it could not', function () {
         ->assertOk()
         ->assertJsonCount(0, 'added')
         ->assertJsonCount(1, 'skipped')
-        ->assertJsonPath('skipped.0.reason', 'No longer sold')
-        ->assertJsonPath('cart.totals.items_count', 0);
+        // A code to branch on, and the sentence to show beside it.
+        ->assertJsonPath('skipped.0.reason', 'inactive_product')
+        ->assertJsonPath('skipped.0.message', 'No longer sold')
+        ->assertJsonPath('cart.totals.items_count', 0)
+        ->assertJsonPath('cart_count', 0);
 });
 
 test('a whole order can be called off before it is packed', function () {

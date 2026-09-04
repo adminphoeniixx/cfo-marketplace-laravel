@@ -87,6 +87,8 @@ class OrderController extends Controller
                 'status' => $model->status,
                 'status_label' => $model->statusLabel(),
                 'eta' => $model->etaLabel(),
+                // The same string under the name the app's other screens use.
+                'eta_label' => $model->etaLabel(),
                 'carrier' => $partner ? [
                     'code' => $partner->code,
                     'name' => $partner->name,
@@ -95,9 +97,16 @@ class OrderController extends Controller
                 ] : null,
                 'tracking_number' => $model->tracking_number,
                 'tracking_url' => DeliveryPartner::trackingUrlFrom($model->carrier, $model->tracking_number),
+                // Lifted out of `carrier` as well, because the "call courier"
+                // button is one tap and should not have to walk an object that
+                // is null for a parcel nobody has handed over yet.
+                'support_phone' => $partner?->support_phone,
                 'progress_step' => $progress,
                 'progress_total' => count($milestones),
                 'milestones' => $milestones,
+                // The same steps, in the shape the tracking screen draws: one
+                // `state` per row rather than two booleans to combine.
+                'events' => self::eventsFrom($milestones),
                 // The lines in the box, so the tracking screen does not have to
                 // fetch the whole order to list what is coming.
                 'items' => OrderItemResource::collection($model->items),
@@ -142,10 +151,15 @@ class OrderController extends Controller
             ? trim($vendor->name.($vendor->city ? ', '.$vendor->city : ''))
             : $sellers->count().' sellers on this order';
 
+        // Where the parcel is at each step, where the marketplace knows: the
+        // seller's city on the way out, the shopper's on the way in.
+        $to = is_array($model->shipping_address) ? ($model->shipping_address['city'] ?? null) : null;
+
         $steps = [[
             'key' => 'placed',
             'title' => 'Order placed',
             'subtitle' => $model->number.' · '.$model->items->sum('quantity').' item(s)',
+            'location' => null,
             'at' => $model->placed_at?->toIso8601String(),
             'done' => $model->placed_at !== null,
         ]];
@@ -155,6 +169,7 @@ class OrderController extends Controller
                 'key' => 'cancelled',
                 'title' => 'Order cancelled',
                 'subtitle' => 'Anything already paid is refunded to the original method',
+                'location' => null,
                 'at' => $model->cancelled_at?->toIso8601String(),
                 'done' => true,
             ];
@@ -164,6 +179,7 @@ class OrderController extends Controller
 
         $steps[] = [
             'key' => 'payment',
+            'location' => null,
             'title' => $model->isPayOnDelivery() ? 'Pay on delivery' : 'Payment confirmed',
             'subtitle' => $model->isPayOnDelivery()
                 ? 'Collected by the courier at the door'
@@ -176,6 +192,7 @@ class OrderController extends Controller
             'key' => 'picked_up',
             'title' => 'Picked up from the seller',
             'subtitle' => $from,
+            'location' => $vendor?->city,
             'at' => $model->shipped_at?->toIso8601String(),
             'done' => $model->shipped_at !== null,
         ];
@@ -184,6 +201,7 @@ class OrderController extends Controller
             'key' => 'out_for_delivery',
             'title' => 'Out for delivery',
             'subtitle' => 'Assigned to a rider near you',
+            'location' => $to,
             // The courier does not report this to the marketplace yet, so it is
             // shown as reached only once the parcel actually arrived.
             'at' => null,
@@ -193,6 +211,7 @@ class OrderController extends Controller
         $steps[] = [
             'key' => 'delivered',
             'title' => 'Delivered',
+            'location' => $to,
             'subtitle' => $model->delivered_at
                 ? 'Signature or OTP taken at the door'
                 : (string) $model->etaLabel(),
@@ -231,6 +250,29 @@ class OrderController extends Controller
     }
 
     /**
+     * The milestones as events: `done` and `current` collapsed into the one
+     * `state` a timeline row is actually drawn from.
+     *
+     * @param  list<array<string, mixed>>  $milestones
+     * @return list<array<string, mixed>>
+     */
+    protected static function eventsFrom(array $milestones): array
+    {
+        return array_map(fn (array $step) => [
+            'key' => $step['key'],
+            'label' => $step['title'],
+            'description' => $step['subtitle'],
+            'location' => $step['location'] ?? null,
+            'happened_at' => $step['at'],
+            'state' => match (true) {
+                (bool) $step['done'] => 'done',
+                (bool) $step['current'] => 'current',
+                default => 'pending',
+            },
+        ], $milestones);
+    }
+
+    /**
      * Put an old order's lines back in the basket.
      *
      * Partial success is the normal case, not an error: a basket bought months
@@ -253,12 +295,21 @@ class OrderController extends Controller
             $refusal = $this->refusalFor($item);
 
             if ($refusal !== null) {
+                [$code, $message] = $refusal;
+
                 $skipped[] = [
                     'product_id' => $item->product_id,
                     'product_variant_id' => $item->product_variant_id,
+                    // The app's own spelling of the same id, so a client
+                    // written against either name works.
+                    'variant_id' => $item->product_variant_id,
                     'name' => $item->name,
                     'emoji' => Emoji::forProduct($item->name),
-                    'reason' => $refusal,
+                    // A code to branch on, and a line to show. `reason` used
+                    // to be the sentence, which meant the app matched on
+                    // English to tell "sold out" from "delisted".
+                    'reason' => $code,
+                    'message' => $message,
                 ];
 
                 continue;
@@ -273,39 +324,44 @@ class OrderController extends Controller
             // The basket as `GET /cart` would return it, so the badge and the
             // totals are right the moment this call comes back.
             'cart' => $this->basket->handle($cart->fresh() ?? $cart),
+            // The badge on its own, for a client that only wants the number.
+            'cart_count' => (int) $cart->activeItems()->sum('quantity'),
         ]);
     }
 
     /**
      * Why this line cannot go back in the basket, or null when it can.
      *
-     * The order matters: the most specific reason is the one worth showing, so
-     * "the seller has paused" beats "out of stock" for a store that has closed
-     * with stock still on the shelf.
+     * A code and the sentence for it: the app branches on the first and shows
+     * the second. The order matters — the most specific reason is the one
+     * worth showing, so "the seller has paused" beats "out of stock" for a
+     * store that has closed with stock still on the shelf.
+     *
+     * @return array{0: string, 1: string}|null
      */
-    protected function refusalFor(OrderItem $item): ?string
+    protected function refusalFor(OrderItem $item): ?array
     {
         $product = $item->product;
 
         // A deleted product resolves to null through the relation's own
         // soft-delete scope, so both spellings of "gone" land here.
         if (! $product || $product->status !== 'active') {
-            return 'No longer sold';
+            return ['inactive_product', 'No longer sold'];
         }
 
         if ($product->vendor && $product->vendor->status !== 'approved') {
-            return 'This seller is not trading right now';
+            return ['seller_unavailable', 'This seller is not trading right now'];
         }
 
         if ($item->product_variant_id) {
             $variant = $product->variants->firstWhere('id', $item->product_variant_id);
 
             if (! $variant || ! $variant->is_active) {
-                return 'That option is no longer available';
+                return ['variant_missing', 'That option is no longer available'];
             }
         }
 
-        return $product->isInStock() ? null : 'Out of stock';
+        return $product->isInStock() ? null : ['out_of_stock', 'Out of stock'];
     }
 
     /**

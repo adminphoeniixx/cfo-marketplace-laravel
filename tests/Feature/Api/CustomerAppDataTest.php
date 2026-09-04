@@ -279,6 +279,15 @@ test('tracking answers the whole screen in one call', function () {
         ->assertJsonPath('data.milestones.2.subtitle', 'Meera Textiles, Chennai')
         ->assertJsonPath('data.milestones.2.done', true)
         ->assertJsonPath('data.milestones.3.current', true)
+        // The same steps as events: one state per row, and the city the
+        // parcel was in, rather than two booleans to combine.
+        ->assertJsonPath('data.events.2.label', 'Picked up from the seller')
+        ->assertJsonPath('data.events.2.location', 'Chennai')
+        ->assertJsonPath('data.events.2.state', 'done')
+        ->assertJsonPath('data.events.3.state', 'current')
+        ->assertJsonPath('data.events.4.state', 'pending')
+        ->assertJsonPath('data.support_phone', '1800 103 6354')
+        ->assertJsonPath('data.eta_label', 'Arriving '.now()->addDay()->format('D, j M'))
         // The lines in the box, so no second call to `/orders/{number}`.
         ->assertJsonCount(1, 'data.items')
         ->assertJsonPath('data.sellers.0.name', 'Meera Textiles');
@@ -326,5 +335,11 @@ test('a return says what is coming back and where it has got to', function () {
         ->assertJsonPath('data.timeline.0.done', true)
         ->assertJsonPath('data.timeline.2.title', 'Refunded to your payment method')
         ->assertJsonPath('data.timeline.2.done', false)
+        // The same steps as events, and the moments named one by one.
+        ->assertJsonPath('data.events.0.state', 'done')
+        ->assertJsonPath('data.events.1.state', 'current')
+        ->assertJsonPath('data.events.2.state', 'pending')
+        ->assertJsonPath('data.seller_approved_at', null)
+        ->assertJsonPath('data.refund_issued_at', null)
         ->assertJsonPath('data.items.0.emoji', '🥻');
 });

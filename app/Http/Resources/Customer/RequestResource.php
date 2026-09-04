@@ -51,11 +51,63 @@ class RequestResource extends JsonResource
                 'quantity' => (int) $item->quantity,
                 'amount' => (float) $item->amount,
             ])->values()->all()),
-            'timeline' => $this->timeline($refund),
+            'timeline' => $timeline = $this->timeline($refund),
+            // The same steps in the shape the detail screen draws: one
+            // `state` per row instead of a `done` flag to combine with
+            // position, and `scheduled_at` for the step still to come.
+            'events' => self::eventsFrom($timeline),
             'created_at' => $this->created_at?->toIso8601String(),
             'reviewed_at' => $this->reviewed_at?->toIso8601String(),
             'processed_at' => $refund?->processed_at?->toIso8601String(),
+            // The same moments named one by one, for a screen that would
+            // rather read a field than walk a list. `picked_up_at` is null
+            // until couriers report a return collection to the marketplace,
+            // which they do not yet.
+            'seller_approved_at' => in_array($this->status, ['approved', 'processed'], true)
+                ? $this->reviewed_at?->toIso8601String()
+                : null,
+            'picked_up_at' => null,
+            'refund_issued_at' => $refund?->processed_at?->toIso8601String(),
+            // A cancellation carries no separate "done" stamp: the moment it
+            // was approved is the moment the order was called off.
+            'cancelled_at' => $cancellation && in_array($cancellation->status, ['approved', 'processed'], true)
+                ? $cancellation->reviewed_at?->toIso8601String()
+                : null,
+            'withdrawn_at' => $this->status === 'withdrawn'
+                ? ($this->reviewed_at ?? $this->updated_at)?->toIso8601String()
+                : null,
         ];
+    }
+
+    /**
+     * The timeline as events: `done` collapsed into a `state`, and the first
+     * step nobody has reached marked `current`.
+     *
+     * @param  list<array<string, mixed>>  $timeline
+     * @return list<array<string, mixed>>
+     */
+    protected static function eventsFrom(array $timeline): array
+    {
+        $current = null;
+
+        foreach ($timeline as $index => $step) {
+            if (! $step['done']) {
+                $current = $index;
+                break;
+            }
+        }
+
+        return array_map(fn (array $step, int $index) => [
+            'key' => $step['key'],
+            'label' => $step['title'],
+            'status' => $step['done'] ? 'done' : ($index === $current ? 'current' : 'pending'),
+            'state' => $step['done'] ? 'done' : ($index === $current ? 'current' : 'pending'),
+            'happened_at' => $step['at'],
+            // Nothing is promised: a step with no date behind it has no date
+            // in front of it either.
+            'scheduled_at' => null,
+            'date' => $step['date'],
+        ], $timeline, array_keys($timeline));
     }
 
     /**
