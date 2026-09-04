@@ -6,11 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\Customer\CategoryResource;
 use App\Http\Resources\Customer\ProductCardResource;
 use App\Http\Resources\Customer\ProductResource;
+use App\Models\Banner;
 use App\Models\Category;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Models\ProductReview;
 use App\Models\Vendor;
+use App\Services\BunnyCdn;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -193,6 +195,26 @@ class CatalogController extends Controller
         $this->markWishlisted($request, $deals->concat($topRated)->concat($newest));
 
         return response()->json([
+            // The carousel at the top. Empty until an admin adds one — which
+            // is still better than the app carrying its own, where a sale
+            // could not start without a release.
+            'banners' => Banner::live()
+                ->orderBy('position')
+                ->orderBy('id')
+                ->get()
+                ->map(fn (Banner $banner) => [
+                    'id' => $banner->id,
+                    'title' => $banner->title,
+                    'subtitle' => $banner->subtitle,
+                    'image_url' => BunnyCdn::display($banner->image_path),
+                    // Where tapping it goes: the app's own route name, and
+                    // whatever that route needs.
+                    'deeplink_route' => $banner->deeplink_route,
+                    'deeplink_params' => (array) ($banner->deeplink_params ?? []),
+                    'sort_order' => (int) $banner->position,
+                    'active' => true,
+                ])
+                ->all(),
             'categories' => CategoryResource::collection(
                 Category::where('is_active', true)->whereNull('parent_id')->orderBy('position')->get()
             ),

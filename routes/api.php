@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\Customer\AuthController as CustomerAuthController;
 use App\Http\Controllers\Api\Customer\CartController;
 use App\Http\Controllers\Api\Customer\CatalogController as CustomerCatalogController;
 use App\Http\Controllers\Api\Customer\CheckoutController;
+use App\Http\Controllers\Api\Customer\ContentController;
 use App\Http\Controllers\Api\Customer\InvoiceController;
 use App\Http\Controllers\Api\Customer\NotificationController as CustomerNotificationController;
 use App\Http\Controllers\Api\Customer\OrderController as CustomerOrderController;
@@ -250,6 +251,16 @@ Route::prefix('customer')->name('api.customer.')->group(function () {
     Route::get('reference', ReferenceController::class)->name('reference');
 
     /*
+    | Words rather than shopping, and all of it open: a shopper who has been
+    | signed out still has to be able to read the privacy policy and find a
+    | phone number.
+    */
+    Route::get('app-config', [ContentController::class, 'appConfig'])->name('app-config');
+    Route::get('support/config', [ContentController::class, 'supportConfig'])->name('support.config');
+    Route::get('legal', [ContentController::class, 'legalIndex'])->name('legal.index');
+    Route::get('legal/{page}', [ContentController::class, 'legal'])->name('legal.show');
+
+    /*
     | The invoice, reached by signature rather than by token — so it can be
     | opened in a browser or handed to a download manager, neither of which
     | carries the app's bearer token. The signature is the authority; it is
@@ -290,6 +301,15 @@ Route::prefix('customer')->name('api.customer.')->group(function () {
         Route::get('me', [CustomerProfileController::class, 'show'])->name('me');
         Route::put('me', [CustomerProfileController::class, 'update'])->name('me.update');
         Route::put('me/password', [CustomerProfileController::class, 'updatePassword'])->name('me.password');
+        // Before `me`, or the account screen's counts would be read as a
+        // profile update.
+        Route::get('me/summary', [CustomerProfileController::class, 'summary'])->name('me.summary');
+        Route::delete('me', [CustomerProfileController::class, 'destroy'])->name('me.destroy');
+
+        Route::get('notification-preferences', [CustomerProfileController::class, 'notificationPreferences'])
+            ->name('notification-preferences');
+        Route::put('notification-preferences', [CustomerProfileController::class, 'updateNotificationPreferences'])
+            ->name('notification-preferences.update');
 
         Route::get('addresses', [CustomerAddressController::class, 'index'])->name('addresses.index');
         Route::post('addresses', [CustomerAddressController::class, 'store'])->name('addresses.store');

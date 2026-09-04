@@ -1,9 +1,12 @@
 <?php
 
+use App\Models\Banner;
 use App\Models\Cancellation;
 use App\Models\Coupon;
 use App\Models\Customer;
 use App\Models\CustomerDeviceToken;
+use App\Models\Faq;
+use App\Models\LegalPage;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Models\PaymentMethod;
@@ -212,6 +215,11 @@ function shopperFixture(): array
 
     $customer->wishlistItems()->create(['product_id' => $second->id]);
 
+    Banner::factory()->create(['title' => 'Festive edit']);
+    Faq::factory()->create(['question' => 'When will my order arrive?']);
+    LegalPage::where('slug', 'privacy')
+        ->update(['body' => 'What we keep, and for how long.', 'is_published' => true]);
+
     return [
         'customer' => $customer,
         'address' => $address,
@@ -305,9 +313,21 @@ function shopperCalls(array $f): array
         'api.customer.auth.logout' => ['POST', route('api.customer.auth.logout'), []],
         'api.customer.auth.logout-all' => ['POST', route('api.customer.auth.logout-all'), []],
 
+        // Words rather than shopping, and no token needed for any of them.
+        'api.customer.app-config' => ['GET', route('api.customer.app-config'), []],
+        'api.customer.support.config' => ['GET', route('api.customer.support.config'), []],
+        'api.customer.legal.index' => ['GET', route('api.customer.legal.index'), []],
+        'api.customer.legal.show' => ['GET', route('api.customer.legal.show', 'privacy'), []],
+
         // The account screen.
         'api.customer.me' => ['GET', route('api.customer.me'), []],
         'api.customer.me.update' => ['PUT', route('api.customer.me.update'), ['first_name' => 'Priyanka']],
+        'api.customer.me.summary' => ['GET', route('api.customer.me.summary'), []],
+        'api.customer.me.destroy' => ['DELETE', route('api.customer.me.destroy'), []],
+        'api.customer.notification-preferences' => ['GET', route('api.customer.notification-preferences'), []],
+        'api.customer.notification-preferences.update' => ['PUT', route('api.customer.notification-preferences.update'), [
+            'push_enabled' => true, 'deals_price_drops' => true,
+        ]],
         'api.customer.me.password' => ['PUT', route('api.customer.me.password'), [
             'current_password' => 'shopper-password',
             'password' => 'another-good-one', 'password_confirmation' => 'another-good-one',
@@ -486,6 +506,15 @@ function smokeCall(array $f, string $name, string $method, string $url, array $p
             'CONTENT_TYPE' => 'application/json',
             'HTTP_X_RAZORPAY_SIGNATURE' => hash_hmac('sha256', $body, 'whsec_test'),
         ], content: $body);
+    }
+
+    if ($name === 'api.customer.me.destroy') {
+        // Its own precondition: an order still on the way keeps the account
+        // open, and this fixture deliberately has two.
+        $f['customer']->orders()->whereNotIn('status', ['completed', 'cancelled', 'refunded'])
+            ->update(['status' => 'cancelled']);
+
+        return test()->deleteJson($url);
     }
 
     // The invoice is HTML on purpose — it is opened in a browser or handed to
