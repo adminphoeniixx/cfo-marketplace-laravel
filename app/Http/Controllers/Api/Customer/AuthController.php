@@ -58,7 +58,7 @@ class AuthController extends Controller
         // that says "we could not text you" tells someone probing for
         // registered numbers more than it tells the shopper. The failure is
         // logged for the people who can act on it.
-        $sent = Sms::sendCode($phone, $code);
+        $sent = Sms::sendCode($phone, $code, self::CODE_TTL);
 
         return response()->json([
             'sent' => true,

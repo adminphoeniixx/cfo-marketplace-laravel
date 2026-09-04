@@ -93,7 +93,9 @@ return [
         // MSG91's own names are accepted, so a key copied straight out of
         // their dashboard works without being renamed on the way in.
         'key' => env('SMS_API_KEY', env('MSG91_AUTHKEY')),
-        'url' => env('SMS_URL', 'https://control.msg91.com/api/v5/flow'),
+        // MSG91's OTP endpoint, not `/flow`: an OTP template posted to flow
+        // answers `type: success` with a request id and delivers nothing.
+        'url' => env('SMS_URL', 'https://control.msg91.com/api/v5/otp'),
         'sender' => env('SMS_SENDER', env('MSG91_SENDER')),
         'template_id' => env('SMS_TEMPLATE_ID', env('MSG91_TEMPLATE_ID')),
         // The variable the template substitutes the code into. MSG91 flow

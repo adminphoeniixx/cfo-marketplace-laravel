@@ -15,9 +15,12 @@ use Illuminate\Support\Facades\Log;
  * that only exists in a log file is a login nobody outside this server can
  * complete.
  *
- * Written against MSG91's flow API by default, since that is what an Indian
- * marketplace usually ends up on, but the shape is provider-agnostic: a URL, a
- * key, a sender and a template. Anything that accepts a JSON POST fits.
+ * Written against MSG91's **OTP** endpoint, which is what an OTP template on
+ * that account actually accepts. Their flow endpoint takes the same key and the
+ * same template id and answers `type: success` with a request id — and delivers
+ * nothing, which is a day lost if you take the 200 at face value. The shape is
+ * otherwise provider-agnostic: a URL, a key, a sender, a template, and the name
+ * of the variable the code goes into.
  */
 class Sms
 {
@@ -37,7 +40,11 @@ class Sms
      * Never throws: a provider having a bad morning must not turn a sign-in
      * screen into a 500. The caller is told false and can say "try again".
      */
-    public static function sendCode(string $phone, string $code): bool
+    /**
+     * @param  int  $ttl  How long the code stays valid, in seconds — passed on so
+     *                    the provider's own copy expires when this one does.
+     */
+    public static function sendCode(string $phone, string $code, int $ttl = 600): bool
     {
         if (! self::enabled()) {
             /*
@@ -64,15 +71,15 @@ class Sms
                 ->post((string) self::config('url'), array_filter([
                     'template_id' => self::config('template_id'),
                     'sender' => self::config('sender'),
-                    'short_url' => '0',
-                    // MSG91 v5 flow: one entry per recipient, each carrying
-                    // its own template variables. The older shape put
-                    // `mobiles` at the root and is still accepted, but this is
-                    // the documented one.
-                    'recipients' => [[
-                        'mobiles' => self::msisdn($phone),
-                        (string) self::config('code_variable', 'otp') => $code,
-                    ]],
+                    'mobile' => self::msisdn($phone),
+                    // The template's own variable name. MSG91's OTP templates
+                    // almost always call it `otp`; a flow template might call
+                    // it `var1`, and naming it wrong sends a message with a
+                    // hole in it rather than an error.
+                    (string) self::config('code_variable', 'otp') => $code,
+                    // Minutes, and matched to this marketplace's own expiry so
+                    // the two cannot disagree about when a code died.
+                    'otp_expiry' => (int) ceil($ttl / 60),
                 ], fn ($value) => $value !== null));
         } catch (ConnectionException $e) {
             Log::error('SMS provider unreachable.', ['phone' => $phone, 'error' => $e->getMessage()]);

@@ -158,7 +158,7 @@ test('a configured provider sends the code and stops handing it back', function 
     config([
         'services.sms.driver' => 'http',
         'services.sms.key' => 'sms-key',
-        'services.sms.url' => 'https://control.msg91.com/api/v5/flow',
+        'services.sms.url' => 'https://control.msg91.com/api/v5/otp',
         'services.sms.template_id' => 'tpl_1',
     ]);
 
@@ -172,11 +172,11 @@ test('a configured provider sends the code and stops handing it back', function 
     expect($response->json('debug_code'))->toBeNull();
 
     Http::assertSent(function ($request) {
-        $recipient = $request['recipients'][0];
-
         // Bare Indian numbers are stored without a country code; providers
-        // want one.
-        return $recipient['mobiles'] === '919876543210' && $recipient['otp'] !== null;
+        // want one. `otp_expiry` is minutes, matched to this app's own TTL.
+        return $request['mobile'] === '919876543210'
+            && $request['otp'] !== null
+            && $request['otp_expiry'] === 10;
     });
 });
 
@@ -184,7 +184,7 @@ test('a provider having a bad morning does not break the sign-in screen', functi
     config([
         'services.sms.driver' => 'http',
         'services.sms.key' => 'sms-key',
-        'services.sms.url' => 'https://control.msg91.com/api/v5/flow',
+        'services.sms.url' => 'https://control.msg91.com/api/v5/otp',
     ]);
 
     Http::fake(['control.msg91.com/*' => Http::response(['message' => 'nope'], 500)]);
@@ -201,7 +201,7 @@ test('a provider answering 200 with an error is still a failure', function () {
     config([
         'services.sms.driver' => 'http',
         'services.sms.key' => 'sms-key',
-        'services.sms.url' => 'https://control.msg91.com/api/v5/flow',
+        'services.sms.url' => 'https://control.msg91.com/api/v5/otp',
         'services.sms.template_id' => 'wrong-template',
     ]);
 
@@ -221,7 +221,7 @@ test('the template variable is whatever the template calls it', function () {
     config([
         'services.sms.driver' => 'http',
         'services.sms.key' => 'sms-key',
-        'services.sms.url' => 'https://control.msg91.com/api/v5/flow',
+        'services.sms.url' => 'https://control.msg91.com/api/v5/otp',
         'services.sms.code_variable' => 'var1',
     ]);
 
@@ -231,5 +231,5 @@ test('the template variable is whatever the template calls it', function () {
 
     // Naming it wrong sends a message with a hole in it rather than an error,
     // so the name is configuration, not a constant.
-    Http::assertSent(fn ($request) => isset($request['recipients'][0]['var1']));
+    Http::assertSent(fn ($request) => isset($request['var1']));
 });
