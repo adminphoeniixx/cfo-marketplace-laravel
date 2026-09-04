@@ -12,7 +12,6 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -190,10 +189,11 @@ class AuthController extends Controller
         ]);
 
         $status = Password::broker('customers')->reset($data, function (Customer $customer, string $password) {
-            $customer->forceFill([
-                'password' => $password,
-                'remember_token' => Str::random(60),
-            ])->save();
+            // Password only: shoppers are never remembered by a session
+            // cookie, so `customers` carries no `remember_token` column and
+            // writing one here was a 500 on the one screen nobody can retry
+            // their way out of.
+            $customer->forceFill(['password' => $password])->save();
 
             // A reset is also how someone recovers a stolen account, so every
             // other device is signed out.

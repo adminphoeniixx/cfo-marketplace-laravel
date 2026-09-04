@@ -124,18 +124,6 @@ return new class extends Migration
             $table->dropColumn(['eta_min_at', 'eta_max_at']);
         });
 
-        Schema::table('categories', function (Blueprint $table) {
-            /*
-            | The tile's glyph, until there is a photograph.
-            |
-            | The prototype drew every category as an emoji and the app copied
-            | that table into its own source; one column and an
-            | `Emoji::forCategory()` fallback means the marketplace owns it and
-            | a category added tomorrow still draws something.
-            */
-            $table->string('icon', 8)->nullable()->after('image_path');
-        });
-
         Schema::table('carts', function (Blueprint $table) {
             $table->dropConstrainedForeignId('selected_address_id');
         });

@@ -95,6 +95,11 @@ named as "not built yet". 66 endpoints now.
 
 ### Fixed
 
+- **`POST /auth/reset-password` was a 500, always.** The reset wrote a
+  `remember_token` onto the shopper, and `customers` has no such column —
+  shoppers are never remembered by a session cookie. Every password reset died
+  on the one screen a locked-out user cannot retry their way out of. The token
+  write is gone; the reset still signs every other device out.
 - **A coupon could be applied and change nothing.** `FREESHIP` on a basket
   already over the free-delivery threshold was accepted, and the total sat
   there unmoved — which reads as a broken checkout. Such a code is now `422`
