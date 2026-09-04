@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AnalyticsController;
+use App\Http\Controllers\Admin\AppContentController;
 use App\Http\Controllers\Admin\AttributeController;
 use App\Http\Controllers\Admin\CancellationController;
 use App\Http\Controllers\Admin\CategoryController;
@@ -176,6 +177,32 @@ Route::middleware(['auth', 'verified', 'deny.vendor'])->prefix('admin')->name('a
         Route::put('payments/{payment}', [PaymentMethodController::class, 'update'])->name('payments.update');
         Route::patch('payments/{payment}/toggle', [PaymentMethodController::class, 'toggle'])->name('payments.toggle');
         Route::delete('payments/{payment}', [PaymentMethodController::class, 'destroy'])->name('payments.destroy');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | App content
+    |--------------------------------------------------------------------------
+    |
+    | The home carousel, the help answers and the legal pages — everything the
+    | shopper app used to carry in its own source. Gated on `settings` rather
+    | than a section of its own: it is the same job as the store's own details,
+    | and one more row in the role matrix for three small tables would be one
+    | more thing to forget to grant.
+    */
+    Route::middleware('role.can:settings')->group(function () {
+        Route::get('content', [AppContentController::class, 'index'])->name('content.index');
+
+        Route::post('content/banners', [AppContentController::class, 'storeBanner'])->name('content.banners.store');
+        Route::put('content/banners/{banner}', [AppContentController::class, 'updateBanner'])->name('content.banners.update');
+        Route::patch('content/banners/{banner}/toggle', [AppContentController::class, 'toggleBanner'])->name('content.banners.toggle');
+        Route::delete('content/banners/{banner}', [AppContentController::class, 'destroyBanner'])->name('content.banners.destroy');
+
+        Route::post('content/faqs', [AppContentController::class, 'storeFaq'])->name('content.faqs.store');
+        Route::put('content/faqs/{faq}', [AppContentController::class, 'updateFaq'])->name('content.faqs.update');
+        Route::delete('content/faqs/{faq}', [AppContentController::class, 'destroyFaq'])->name('content.faqs.destroy');
+
+        Route::put('content/pages/{page}', [AppContentController::class, 'updatePage'])->name('content.pages.update');
     });
 
     /*

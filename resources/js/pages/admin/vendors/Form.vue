@@ -4,6 +4,7 @@ import { computed } from 'vue';
 import PageHeader from '@/components/admin/PageHeader.vue';
 import PButton from '@/components/admin/PButton.vue';
 import PCard from '@/components/admin/PCard.vue';
+import PCheckbox from '@/components/admin/PCheckbox.vue';
 import PSelect from '@/components/admin/PSelect.vue';
 import PTextarea from '@/components/admin/PTextarea.vue';
 import PTextField from '@/components/admin/PTextField.vue';
@@ -18,6 +19,8 @@ type Vendor = {
     status: string;
     commission_type: string;
     commission_rate: string;
+    is_assured: boolean;
+    cod_available: boolean;
     contact_name: string | null;
     address_line1: string | null;
     address_line2: string | null;
@@ -45,6 +48,8 @@ const form = useForm({
     status: props.vendor?.status ?? 'pending',
     commission_type: props.vendor?.commission_type ?? 'percentage',
     commission_rate: props.vendor?.commission_rate ?? 10,
+    is_assured: props.vendor?.is_assured ?? false,
+    cod_available: props.vendor?.cod_available ?? true,
     contact_name: props.vendor?.contact_name ?? '',
     address_line1: props.vendor?.address_line1 ?? '',
     address_line2: props.vendor?.address_line2 ?? '',
@@ -225,6 +230,19 @@ const submit = () => {
                         :error="form.errors.status"
                         help-text="Only approved vendors can sell."
                     />
+
+                    <div class="mt-3 space-y-2">
+                        <PCheckbox
+                            v-model="form.is_assured"
+                            label="Marketplace Assured"
+                            help-text="Draws the badge on this store's products, and fills the shopper app's “Assured” filter."
+                        />
+                        <PCheckbox
+                            v-model="form.cod_available"
+                            label="Takes cash on delivery"
+                            help-text="Turning this off removes this store's products from the app's COD filter."
+                        />
+                    </div>
                 </PCard>
 
                 <PCard title="Commission">

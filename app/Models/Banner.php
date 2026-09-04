@@ -6,8 +6,13 @@ use Database\Factories\BannerFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 /**
+ * @property array<string, mixed>|null $deeplink_params
+ * @property Carbon|null $starts_at
+ * @property Carbon|null $ends_at
+ *
  * A card in the home screen's carousel.
  *
  * The app used to carry these in its own source, so a sale could not start

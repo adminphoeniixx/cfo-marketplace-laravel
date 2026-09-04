@@ -6,11 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\Customer\ProfileResource;
 use App\Models\Customer;
 use App\Models\CustomerDeviceToken;
+use App\Services\Sms;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -54,14 +54,19 @@ class AuthController extends Controller
 
         Cache::put($this->codeKey($phone), ['code' => Hash::make($code), 'attempts' => 0], self::CODE_TTL);
 
-        Log::info('Customer login code issued', ['phone' => $phone, 'code' => $code]);
+        // Answered `true` even where the provider refused: a sign-in screen
+        // that says "we could not text you" tells someone probing for
+        // registered numbers more than it tells the shopper. The failure is
+        // logged for the people who can act on it.
+        $sent = Sms::sendCode($phone, $code);
 
         return response()->json([
             'sent' => true,
+            'delivered' => $sent,
             'expires_in' => self::CODE_TTL,
-            // Never in production: a code in the response would make the whole
-            // exercise pointless.
-            'debug_code' => app()->environment('production') ? null : $code,
+            // Never in production, and never once a provider is wired up: a
+            // code in the response would make the whole exercise pointless.
+            'debug_code' => app()->environment('production') || Sms::enabled() ? null : $code,
         ]);
     }
 

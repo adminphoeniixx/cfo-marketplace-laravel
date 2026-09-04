@@ -183,6 +183,13 @@ const allGroups = computed<NavGroup[]>(() => [
                 section: 'shipping',
             },
             {
+                label: 'App content',
+                href: '/admin/content',
+                match: '/admin/content',
+                icon: 'settings',
+                section: 'settings',
+            },
+            {
                 label: 'Store settings',
                 href: '/admin/settings',
                 match: '/admin/settings',

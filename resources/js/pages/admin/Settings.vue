@@ -35,6 +35,9 @@ const form = useForm({
     store_email: props.settings.store_email ?? '',
     store_phone: props.settings.store_phone ?? '',
     support_chat_url: props.settings.support_chat_url ?? '',
+    support_chat_provider: props.settings.support_chat_provider ?? '',
+    support_hours: props.settings.support_hours ?? '',
+    seller_onboarding_url: props.settings.seller_onboarding_url ?? '',
     currency: props.settings.currency ?? 'INR',
     weight_unit: props.settings.weight_unit ?? 'kg',
     order_prefix: props.settings.order_prefix ?? '#',
@@ -155,6 +158,27 @@ const destroyPartner = (partner: DeliveryPartner) =>
                             placeholder="https://wa.me/919000000000"
                             help-text="Where “Need help with this order” goes in the shopper app."
                             :error="form.errors.support_chat_url"
+                        />
+                        <PTextField
+                            v-model="form.support_chat_provider"
+                            label="Chat provider"
+                            placeholder="whatsapp"
+                            help-text="Named beside the chat button. Ignored while there is no chat link."
+                            :error="form.errors.support_chat_provider"
+                        />
+                        <PTextField
+                            v-model="form.support_hours"
+                            label="Support hours"
+                            placeholder="Every day, 9am to 9pm"
+                            help-text="Shown under the phone number on the app's help screen."
+                            :error="form.errors.support_hours"
+                        />
+                        <PTextField
+                            v-model="form.seller_onboarding_url"
+                            label="Sell with us link"
+                            placeholder="https://sell.example.com"
+                            help-text="Where “Sell on this marketplace” goes in the shopper app."
+                            :error="form.errors.seller_onboarding_url"
                         />
                         <PTextField
                             v-model="form.order_prefix"

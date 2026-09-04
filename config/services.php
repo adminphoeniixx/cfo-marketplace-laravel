@@ -56,6 +56,24 @@ return [
         'timeout' => (int) env('RAZORPAY_TIMEOUT', 20),
     ],
 
+    /*
+    | Text messages, which here means the sign-in code and nothing else.
+    |
+    | Leave `SMS_DRIVER` at `log` and codes go to the log and come back as
+    | `debug_code` outside production — how the demo and the tests sign in.
+    | Production must set `http` and a provider, or a shopper cannot get in.
+    */
+    'sms' => [
+        'driver' => env('SMS_DRIVER', 'log'),
+        'key' => env('SMS_API_KEY'),
+        'url' => env('SMS_URL', 'https://control.msg91.com/api/v5/flow'),
+        'sender' => env('SMS_SENDER'),
+        'template_id' => env('SMS_TEMPLATE_ID'),
+        'country_code' => env('SMS_COUNTRY_CODE', '91'),
+        'connect_timeout' => (int) env('SMS_CONNECT_TIMEOUT', 5),
+        'timeout' => (int) env('SMS_TIMEOUT', 15),
+    ],
+
     'bunnycdn' => [
         'storage_zone' => env('BUNNYCDN_STORAGE_ZONE'),
         'api_key' => env('BUNNYCDN_API_KEY'),

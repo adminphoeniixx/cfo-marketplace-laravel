@@ -161,6 +161,11 @@ class VendorController extends Controller
             'phone' => ['nullable', 'string', 'max:25'],
             'description' => ['nullable', 'string', 'max:2000'],
             'status' => ['required', Rule::in(Vendor::STATUSES)],
+            // The marketplace's own badge and whether this store handles cash
+            // — both are the marketplace's call, which is why they are set
+            // here and not in the seller app.
+            'is_assured' => ['boolean'],
+            'cod_available' => ['boolean'],
             'commission_type' => ['required', Rule::in(['percentage', 'flat'])],
             'commission_rate' => ['required', 'numeric', 'min:0', 'max:100'],
             'contact_name' => ['nullable', 'string', 'max:120'],

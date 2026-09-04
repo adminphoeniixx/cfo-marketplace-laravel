@@ -23,6 +23,12 @@ class SettingController extends Controller
         // Where "Need help with this order" goes in the shopper app. Whatever
         // the marketplace actually answers on — WhatsApp, a helpdesk, a page.
         'support_chat_url' => '',
+        // Named on the help screen beside the chat button, and only ever
+        // shown where there is a URL to go with it.
+        'support_chat_provider' => '',
+        'support_hours' => '',
+        // "Sell on <marketplace>" in the shopper app's account screen.
+        'seller_onboarding_url' => '',
         'currency' => 'INR',
         'weight_unit' => 'kg',
         'order_prefix' => '#',
@@ -65,6 +71,9 @@ class SettingController extends Controller
             'store_email' => ['required', 'email', 'max:180'],
             'store_phone' => ['nullable', 'string', 'max:25'],
             'support_chat_url' => ['nullable', 'url', 'max:255'],
+            'support_chat_provider' => ['nullable', 'string', 'max:40'],
+            'support_hours' => ['nullable', 'string', 'max:120'],
+            'seller_onboarding_url' => ['nullable', 'url', 'max:255'],
             'currency' => ['required', 'string', 'max:3'],
             'weight_unit' => ['required', 'string', 'max:5'],
             'order_prefix' => ['required', 'string', 'max:5'],

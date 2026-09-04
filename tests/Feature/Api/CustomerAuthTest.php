@@ -3,6 +3,7 @@
 use App\Models\Customer;
 use App\Models\User;
 use App\Models\Vendor;
+use Illuminate\Support\Facades\Http;
 
 test('a phone number and a code are enough to get in', function () {
     $issued = $this->postJson(route('api.customer.auth.otp'), [
@@ -151,4 +152,45 @@ test('the account screen can list and revoke devices', function () {
     $this->deleteJson(route('api.customer.auth.devices.revoke', $other->id))->assertOk();
 
     expect($customer->tokens()->count())->toBe(1);
+});
+
+test('a configured provider sends the code and stops handing it back', function () {
+    config([
+        'services.sms.driver' => 'http',
+        'services.sms.key' => 'sms-key',
+        'services.sms.url' => 'https://control.msg91.com/api/v5/flow',
+        'services.sms.template_id' => 'tpl_1',
+    ]);
+
+    Http::fake(['control.msg91.com/*' => Http::response(['type' => 'success'])]);
+
+    $response = $this->postJson(route('api.customer.auth.otp'), ['phone' => '9876543210'])
+        ->assertOk()
+        ->assertJsonPath('delivered', true);
+
+    // The whole point of an SMS is that the code is not in the response.
+    expect($response->json('debug_code'))->toBeNull();
+
+    Http::assertSent(function ($request) {
+        // Bare Indian numbers are stored without a country code; providers
+        // want one.
+        return $request['mobiles'] === '919876543210' && $request['otp'] !== null;
+    });
+});
+
+test('a provider having a bad morning does not break the sign-in screen', function () {
+    config([
+        'services.sms.driver' => 'http',
+        'services.sms.key' => 'sms-key',
+        'services.sms.url' => 'https://control.msg91.com/api/v5/flow',
+    ]);
+
+    Http::fake(['control.msg91.com/*' => Http::response(['message' => 'nope'], 500)]);
+
+    // `sent` stays true: telling a caller which numbers are registered is a
+    // gift to whoever is probing, and the failure is in the log instead.
+    $this->postJson(route('api.customer.auth.otp'), ['phone' => '9876543210'])
+        ->assertOk()
+        ->assertJsonPath('sent', true)
+        ->assertJsonPath('delivered', false);
 });
