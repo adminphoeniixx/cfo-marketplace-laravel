@@ -33,6 +33,8 @@ class Vendor extends Model
     protected function casts(): array
     {
         return [
+            'is_assured' => 'boolean',
+            'cod_available' => 'boolean',
             'commission_rate' => 'decimal:2',
             'rating' => 'decimal:2',
             'approved_at' => 'datetime',

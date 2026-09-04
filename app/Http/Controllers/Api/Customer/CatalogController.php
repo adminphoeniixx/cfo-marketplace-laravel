@@ -9,6 +9,7 @@ use App\Http\Resources\Customer\ProductResource;
 use App\Models\Banner;
 use App\Models\Category;
 use App\Models\Customer;
+use App\Models\PaymentMethod;
 use App\Models\Product;
 use App\Models\ProductReview;
 use App\Models\Vendor;
@@ -17,7 +18,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Illuminate\Validation\Rule;
 
 /**
  * Browsing, which is the only part of the shopper API that works signed out.
@@ -29,6 +29,53 @@ use Illuminate\Validation\Rule;
 class CatalogController extends Controller
 {
     use ScopesToCustomer;
+
+    /**
+     * Everything the listing and the filter sheet both accept, in one place —
+     * so a filter the app can send is a filter the counts are worked out for.
+     *
+     * @var array<string, array<int, mixed>>
+     */
+    public const FILTER_RULES = [
+        'q' => ['nullable', 'string', 'max:120'],
+        'category_id' => ['nullable', 'integer'],
+        'vendor_id' => ['nullable', 'integer'],
+        'brand' => ['nullable', 'string', 'max:120'],
+        'min_price' => ['nullable', 'numeric', 'min:0'],
+        'max_price' => ['nullable', 'numeric', 'min:0'],
+        'min_rating' => ['nullable', 'numeric', 'min:0', 'max:5'],
+        'min_discount' => ['nullable', 'integer', 'min:0', 'max:100'],
+        'in_stock' => ['nullable', 'boolean'],
+        'assured' => ['nullable', 'boolean'],
+        'cod' => ['nullable', 'boolean'],
+        'sort' => ['nullable', 'in:relevance,price_low,price_high,rating,discount,newest'],
+    ];
+
+    /**
+     * The bands the filter sheet offers. Rupees, because this marketplace is
+     * priced in them; a currency switch would make these a setting.
+     *
+     * @var list<array{label: string, min: int|null, max: int|null}>
+     */
+    private const PRICE_BANDS = [
+        ['label' => 'Under ₹500', 'min' => null, 'max' => 500],
+        ['label' => '₹500 – ₹1,000', 'min' => 500, 'max' => 1000],
+        ['label' => '₹1,000 – ₹2,500', 'min' => 1000, 'max' => 2500],
+        ['label' => '₹2,500 – ₹5,000', 'min' => 2500, 'max' => 5000],
+        ['label' => 'Over ₹5,000', 'min' => 5000, 'max' => null],
+    ];
+
+    /**
+     * @var array<string, string>
+     */
+    private const SORTS = [
+        'relevance' => 'Relevance',
+        'price_low' => 'Price: low to high',
+        'price_high' => 'Price: high to low',
+        'rating' => 'Customer rating',
+        'discount' => 'Discount',
+        'newest' => 'Newest first',
+    ];
 
     /**
      * The category tree, parents with their children.
@@ -55,47 +102,9 @@ class CatalogController extends Controller
      */
     public function products(Request $request): JsonResponse
     {
-        $data = $request->validate([
-            'q' => ['nullable', 'string', 'max:120'],
-            'category_id' => ['nullable', 'integer'],
-            'vendor_id' => ['nullable', 'integer'],
-            'brand' => ['nullable', 'string', 'max:120'],
-            'min_price' => ['nullable', 'numeric', 'min:0'],
-            'max_price' => ['nullable', 'numeric', 'min:0'],
-            'min_rating' => ['nullable', 'numeric', 'min:0', 'max:5'],
-            'min_discount' => ['nullable', 'integer', 'min:0', 'max:100'],
-            'in_stock' => ['nullable', 'boolean'],
-            'sort' => ['nullable', Rule::in(['relevance', 'price_low', 'price_high', 'rating', 'discount', 'newest'])],
-        ]);
+        $data = $request->validate(self::FILTER_RULES);
 
-        $query = $this->sellable()
-            // `whereLike(..., caseSensitive: false)` rather than `like`: plain
-            // `like` is case-sensitive on Postgres and not on SQLite, so a
-            // lowercase search found nothing on the server while the tests
-            // stayed green. The grammar picks the right operator per driver.
-            ->when($data['q'] ?? null, fn (Builder $q, string $term) => $q->where(
-                fn (Builder $inner) => $inner
-                    ->whereLike('name', "%{$term}%", caseSensitive: false)
-                    ->orWhereLike('brand', "%{$term}%", caseSensitive: false)
-                    ->orWhereLike('short_description', "%{$term}%", caseSensitive: false)
-            ))
-            ->when($data['category_id'] ?? null, fn (Builder $q, int $id) => $q
-                ->whereIn('category_id', $this->categoryFamily($id)))
-            ->when($data['vendor_id'] ?? null, fn (Builder $q, int $id) => $q->where('vendor_id', $id))
-            ->when($data['brand'] ?? null, fn (Builder $q, string $brand) => $q->where('brand', $brand))
-            ->when($data['min_price'] ?? null, fn (Builder $q, $min) => $q->where('price', '>=', $min))
-            ->when($data['max_price'] ?? null, fn (Builder $q, $max) => $q->where('price', '<=', $max))
-            ->when($data['min_rating'] ?? null, fn (Builder $q, $rating) => $q->where('rating', '>=', $rating))
-            ->when($data['min_discount'] ?? null, fn (Builder $q, int $off) => $q
-                ->whereNotNull('compare_at_price')
-                // `* 1.0` matters: without it SQLite divides two integers and
-                // every discounted product looks like 100% off.
-                ->whereRaw('(1 - (price * 1.0 / NULLIF(compare_at_price, 0))) * 100 >= ?', [$off]))
-            ->when($data['in_stock'] ?? null, fn (Builder $q) => $q
-                ->where(fn (Builder $inner) => $inner
-                    ->where('track_inventory', false)
-                    ->orWhere('allow_backorder', true)
-                    ->orWhere('stock_quantity', '>', 0)));
+        $query = $this->applyFilters($this->sellable(), $data);
 
         $this->applySort($query, $data['sort'] ?? 'relevance');
 
@@ -109,6 +118,180 @@ class CatalogController extends Controller
     }
 
     /**
+     * The filter sheet, and how many products each choice would leave.
+     *
+     * Sent rather than hardcoded, because the app's own chips were a guess at
+     * the catalogue: a price band nothing falls into, a seller who has stopped
+     * trading, a brand that was never stocked. Each facet is counted against
+     * every filter *except its own*, which is what makes multi-select read
+     * correctly — picking one seller must not empty the seller list.
+     */
+    public function filters(Request $request): JsonResponse
+    {
+        $data = $request->validate(self::FILTER_RULES);
+
+        // The catalogue as it stands under everything but the named dimension.
+        $without = fn (string ...$except) => $this->applyFilters($this->sellable(), $data, array_values($except));
+
+        $prices = $without('min_price', 'max_price');
+        $ratings = $without('min_rating');
+        $discounts = $without('min_discount');
+
+        // Counted first, then named in one query rather than one per row.
+        $sellerCounts = $this->countsBy($without('vendor_id'), 'vendor_id');
+        $sellerNames = Vendor::whereIn('id', $sellerCounts->keys())->pluck('name', 'id');
+
+        return response()->json([
+            'data' => [
+                'total' => (clone $without())->count(),
+                'price_ranges' => collect(self::PRICE_BANDS)
+                    ->map(fn (array $band) => [
+                        'label' => $band['label'],
+                        'min_price' => $band['min'],
+                        'max_price' => $band['max'],
+                        'count' => (clone $prices)
+                            ->when($band['min'] !== null, fn (Builder $q) => $q->where('price', '>=', $band['min']))
+                            ->when($band['max'] !== null, fn (Builder $q) => $q->where('price', '<=', $band['max']))
+                            ->count(),
+                    ])->all(),
+                'rating_ranges' => collect([4, 3, 2])
+                    ->map(fn (int $stars) => [
+                        'label' => $stars.' ★ & above',
+                        'min_rating' => $stars,
+                        'count' => (clone $ratings)->where('rating', '>=', $stars)->count(),
+                    ])->all(),
+                'discount_ranges' => collect([10, 30, 50, 70])
+                    ->map(fn (int $off) => [
+                        'label' => $off.'% or more',
+                        'min_discount' => $off,
+                        'count' => $this->discountedAtLeast(clone $discounts, $off)->count(),
+                    ])->all(),
+                'sellers' => $sellerCounts
+                    ->map(fn (int $count, int $id) => [
+                        'id' => $id,
+                        'name' => (string) ($sellerNames[$id] ?? 'Seller'),
+                        'count' => $count,
+                    ])->values()->all(),
+                'brands' => $this->countsBy($without('brand'), 'brand')
+                    ->map(fn (int $count, string $brand) => ['name' => $brand, 'count' => $count])
+                    ->values()->all(),
+                'boolean_filters' => [
+                    [
+                        'key' => 'assured',
+                        'label' => 'Marketplace Assured',
+                        'count' => (clone $without('assured'))->whereHas('vendor', fn ($q) => $q->where('is_assured', true))->count(),
+                    ],
+                    [
+                        'key' => 'cod',
+                        'label' => 'Cash on delivery',
+                        'count' => PaymentMethod::payOnDeliveryIsOffered()
+                            ? (clone $without('cod'))->whereHas('vendor', fn ($q) => $q->where('cod_available', true))->count()
+                            : 0,
+                    ],
+                    [
+                        'key' => 'in_stock',
+                        'label' => 'In stock',
+                        'count' => $this->inStockOnly(clone $without('in_stock'))->count(),
+                    ],
+                ],
+                'sorts' => collect(self::SORTS)
+                    ->map(fn (string $label, string $key) => ['key' => $key, 'label' => $label])
+                    ->values()->all(),
+            ],
+        ]);
+    }
+
+    /**
+     * Every filter the listing understands, applied to a query.
+     *
+     * `$except` names the dimensions to leave off, which is what lets the
+     * facet counts be worked out one at a time.
+     *
+     * @param  Builder<Product>  $query
+     * @param  array<string, mixed>  $data
+     * @param  list<string>  $except
+     * @return Builder<Product>
+     */
+    protected function applyFilters(Builder $query, array $data, array $except = []): Builder
+    {
+        $value = fn (string $key) => in_array($key, $except, true) ? null : ($data[$key] ?? null);
+
+        return $query
+            // `whereLike(..., caseSensitive: false)` rather than `like`: plain
+            // `like` is case-sensitive on Postgres and not on SQLite, so a
+            // lowercase search found nothing on the server while the tests
+            // stayed green. The grammar picks the right operator per driver.
+            ->when($value('q'), fn (Builder $q, string $term) => $q->where(
+                fn (Builder $inner) => $inner
+                    ->whereLike('name', "%{$term}%", caseSensitive: false)
+                    ->orWhereLike('brand', "%{$term}%", caseSensitive: false)
+                    ->orWhereLike('short_description', "%{$term}%", caseSensitive: false)
+            ))
+            ->when($value('category_id'), fn (Builder $q, int $id) => $q
+                ->whereIn('category_id', $this->categoryFamily($id)))
+            ->when($value('vendor_id'), fn (Builder $q, int $id) => $q->where('vendor_id', $id))
+            ->when($value('brand'), fn (Builder $q, string $brand) => $q->where('brand', $brand))
+            ->when($value('min_price'), fn (Builder $q, $min) => $q->where('price', '>=', $min))
+            ->when($value('max_price'), fn (Builder $q, $max) => $q->where('price', '<=', $max))
+            ->when($value('min_rating'), fn (Builder $q, $rating) => $q->where('rating', '>=', $rating))
+            ->when($value('min_discount'), fn (Builder $q, int $off) => $q
+                ->whereNotNull('compare_at_price')
+                // `* 1.0` matters: without it SQLite divides two integers and
+                // every discounted product looks like 100% off.
+                ->whereRaw('(1 - (price * 1.0 / NULLIF(compare_at_price, 0))) * 100 >= ?', [$off]))
+            ->when($value('in_stock'), fn (Builder $q) => $this->inStockOnly($q))
+            // The marketplace's own badge, carried by the store.
+            ->when($value('assured'), fn (Builder $q) => $q
+                ->whereHas('vendor', fn ($vendor) => $vendor->where('is_assured', true)))
+            // Both halves have to be true: a store that takes cash cannot
+            // offer it while the marketplace has the method switched off.
+            ->when($value('cod'), fn (Builder $q) => PaymentMethod::payOnDeliveryIsOffered()
+                ? $q->whereHas('vendor', fn ($vendor) => $vendor->where('cod_available', true))
+                : $q->whereRaw('1 = 0'));
+    }
+
+    /**
+     * @param  Builder<Product>  $query
+     * @return Builder<Product>
+     */
+    protected function inStockOnly(Builder $query): Builder
+    {
+        return $query->where(fn (Builder $inner) => $inner
+            ->where('track_inventory', false)
+            ->orWhere('allow_backorder', true)
+            ->orWhere('stock_quantity', '>', 0));
+    }
+
+    /**
+     * @param  Builder<Product>  $query
+     * @return Builder<Product>
+     */
+    protected function discountedAtLeast(Builder $query, int $percent): Builder
+    {
+        return $query->whereNotNull('compare_at_price')
+            ->whereRaw('(1 - (price * 1.0 / NULLIF(compare_at_price, 0))) * 100 >= ?', [$percent]);
+    }
+
+    /**
+     * How many products sit under each value of one column, biggest first.
+     *
+     * @param  Builder<Product>  $query
+     * @return Collection<array-key, int>
+     */
+    protected function countsBy(Builder $query, string $column): Collection
+    {
+        return $query->getQuery()
+            ->select($column)
+            ->selectRaw('count(*) as total')
+            ->whereNotNull($column)
+            ->groupBy($column)
+            ->orderByDesc('total')
+            ->limit(30)
+            ->pluck('total', $column)
+            ->map(fn ($total) => (int) $total);
+    }
+
+    /**
      * The product page. Takes an id or a slug, because links carry slugs.
      */
     public function product(Request $request, string $product): JsonResponse
@@ -117,7 +300,7 @@ class CatalogController extends Controller
             ->with([
                 'images',
                 'category:id,name,slug',
-                'vendor:id,name,city,rating',
+                'vendor:id,name,city,rating,is_assured,cod_available',
                 'taxClass.rates',
                 'variants' => fn ($query) => $query->where('is_active', true)->orderBy('position'),
                 'variants.values.attribute:id,name',
@@ -280,7 +463,7 @@ class CatalogController extends Controller
                 ->orWhere('published_at', '<=', now()))
             // `category` is here for the emoji fallback: one extra query per
             // page, against a tile that would otherwise be blank.
-            ->with(['images', 'vendor:id,name', 'category:id,name,icon'])
+            ->with(['images', 'vendor:id,name,is_assured,cod_available', 'category:id,name,icon'])
             ->withCount(['reviews' => fn ($query) => $query->where('status', 'published')]);
     }
 

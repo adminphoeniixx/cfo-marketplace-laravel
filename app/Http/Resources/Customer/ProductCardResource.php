@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Customer;
 
+use App\Models\PaymentMethod;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -43,7 +44,15 @@ class ProductCardResource extends JsonResource
             'vendor' => $this->whenLoaded('vendor', fn () => [
                 'id' => $this->vendor->id,
                 'name' => $this->vendor->name,
+                'is_assured' => (bool) $this->vendor->is_assured,
             ]),
+            // The marketplace's badge and whether cash is an option, both
+            // carried by the store — the app was drawing two filter chips
+            // with nothing behind either of them.
+            'assured' => $this->relationLoaded('vendor') && (bool) $this->vendor?->is_assured,
+            'cod_available' => $this->relationLoaded('vendor')
+                && (bool) $this->vendor?->cod_available
+                && PaymentMethod::payOnDeliveryIsOffered(),
             'is_wishlisted' => $this->when(
                 isset($this->is_wishlisted),
                 fn () => (bool) $this->is_wishlisted,

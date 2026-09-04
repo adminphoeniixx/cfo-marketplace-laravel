@@ -72,6 +72,19 @@ class PaymentMethod extends Model
     }
 
     /**
+     * Whether the marketplace is taking cash on delivery at all right now.
+     *
+     * The "COD" filter is two facts, not one: the store has to handle cash and
+     * the marketplace has to still offer it. With the method switched off in
+     * the panel, the chip matches nothing rather than lying.
+     */
+    public static function payOnDeliveryIsOffered(): bool
+    {
+        return self::active()->get(['code'])
+            ->contains(fn (self $method) => self::isPayOnDelivery($method->code));
+    }
+
+    /**
      * Cash on delivery, whatever the panel called it.
      */
     public static function isPayOnDelivery(?string $code): bool

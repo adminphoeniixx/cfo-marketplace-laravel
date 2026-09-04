@@ -245,6 +245,8 @@ Route::prefix('customer')->name('api.customer.')->group(function () {
     Route::get('categories', [CustomerCatalogController::class, 'categories'])->name('categories');
     Route::get('products', [CustomerCatalogController::class, 'products'])->name('products');
     Route::get('products/suggestions', [CustomerCatalogController::class, 'suggestions'])->name('products.suggestions');
+    // Before `products/{product}`, or a product slugged "filters" would win.
+    Route::get('products/filters', [CustomerCatalogController::class, 'filters'])->name('products.filters');
     Route::get('products/{product}', [CustomerCatalogController::class, 'product'])->name('products.show');
     Route::get('products/{product}/reviews', [ReviewController::class, 'index'])->name('products.reviews');
     Route::get('sellers/{vendor}', [CustomerCatalogController::class, 'seller'])->name('sellers.show');

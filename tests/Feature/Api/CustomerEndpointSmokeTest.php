@@ -339,6 +339,7 @@ function shopperCalls(array $f): array
         'api.customer.reference' => ['GET', route('api.customer.reference'), []],
         'api.customer.products' => ['GET', route('api.customer.products', ['sort' => 'newest']), []],
         'api.customer.products.suggestions' => ['GET', route('api.customer.products.suggestions', ['q' => 'wool']), []],
+        'api.customer.products.filters' => ['GET', route('api.customer.products.filters'), []],
         'api.customer.products.show' => ['GET', route('api.customer.products.show', $f['product']->id), []],
         'api.customer.sellers.show' => ['GET', route('api.customer.sellers.show', $f['vendor']->id), []],
 
