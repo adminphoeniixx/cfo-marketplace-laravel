@@ -10,11 +10,13 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\PersonalAccessToken;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 class AuthController extends Controller
 {
@@ -190,7 +192,12 @@ class AuthController extends Controller
     {
         $data = $request->validate(['email' => ['required', 'email']]);
 
-        Password::broker()->sendResetLink($data);
+        // As on the shopper side: an unreachable relay is logged, not raised.
+        try {
+            Password::broker()->sendResetLink($data);
+        } catch (TransportExceptionInterface $e) {
+            Log::error('A seller password reset link could not be emailed.', ['error' => $e->getMessage()]);
+        }
 
         return response()->json([
             'message' => 'If that address belongs to a seller, a reset link is on its way.',

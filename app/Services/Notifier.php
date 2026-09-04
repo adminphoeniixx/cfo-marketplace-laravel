@@ -8,7 +8,9 @@ use App\Notifications\AdminNotification;
 use App\Support\Roles;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 /**
  * Works out who should hear about something, then tells them.
@@ -28,7 +30,34 @@ class Notifier
             return;
         }
 
-        Notification::send($recipients, $notification);
+        self::deliver($recipients, $notification);
+    }
+
+    /**
+     * Send, and survive a mail server having a bad morning.
+     *
+     * Nothing here is queued, so an unreachable — or misconfigured — SMTP
+     * relay throws straight out of whatever request triggered it: a seller
+     * signing up, a shopper asking for a password link, an order being placed.
+     * A marketplace that cannot register a seller because a mail relay is down
+     * is a worse failure than a notification nobody received, so the send is
+     * logged and the request carries on.
+     *
+     * The database copy is already written by then, so the bell in the panel
+     * still shows it.
+     *
+     * @param  Collection<int, User>|User  $recipients
+     */
+    protected static function deliver(Collection|User $recipients, AdminNotification $notification): void
+    {
+        try {
+            Notification::send($recipients, $notification);
+        } catch (TransportExceptionInterface $e) {
+            Log::error('A notification could not be emailed.', [
+                'notification' => $notification::class,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
@@ -50,7 +79,7 @@ class Notifier
             return;
         }
 
-        Notification::send($recipients, $notification);
+        self::deliver($recipients, $notification);
     }
 
     /**
@@ -70,7 +99,7 @@ class Notifier
         $staff = self::staffFor($staffCopy::section(), $actor);
 
         if ($staff->isNotEmpty()) {
-            Notification::send($staff, $staffCopy);
+            self::deliver($staff, $staffCopy);
         }
 
         foreach (array_unique($vendorIds) as $vendorId) {
@@ -78,7 +107,7 @@ class Notifier
             $sellers = self::storesFor($copy::section(), [$vendorId], $actor);
 
             if ($sellers->isNotEmpty()) {
-                Notification::send($sellers, $copy);
+                self::deliver($sellers, $copy);
             }
         }
     }

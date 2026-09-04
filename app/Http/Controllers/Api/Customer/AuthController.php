@@ -11,10 +11,12 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\PersonalAccessToken;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 /**
  * Getting into the shopper app.
@@ -175,7 +177,19 @@ class AuthController extends Controller
     {
         $request->validate(['email' => ['required', 'email']]);
 
-        $status = Password::broker('customers')->sendResetLink($request->only('email'));
+        $status = Password::INVALID_USER;
+
+        /*
+        | A relay having a bad morning must not become a 500 on the one screen
+        | somebody locked out of their account has left. Nothing here is
+        | queued, so the send happens inside this request and its failure would
+        | otherwise escape it.
+        */
+        try {
+            $status = Password::broker('customers')->sendResetLink($request->only('email'));
+        } catch (TransportExceptionInterface $e) {
+            Log::error('A password reset link could not be emailed.', ['error' => $e->getMessage()]);
+        }
 
         // Always the same answer: whether an address is registered is not
         // something an unauthenticated caller gets to find out.
