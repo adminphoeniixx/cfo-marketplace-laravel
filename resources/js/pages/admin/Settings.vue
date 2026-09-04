@@ -34,6 +34,7 @@ const form = useForm({
     store_name: props.settings.store_name ?? '',
     store_email: props.settings.store_email ?? '',
     store_phone: props.settings.store_phone ?? '',
+    support_chat_url: props.settings.support_chat_url ?? '',
     currency: props.settings.currency ?? 'INR',
     weight_unit: props.settings.weight_unit ?? 'kg',
     order_prefix: props.settings.order_prefix ?? '#',
@@ -147,6 +148,13 @@ const destroyPartner = (partner: DeliveryPartner) =>
                             v-model="form.store_phone"
                             label="Support phone"
                             :error="form.errors.store_phone"
+                        />
+                        <PTextField
+                            v-model="form.support_chat_url"
+                            label="Support chat link"
+                            placeholder="https://wa.me/919000000000"
+                            help-text="Where “Need help with this order” goes in the shopper app."
+                            :error="form.errors.support_chat_url"
                         />
                         <PTextField
                             v-model="form.order_prefix"

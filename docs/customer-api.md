@@ -47,7 +47,9 @@ end to end. When a provider is added, that one method changes and nothing else.
 | optional | Browsing endpoints read a token if one is sent — that is the only reason `is_wishlisted` appears. |
 | customer | Everything personal. `401` without a token, `403` with a non-customer or blocked one. |
 
-47 of the 61 routes are in the last tier.
+50 of the 66 routes are in the last tier. Two of the public ones are not
+browsing at all: the signed invoice link and Razorpay's webhook, both of which
+are reached by signature rather than by token.
 
 ### Scoping
 
@@ -73,6 +75,15 @@ another shopper's order, address, request or cart line is a **404**, never a
 
 **Only `active`, published products are visible** — by id, by slug, by search
 or by category. A draft is a 404 however it is reached.
+
+### Tiles without a photograph
+
+Every product carries `emoji` and every category carries `icon`, always
+filled — an admin's own choice where they set one, otherwise a glyph read off
+the name. The same `emoji` appears on basket lines, order lines and the items
+on a return, so **no client needs a lookup table of its own**. A card draws
+`image` when it has one and falls back to the glyph when it does not; neither
+field is ever null.
 
 ### `GET /products` — the filters
 
@@ -119,6 +130,9 @@ returning just the line that changed would leave the app guessing at the rest.
 ```json
 { "data": {
   "id": 12,
+  "selected_address": { "id": 4, "label": "Home", "first_name": "Priya",
+                        "city": "Chennai", "postcode": "600090" },
+  "available_coupon_count": 3,
   "coupon": { "code": "FIRST100", "discount": 100, "covers_shipping": false },
   "totals": { "items_count": 3, "mrp_total": 11497, "subtotal": 9000,
               "saved_on_mrp": 2497, "discount_total": 100,
@@ -132,6 +146,11 @@ returning just the line that changed would leave the app guessing at the rest.
 
 Things worth knowing:
 
+- **`selected_address` is the address strip**, so the cart screen does not have
+  to call `GET /checkout` to draw it. It is the same address checkout will
+  pre-select — see [Where a basket is heading](#where-a-basket-is-heading).
+- **`available_coupon_count`** is how many rows `GET /cart/coupons` will
+  return. The count and the sheet cannot disagree.
 - **Lines are grouped by seller.** A basket across two stores is normal and
   ships as two parcels; nothing may treat the first line's vendor as "the"
   vendor of the order.
@@ -147,6 +166,16 @@ Things worth knowing:
   apply is `422` and the message names the shortfall. `GET /cart/coupons`
   judges every live code against the current basket, so the screen can show
   "add ₹400 more to use this" without trying it.
+- **A code that would take nothing off is refused, not applied.** A
+  `free_shipping` coupon on a basket already over the free-delivery threshold
+  saves nothing, and accepting it looks exactly like a broken checkout — so it
+  is a `422` naming the reason, and `GET /cart/coupons` marks the row
+  `usable: false` with the same words.
+- The applied coupon carries `discount` (off the items), `shipping_discount`
+  (off delivery) and `savings` — the two added up. **`savings` is the figure
+  the "you saved" line should quote**; `discount` alone misses a free-shipping
+  code entirely. `totals.shipping_full_total` is what delivery would have cost
+  without it.
 - A guest basket built before sign-in can be handed over with an
   `X-Cart-Token` header on the first authenticated call; it is merged into the
   shopper's own basket and then deleted.
@@ -157,6 +186,48 @@ Things worth knowing:
 
 `GET /checkout` is the review screen: addresses, delivery choices, ways to pay,
 and what the combination costs. `POST /orders` places the order.
+
+### Where a basket is heading
+
+`GET /checkout` answers with both `selected_address_id` and the whole
+`selected_address`, decided by one rule — used by the cart strip too, so the two
+screens cannot disagree:
+
+1. `address_id` on the request, if it names one of the shopper's own;
+2. the address already chosen for this basket;
+3. the default shipping address (`is_default_shipping`);
+4. whatever exists.
+
+**Passing `address_id` is what "choosing" means.** It is remembered on the
+basket, so it survives the app being closed and `GET /cart` shows the same one.
+
+### Delivery options come display-ready
+
+```json
+{ "code": "standard-delivery", "name": "Standard delivery", "rate": 0,
+  "price_label": "FREE", "eta_label": "Arrives 4–6 Sep",
+  "note": "Free over ₹999", "delivery_days_min": 4, "delivery_days_max": 6 }
+```
+
+`price_label`, `eta_label` and `note` are the strings the row draws. The day
+counts are still there for anything that would rather compute its own, but the
+labels are the API's answer — clients building their own from `delivery_days_*`
+is how the checkout screen and the order screen ended up promising different
+days for one parcel. `note` is `null` when there is nothing to add.
+
+`full_rate` is the same option before any coupon, which is what makes a
+free-shipping code's worth arithmetic rather than a guess.
+
+**Only rates whose basket-value band fits are offered.** A rate carrying
+`min_order_amount` / `max_order_amount` in the admin panel is left out of the
+list when the basket falls outside it. If nothing at all fits the address, free
+standard delivery (3–7 days) is the fallback, so an order can always be taken.
+
+### Ways to pay
+
+Each method carries `icon` (an emoji — the admin's own, or one derived from the
+code) and `is_pay_on_delivery`, so nothing has to match on code spellings to
+know whether a gateway needs opening.
 
 ```
 POST /orders
@@ -170,9 +241,8 @@ POST /orders
 - Anything that cannot be shipped stops the order with `422` and a message
   naming the line — nothing is half-sold.
 - `payment_method` is a **code from `/reference`**, not free text. The order
-  records the label the shopper saw. Cash on delivery lands `payment_status:
-  pending`; everything else is treated as captured until a real gateway is
-  wired up.
+  records the label the shopper saw. What happens to `payment_status` next
+  depends on whether a gateway is configured — see [Paying](#paying).
 - One basket across two sellers becomes **one order with two sets of lines**,
   each line carrying its own vendor, commission rate and vendor earning. The
   discount is spread across the lines it came off, so a seller's commission is
@@ -186,14 +256,60 @@ and the seller.
 
 ---
 
+## Paying
+
+| Method | Path | Tier | |
+|---|---|---|---|
+| POST | `/payments/create-intent` | customer | Opens a payment for an order that is waiting for one. |
+| POST | `/payments/verify` | customer | Settles it from what the checkout widget handed the app. |
+| POST | `/payments/webhook/razorpay` | signature | Settles it from Razorpay's own account of events. |
+
+**Whether there is a gateway at all is a configuration fact.** With
+`RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` unset, the marketplace behaves as it
+always has: anything but cash on delivery is marked paid the moment it is
+placed. Set them and nothing else changes — except that an online order is
+written `status: pending, payment_status: pending` and waits for a real capture,
+because nothing should be packed against money that has not arrived.
+
+Orders carry `payment_required: true` while they are in that state. The flow:
+
+```
+POST /orders                     → 201, data.payment_required = true
+POST /payments/create-intent     → 201, { key, gateway_order_id, amount_in_paise, prefill }
+   … open Razorpay Checkout with those …
+POST /payments/verify            → 200, the order, now paid
+```
+
+- **Repeating `create-intent` on the same unpaid order returns the attempt
+  already open**, not a second one. Backing out of the gateway sheet and tapping
+  Pay again is ordinary, not a new order.
+- `verify` is only believed if `razorpay_signature` is the HMAC of
+  `order_id|payment_id` under the key secret. A bad one is `422`, and the
+  attempt is recorded as failed.
+- The webhook is public because a gateway carries no token, and trusted only
+  because the body is signed with `RAZORPAY_WEBHOOK_SECRET`. Unsigned is `401`.
+  It is also what saves an order when the app dies between paying and saying so.
+- **The two settling paths race each other and that is fine.** Capture is
+  idempotent: whichever arrives second changes nothing, and a replayed webhook
+  writes no second payment event.
+- A paid order carries `transaction_id` — the gateway's payment id, which is the
+  receipt number the payment card shows.
+
+Amounts cross the wire to Razorpay in **paise**, converted server-side.
+`amount_in_paise` is handed to the app already converted so nothing does that
+multiplication twice.
+
+---
+
 ## Orders
 
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/orders?filter=` | `all`, `open`, `delivered`, `cancelled`. |
 | GET | `/orders/{number}` | `1043` or `#1043` — both spellings work. |
-| GET | `/orders/{number}/track` | Courier, tracking number and the four milestones. |
-| POST | `/orders/{number}/reorder` | Puts the lines back in the basket; returns `added` and `skipped`. |
+| GET | `/orders/{number}/track` | The whole tracking screen in one call. |
+| GET | `/orders/{number}/invoice` | A signed, seven-day link to the invoice. |
+| POST | `/orders/{number}/reorder` | Puts the lines back in the basket and hands the basket back. |
 
 An order carries `status_label` ("Being packed", "On the way"), its `sellers`,
 a `timeline` built from its own timestamps, and `can_cancel` / `can_return` so
@@ -201,6 +317,86 @@ the app never offers a button the API will refuse.
 
 The timeline is filtered to what a shopper may read — staff and seller notes
 stay internal.
+
+### Display-ready fields on an order
+
+| Field | |
+|---|---|
+| `eta` | "Arriving 4–6 Sep", "Delivered 2 Sep", or `null` once it is called off. Frozen at checkout from the delivery option the shopper chose, so it is the date they were promised — not one recomputed off rates that have moved since. |
+| `transaction_id` | The gateway's payment id. `null` on cash on delivery and until capture. |
+| `payment_icon` | The glyph for the method the order recorded. |
+| `payment_required` | Whether a gateway still has to be opened for it. |
+| `invoice_url` | The same signed link `GET /orders/{number}/invoice` returns. |
+| `help` | `sellers[]` (id, name, phone, email), `seller_phone` — filled in **only** where the order has exactly one seller — plus `support_email`, `support_phone` and `chat_url` from the admin panel. |
+
+`help.seller_phone` is null on a two-seller order on purpose: "the seller" of a
+shared basket does not exist, and the app should offer the list.
+
+### `GET /orders/{number}/track`
+
+Everything the courier screen draws, so it no longer needs this call *and*
+`GET /orders/{number}`:
+
+```json
+{ "data": {
+  "eta": "Arriving Mon, 1 Sep",
+  "carrier": { "code": "delhivery", "name": "Delhivery",
+               "support_phone": "1800 103 6354",
+               "tracking_url": "https://…/TRK-88213" },
+  "tracking_number": "TRK-88213",
+  "progress_step": 3, "progress_total": 5,
+  "milestones": [ { "key": "picked_up", "title": "Picked up from the seller",
+                    "subtitle": "Meera Textiles, Chennai",
+                    "at": "2026-08-31T09:41:00+00:00",
+                    "done": true, "current": false } ],
+  "items": [ … ], "sellers": [ … ], "steps": [ … ]
+} }
+```
+
+- `done` is only ever true of something that actually happened. The courier does
+  not report its own scans to this marketplace, so **"Out for delivery" is shown
+  as reached only once the parcel arrived** — the milestone is honest about the
+  fact rather than inventing a time.
+- `current` marks the step the parcel is sitting on; `progress_step` is how many
+  are done, which is how many segments of the bar to fill.
+- A cancelled order stops at "Order cancelled" instead of pretending the rest is
+  still coming.
+- `steps` is the original four-key array, kept so nothing that reads it breaks.
+
+### `POST /orders/{number}/reorder`
+
+Partial success is the normal case, not an error — always `200` unless the order
+itself is a 404.
+
+```json
+{ "added":   [ { "cart_item_id": 101, "product_id": 55, "product_variant_id": 12,
+                 "name": "Kashmiri wool shawl", "requested_quantity": 2,
+                 "quantity": 1, "status": "partial",
+                 "warning": "Only 1 of 2 could be added." } ],
+  "skipped": [ { "product_id": 77, "name": "Old item", "reason": "Out of stock" } ],
+  "cart":    { … exactly what GET /cart returns … } }
+```
+
+- The original variant is restored, not just the product.
+- Quantity is kept where the shelf allows it and trimmed where it does not;
+  `status` is then `partial` and `warning` says so.
+- Reasons: `No longer sold`, `This seller is not trading right now`,
+  `That option is no longer available`, `Out of stock`.
+- **The whole basket comes back**, so the cart badge and totals are right the
+  moment the call returns.
+
+### Invoices
+
+`GET /orders/{number}/invoice` returns `{ url, expires_at, content_type }`. The
+URL is **signed rather than token-authenticated**, so it opens in a browser, a
+download manager or an email client — none of which carries the app's bearer
+token — and it expires after seven days.
+
+The document is **HTML, not PDF**: this marketplace has no PDF library, and a
+print-ready page renders to PDF in one keystroke everywhere the app runs.
+`content_type` says so rather than leaving anyone to guess. One page covers the
+whole order, with a block per seller, because a shared basket has two sets of
+tax registration numbers on it.
 
 ---
 
@@ -224,6 +420,12 @@ merges them and each row carries `kind`.
   there is nothing to refund.
 - Withdrawing sets status `withdrawn`, a status the panels do not yet filter
   on. It is deliberately not a delete: the request happened.
+
+Each request carries what the refund screen draws: `amount`, `method`,
+`reason_label`, `note`, its `items` (with `image` and `emoji`), a `timeline` of
+requested → reviewed → refunded with a `done` flag on each, and `eta` — "Back in
+your account by 24 Aug" once approved, "Usually 3–5 working days once it is
+approved" before that, and `null` where no money is coming back at all.
 
 ---
 
@@ -272,12 +474,18 @@ Standard Laravel shapes.
 
 Said plainly, so nobody plans around a hole:
 
-- **No payment gateway.** Non-COD orders are marked paid on placement.
+- **One gateway, Razorpay.** Cards, UPI and net banking all go through it, and
+  with no credentials configured a non-COD order is still marked paid on
+  placement. No other provider is wired up.
 - **No SMS.** Login codes are logged, and returned outside production.
 - **No push delivery to shoppers.** Tokens are stored and the feed works, but
   nothing sends to them yet; the seller app's FCM path is not shared.
 - **Customers are not notified of seller-side status changes.** The order
   timeline is truthful, but no notification fires when a seller ships.
-- **No invoice endpoint.** The prototype's "download invoice" has no API.
+- **Invoices are HTML, not PDF**, and one document covers the whole order rather
+  than one per seller.
+- **Courier milestones are the order's own timestamps**, not the carrier's
+  scans. Nothing polls Delhivery or Shiprocket; "Out for delivery" is therefore
+  only ever reached retrospectively.
 - **Guest checkout does not exist.** A basket may be built signed out and
   merged on sign-in, but placing an order needs an account.

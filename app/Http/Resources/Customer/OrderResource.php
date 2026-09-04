@@ -4,9 +4,14 @@ namespace App\Http\Resources\Customer;
 
 use App\Models\DeliveryPartner;
 use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\PaymentMethod;
+use App\Models\Setting;
 use App\Models\Vendor;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\URL;
 
 /**
  * An order as the person who placed it sees it.
@@ -26,7 +31,7 @@ class OrderResource extends JsonResource
     {
         $items = $this->relationLoaded('items') ? $this->items : collect();
         $vendors = Vendor::whereIn('id', $items->pluck('vendor_id')->filter()->unique())
-            ->get(['id', 'name', 'city'])
+            ->get(['id', 'name', 'city', 'phone', 'store_email'])
             ->keyBy('id');
 
         return [
@@ -37,6 +42,12 @@ class OrderResource extends JsonResource
             'payment_status' => $this->payment_status,
             'fulfillment_status' => $this->fulfillment_status,
             'payment_method' => $this->payment_method,
+            'payment_icon' => PaymentMethod::iconForName($this->payment_method),
+            // The receipt number the payment card shows under the total. Null
+            // on cash on delivery, and until a gateway actually captures.
+            'transaction_id' => $this->transaction_id,
+            // True while the app still has to open a gateway for this order.
+            'payment_required' => $this->awaitsPayment(),
             'shipping_method' => $this->shipping_method,
             'carrier' => $this->carrier,
             'tracking_number' => $this->tracking_number,
@@ -60,6 +71,11 @@ class OrderResource extends JsonResource
                     'name' => $vendors[$id]->name ?? 'Seller',
                     'city' => $vendors[$id]->city ?? null,
                 ])->all(),
+            // Display-ready, from the window frozen at checkout: "Arriving
+            // 4–6 Sep", "Delivered 2 Sep", or null once it is called off.
+            'eta' => $this->etaLabel(),
+            'invoice_url' => $this->invoiceUrl(),
+            'help' => $this->help($vendors, $items),
             'can_cancel' => $this->canBeCancelledByCustomer(),
             'can_return' => $this->canBeReturnedByCustomer(),
             'placed_at' => $this->placed_at?->toIso8601String(),
@@ -71,18 +87,54 @@ class OrderResource extends JsonResource
         ];
     }
 
-    protected function statusLabel(): string
+    /**
+     * A signed, time-limited link to this order's invoice.
+     *
+     * Signed rather than token-authenticated so it survives being handed to a
+     * download manager or a PDF viewer, neither of which carries the app's
+     * bearer token.
+     */
+    protected function invoiceUrl(): string
     {
-        return match ($this->status) {
-            'pending' => 'Payment pending',
-            'processing' => 'Being packed',
-            'on_hold' => 'On hold',
-            'shipped' => 'On the way',
-            'completed' => 'Delivered',
-            'cancelled' => 'Cancelled',
-            'refunded' => 'Refunded',
-            default => ucfirst($this->status),
-        };
+        return URL::temporarySignedRoute(
+            'api.customer.invoices.show',
+            now()->addDays(7),
+            ['order' => $this->id],
+        );
+    }
+
+    /**
+     * Who to contact about this order.
+     *
+     * A list of sellers, never one: a basket across two stores is normal here,
+     * so "the seller" of an order does not exist. `seller_phone` is filled in
+     * only where there is exactly one of them and the row is unambiguous —
+     * otherwise the app has the list and asks.
+     *
+     * @param  Collection<int, Vendor>  $vendors
+     * @param  Collection<int, OrderItem>  $items
+     * @return array<string, mixed>
+     */
+    protected function help(Collection $vendors, Collection $items): array
+    {
+        $sellers = $items->pluck('vendor_id')->filter()->unique()->values()
+            ->map(fn ($id) => [
+                'id' => (int) $id,
+                'name' => $vendors[$id]->name ?? 'Seller',
+                'phone' => $vendors[$id]->phone ?? null,
+                'email' => $vendors[$id]->store_email ?? null,
+            ])
+            ->all();
+
+        return [
+            'sellers' => $sellers,
+            'seller_phone' => count($sellers) === 1 ? $sellers[0]['phone'] : null,
+            'support_email' => Setting::cached('store_email') ?: null,
+            'support_phone' => Setting::cached('store_phone') ?: null,
+            // Whatever the marketplace actually answers on, set in the admin
+            // panel. Null means the app should fall back to its own help page.
+            'chat_url' => Setting::cached('support_chat_url') ?: null,
+        ];
     }
 
     /**

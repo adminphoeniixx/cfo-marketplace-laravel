@@ -231,11 +231,16 @@ class CatalogController extends Controller
                     'brand' => $p->brand,
                     'price' => (float) $p->price,
                     'image' => $p->images->first()?->url,
+                    'emoji' => $p->emoji(),
                 ]),
             'categories' => Category::where('is_active', true)
                 ->whereLike('name', "%{$term}%", caseSensitive: false)
                 ->limit(4)
-                ->get(['id', 'name', 'slug']),
+                ->get(['id', 'name', 'slug', 'icon'])
+                ->map(fn (Category $category) => [
+                    ...$category->only(['id', 'name', 'slug']),
+                    'icon' => $category->glyph(),
+                ]),
         ]);
     }
 
@@ -251,7 +256,9 @@ class CatalogController extends Controller
             ->where(fn (Builder $query) => $query
                 ->whereNull('published_at')
                 ->orWhere('published_at', '<=', now()))
-            ->with(['images', 'vendor:id,name'])
+            // `category` is here for the emoji fallback: one extra query per
+            // page, against a tile that would otherwise be blank.
+            ->with(['images', 'vendor:id,name', 'category:id,name,icon'])
             ->withCount(['reviews' => fn ($query) => $query->where('status', 'published')]);
     }
 

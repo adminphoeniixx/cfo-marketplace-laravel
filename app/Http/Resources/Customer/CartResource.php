@@ -3,6 +3,7 @@
 namespace App\Http\Resources\Customer;
 
 use App\Models\Cart;
+use App\Models\CustomerAddress;
 use App\Models\Vendor;
 use App\Services\BunnyCdn;
 use Illuminate\Http\Request;
@@ -21,9 +22,15 @@ class CartResource extends JsonResource
 {
     /**
      * @param  array<string, mixed>  $quote
+     * @param  CustomerAddress|null  $address  Where this basket is heading.
+     * @param  int  $couponCount  Live codes `GET /cart/coupons` would list.
      */
-    public function __construct(Cart $cart, protected array $quote)
-    {
+    public function __construct(
+        Cart $cart,
+        protected array $quote,
+        protected ?CustomerAddress $address = null,
+        protected int $couponCount = 0,
+    ) {
         parent::__construct($cart);
     }
 
@@ -43,7 +50,12 @@ class CartResource extends JsonResource
 
         return [
             'id' => $this->id,
+            // The address strip at the top of the cart screen. It used to cost
+            // the app an extra `GET /checkout` to draw, which also meant the
+            // two screens could disagree about where the basket was going.
+            'selected_address' => $this->address ? new AddressResource($this->address) : null,
             'coupon' => $this->quote['coupon'],
+            'available_coupon_count' => $this->couponCount,
             'totals' => $this->quote['totals'],
             'shipping_options' => $this->quote['shipping_options'],
             // Grouped the way the screen draws it: one block per seller,
@@ -67,6 +79,7 @@ class CartResource extends JsonResource
                 'product_variant_id' => $item->product_variant_id,
                 'name' => $item->product->name,
                 'image' => BunnyCdn::display($item->product->images->first()?->path),
+                'emoji' => $item->product->emoji(),
                 'price' => $item->unitPrice(),
                 'quantity' => (int) $item->quantity,
             ])->values(),
@@ -87,6 +100,7 @@ class CartResource extends JsonResource
             'sku' => $line['sku'],
             'options' => $line['options'],
             'image' => BunnyCdn::display($line['image']),
+            'emoji' => $line['emoji'],
             'unit_price' => $line['unit_price'],
             'mrp' => $line['mrp'],
             'quantity' => $line['quantity'],

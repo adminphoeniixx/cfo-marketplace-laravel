@@ -103,6 +103,9 @@ class CategoryController extends Controller
             ],
             'description' => ['nullable', 'string', 'max:2000'],
             'image_path' => ['nullable', 'string', 'max:255'],
+            // The glyph the shopper app draws before there is a photograph.
+            // Left blank, one is read off the name instead.
+            'icon' => ['nullable', 'string', 'max:8'],
             'position' => ['nullable', 'integer', 'min:0', 'max:9999'],
             'is_active' => ['boolean'],
             'is_featured' => ['boolean'],

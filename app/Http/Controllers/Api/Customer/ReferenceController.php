@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Cancellation;
 use App\Models\DeliveryPartner;
 use App\Models\Order;
-use App\Models\PaymentMethod;
 use App\Models\Refund;
 use Illuminate\Http\JsonResponse;
 
@@ -21,17 +20,16 @@ class ReferenceController extends Controller
     public function __invoke(): JsonResponse
     {
         return response()->json([
-            'payment_methods' => PaymentMethod::active()->orderBy('position')->get()
-                ->map(fn (PaymentMethod $method) => [
-                    'code' => $method->code,
-                    'name' => $method->name,
-                    'description' => $method->description,
-                ]),
+            // The same shape the checkout screen gets, from the same place.
+            'payment_methods' => CheckoutController::paymentMethods(),
             'delivery_partners' => DeliveryPartner::where('is_active', true)->orderBy('position')->get()
                 ->map(fn (DeliveryPartner $partner) => [
                     'code' => $partner->code,
                     'name' => $partner->name,
                     'support_phone' => $partner->support_phone,
+                    // The pattern, with `{tracking}` still in it: the app can
+                    // show where a link would go before there is a consignment.
+                    'tracking_url' => $partner->tracking_url,
                 ]),
             'cancellation_reasons' => collect(Cancellation::REASONS)
                 ->map(fn (string $label, string $key) => ['key' => $key, 'label' => $label])

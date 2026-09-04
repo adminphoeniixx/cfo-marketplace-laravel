@@ -4,6 +4,8 @@ namespace App\Http\Resources\Customer;
 
 use App\Models\Cancellation;
 use App\Models\Refund;
+use App\Services\BunnyCdn;
+use App\Services\Emoji;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -38,15 +40,94 @@ class RequestResource extends JsonResource
             'amount' => (float) $this->total_amount,
             'method' => $refund ? (Refund::METHODS[$refund->method] ?? $refund->method) : null,
             'refund_requested' => $isRefund ? true : (bool) $cancellation?->refund_requested,
+            // Display-ready, because the refund screen's headline is a
+            // sentence about money and a date, not two fields to assemble.
+            'eta' => $this->eta($refund, $cancellation),
             'items' => $this->whenLoaded('items', fn () => $this->items->map(fn ($item) => [
                 'name' => $item->orderItem?->name,
                 'sku' => $item->orderItem?->sku,
+                'image' => BunnyCdn::display($item->orderItem?->image_path),
+                'emoji' => Emoji::forProduct($item->orderItem?->name),
                 'quantity' => (int) $item->quantity,
                 'amount' => (float) $item->amount,
-            ])->values()),
+            ])->values()->all()),
+            'timeline' => $this->timeline($refund),
             'created_at' => $this->created_at?->toIso8601String(),
             'reviewed_at' => $this->reviewed_at?->toIso8601String(),
             'processed_at' => $refund?->processed_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * When the shopper gets their money, in the words the screen shows.
+     *
+     * Nothing is promised that is not known: a request nobody has looked at
+     * yet says how long the step after it takes, rather than naming a date the
+     * marketplace cannot hold to.
+     */
+    protected function eta(?Refund $refund, ?Cancellation $cancellation): ?string
+    {
+        // Cash on delivery, or a cancellation with nothing taken yet: there is
+        // no money on its way back.
+        if ($refund === null && ! (bool) $cancellation?->refund_requested) {
+            return null;
+        }
+
+        if ($refund?->processed_at) {
+            return 'Refunded on '.$refund->processed_at->format('j M');
+        }
+
+        return match ($this->status) {
+            'approved' => 'Back in your account by '
+                .($this->reviewed_at ?? $this->created_at ?? now())->copy()->addDays(5)->format('j M'),
+            'pending' => 'Usually 3–5 working days once it is approved',
+            default => null,
+        };
+    }
+
+    /**
+     * The steps a request goes through, and where this one has got to.
+     *
+     * Built from its own timestamps rather than from a status machine, so a
+     * step is `done` only where something actually happened.
+     *
+     * @return list<array<string, mixed>>
+     */
+    protected function timeline(?Refund $refund): array
+    {
+        $isRefund = $refund !== null;
+
+        $steps = [
+            [
+                'key' => 'requested',
+                'title' => $isRefund ? 'Return requested' : 'Cancellation requested',
+                'at' => $this->created_at?->toIso8601String(),
+                'date' => $this->created_at?->format('j M'),
+                'done' => true,
+            ],
+            [
+                'key' => 'reviewed',
+                'title' => match ($this->status) {
+                    'rejected' => 'Declined by the seller',
+                    'withdrawn' => 'Withdrawn',
+                    default => 'Approved by the seller',
+                },
+                'at' => $this->reviewed_at?->toIso8601String(),
+                'date' => $this->reviewed_at?->format('j M'),
+                'done' => in_array($this->status, ['approved', 'rejected', 'processed', 'withdrawn'], true),
+            ],
+        ];
+
+        if ($isRefund) {
+            $steps[] = [
+                'key' => 'refunded',
+                'title' => 'Refunded to your payment method',
+                'at' => $refund->processed_at?->toIso8601String(),
+                'date' => $refund->processed_at?->format('j M'),
+                'done' => $refund->processed_at !== null,
+            ];
+        }
+
+        return $steps;
     }
 }

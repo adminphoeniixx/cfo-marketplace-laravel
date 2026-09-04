@@ -8,6 +8,7 @@ use App\Models\Coupon;
 use App\Models\CustomerAddress;
 use App\Models\ShippingRate;
 use App\Models\ShippingZone;
+use App\Services\Eta;
 use Illuminate\Support\Collection;
 
 /**
@@ -42,6 +43,12 @@ class QuoteBasket
         $shippingOptions = $this->shippingOptions($lines, $subtotal, $address, $coupon);
         $chosen = collect($shippingOptions)->firstWhere('code', $shippingCode) ?? ($shippingOptions[0] ?? null);
         $shipping = (float) ($chosen['rate'] ?? 0);
+        // What delivery would have cost with no coupon on the basket. A
+        // free-shipping code on a basket that already ships free is worth
+        // nothing, and that has to be visible rather than left as a total the
+        // shopper watches not move.
+        $shippingFull = (float) ($chosen['full_rate'] ?? $shipping);
+        $shippingDiscount = round(max($shippingFull - $shipping, 0), 2);
 
         // Tax follows the discount: the shopper is taxed on what they pay, so
         // the coupon comes off each line in proportion before the rate applies.
@@ -56,6 +63,11 @@ class QuoteBasket
                 'code' => $coupon->code,
                 'description' => $coupon->description,
                 'discount' => $discount,
+                'shipping_discount' => $shippingDiscount,
+                // The whole of what this code is worth here — items and
+                // delivery together. Zero means the basket is no cheaper for
+                // having it, which is a thing worth saying out loud.
+                'savings' => round($discount + $shippingDiscount, 2),
                 'covers_shipping' => $coupon->coversShipping($subtotal),
             ] : null,
             'shipping_options' => $shippingOptions,
@@ -68,6 +80,7 @@ class QuoteBasket
                 'saved_on_mrp' => round(max($mrpTotal - $subtotal, 0), 2),
                 'discount_total' => $discount,
                 'shipping_total' => $shipping,
+                'shipping_full_total' => $shippingFull,
                 'tax_total' => $tax,
                 'grand_total' => round($taxable + $shipping + $tax, 2),
             ],
@@ -101,6 +114,9 @@ class QuoteBasket
             'sku' => $variant->sku ?? $product->sku,
             'options' => $variant?->name ? ['Variant' => $variant->name] : null,
             'image' => $product->images->first()?->path,
+            // Drawn where there is no photograph. Worked out here so the cart
+            // screen and the checkout summary show the same tile.
+            'emoji' => $product->emoji(),
             'unit_price' => $unit,
             'mrp' => max($mrp, $unit),
             'quantity' => $quantity,
@@ -171,6 +187,15 @@ class QuoteBasket
                 ->where(fn ($query) => $query
                     ->whereNull('vendor_id')
                     ->orWhereIn('vendor_id', $vendorIds))
+                // The panel collects a basket-value band per rate — "₹0–₹499
+                // goes by Standard" — and quoting ignored it, so a rate meant
+                // for small baskets was offered on every one of them.
+                ->where(fn ($query) => $query
+                    ->whereNull('min_order_amount')
+                    ->orWhere('min_order_amount', '<=', $subtotal))
+                ->where(fn ($query) => $query
+                    ->whereNull('max_order_amount')
+                    ->orWhere('max_order_amount', '>=', $subtotal))
                 ->orderBy('position')
                 ->get()
             : collect();
@@ -179,17 +204,32 @@ class QuoteBasket
 
         $options = $rates
             ->groupBy('name')
-            ->map(function (Collection $group) use ($lines, $subtotal, $freeBecause) {
+            ->map(function (Collection $group) use ($lines, $subtotal, $freeBecause, $coupon) {
                 $cost = $group->max(fn (ShippingRate $rate) => $this->costOf($rate, $lines, $subtotal));
                 $rate = $group->first();
+
+                $charged = $freeBecause !== null ? 0.0 : round((float) $cost, 2);
+                // The highest threshold on the group: on a basket touching two
+                // stores, delivery is only free once every one of them is.
+                $freeAbove = $group->pluck('free_above_amount')->filter()->max();
 
                 return [
                     'code' => str($rate->name)->slug()->value(),
                     'name' => (string) $rate->name,
-                    'rate' => $freeBecause !== null ? 0.0 : round((float) $cost, 2),
+                    'rate' => $charged,
+                    // Before any coupon, so what a free-shipping code saves is
+                    // arithmetic rather than a guess.
+                    'full_rate' => round((float) $cost, 2),
                     'free_because' => $freeBecause,
                     'delivery_days_min' => $rate->delivery_days_min,
                     'delivery_days_max' => $rate->delivery_days_max,
+                    ...self::labelsFor(
+                        $charged,
+                        $rate->delivery_days_min,
+                        $rate->delivery_days_max,
+                        $freeBecause === 'coupon' ? $coupon->code : null,
+                        $freeAbove !== null ? (float) $freeAbove : null,
+                    ),
                 ];
             })
             ->values()
@@ -205,10 +245,41 @@ class QuoteBasket
             'code' => 'standard',
             'name' => 'Standard delivery',
             'rate' => 0.0,
+            'full_rate' => 0.0,
             'free_because' => $freeBecause,
             'delivery_days_min' => 3,
             'delivery_days_max' => 7,
+            ...self::labelsFor(0.0, 3, 7, $freeBecause === 'coupon' ? $coupon->code : null, null),
         ]];
+    }
+
+    /**
+     * The three strings the delivery row actually draws.
+     *
+     * Display-ready on purpose: the app was turning day counts into "Arrives
+     * 4–6 Sep" itself and falling back to a hardcoded line where a rate had no
+     * days on it, so the same option could read differently on two screens.
+     *
+     * @return array{price_label: string, eta_label: string|null, note: string|null}
+     */
+    protected static function labelsFor(
+        float $rate,
+        ?int $minDays,
+        ?int $maxDays,
+        ?string $couponCode,
+        ?float $freeAbove,
+    ): array {
+        $window = Eta::window($minDays, $maxDays);
+
+        return [
+            'price_label' => $rate <= 0 ? 'FREE' : '₹'.number_format($rate, fmod($rate, 1) === 0.0 ? 0 : 2),
+            'eta_label' => $window ? Eta::label($window[0], $window[1]) : null,
+            'note' => match (true) {
+                $couponCode !== null => "Free with {$couponCode}",
+                $freeAbove !== null && $rate > 0 => 'Free over ₹'.number_format($freeAbove, 0),
+                default => null,
+            },
+        ];
     }
 
     protected function zoneFor(?CustomerAddress $address): ?ShippingZone
@@ -253,13 +324,19 @@ class QuoteBasket
         $quantity = (int) $lines->sum('quantity');
         $weight = (float) $lines->sum(fn (array $l) => $l['weight'] * $l['quantity']);
 
+        /*
+        | The arms are `ShippingRate::TYPES` and the sums are the ones the admin
+        | panel's own rate label promises. They used to be `per_item` and
+        | `weight` — two spellings nothing has ever written — so every rate fell
+        | through to a default that added all three columns together. Panel-made
+        | rates came out right only because the columns it hides are left at
+        | zero; one hand-edited row would have been charged twice over.
+        */
         return round(match ($rate->type) {
             'free' => 0.0,
-            'per_item' => (float) $rate->per_item_rate * $quantity,
-            'weight' => (float) $rate->per_kg_rate * $weight,
-            default => (float) $rate->rate
-                + (float) $rate->per_item_rate * $quantity
-                + (float) $rate->per_kg_rate * $weight,
+            'weight_based' => (float) $rate->rate + (float) $rate->per_kg_rate * $weight,
+            'item_based' => (float) $rate->rate + (float) $rate->per_item_rate * $quantity,
+            default => (float) $rate->rate,
         }, 2);
     }
 }

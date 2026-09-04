@@ -20,6 +20,9 @@ class SettingController extends Controller
         'store_name' => 'Marketplace',
         'store_email' => 'support@marketplace.test',
         'store_phone' => '',
+        // Where "Need help with this order" goes in the shopper app. Whatever
+        // the marketplace actually answers on — WhatsApp, a helpdesk, a page.
+        'support_chat_url' => '',
         'currency' => 'INR',
         'weight_unit' => 'kg',
         'order_prefix' => '#',
@@ -61,6 +64,7 @@ class SettingController extends Controller
             'store_name' => ['required', 'string', 'max:120'],
             'store_email' => ['required', 'email', 'max:180'],
             'store_phone' => ['nullable', 'string', 'max:25'],
+            'support_chat_url' => ['nullable', 'url', 'max:255'],
             'currency' => ['required', 'string', 'max:3'],
             'weight_unit' => ['required', 'string', 'max:5'],
             'order_prefix' => ['required', 'string', 'max:5'],

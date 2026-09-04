@@ -18,6 +18,7 @@ type Category = {
     description: string | null;
     image_path: string | null;
     image_url: string | null;
+    icon: string | null;
     position: number;
     is_active: boolean;
     is_featured: boolean;
@@ -38,6 +39,7 @@ const form = useForm({
     parent_id: props.category?.parent_id ?? null,
     description: props.category?.description ?? '',
     image_path: props.category?.image_path ?? '',
+    icon: props.category?.icon ?? '',
     position: props.category?.position ?? 0,
     is_active: props.category?.is_active ?? true,
     is_featured: props.category?.is_featured ?? false,
@@ -162,6 +164,13 @@ const submit = () => {
                                     : 'auto-generated'
                             "
                             help-text="Leave blank to generate from the name."
+                        />
+                        <PTextField
+                            v-model="form.icon"
+                            label="Icon"
+                            placeholder="🥻"
+                            :error="form.errors.icon"
+                            help-text="One emoji, drawn in the shopper app where there is no photograph. Leave blank to pick one from the name."
                         />
                         <PTextarea
                             v-model="form.description"

@@ -13,7 +13,9 @@ use App\Models\ProductVariant;
 use App\Models\Vendor;
 use App\Notifications\LowStockReached;
 use App\Notifications\OrderPlaced;
+use App\Services\Eta;
 use App\Services\Notifier;
+use App\Services\Razorpay;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -98,17 +100,31 @@ class PlaceOrder
         // Whether the money is already in decides `payment_status`; the caller
         // works that out from the chosen method, because the codes are the
         // admin panel's to name and 'cod' is not the only spelling.
-        $paid = ! ($data['pay_on_delivery'] ?? false);
+        $payOnDelivery = (bool) ($data['pay_on_delivery'] ?? false);
+
+        /*
+        | With a gateway configured, money is not in until Razorpay says it is:
+        | the order is written `pending` and waits for `POST /payments/verify`
+        | or the webhook. With no gateway the marketplace keeps its old
+        | behaviour and treats anything but cash on delivery as captured, which
+        | is what lets the demo and the test suite run without credentials.
+        */
+        $awaitingPayment = ! $payOnDelivery && Razorpay::enabled();
+        $paid = ! $payOnDelivery && ! $awaitingPayment;
+
         $addressPayload = $this->addressPayload($address, $customer);
+        // The window the shopper was promised, frozen at the moment they
+        // agreed to it — not recomputed later off rates that may have moved.
+        $eta = Eta::window(...$this->deliveryDays($quote));
 
         $order = Order::create([
             'number' => Order::nextNumber(),
             'customer_id' => $customer->id,
             'email' => $customer->email,
             'phone' => $address->phone ?? $customer->phone,
-            'status' => 'processing',
-            // A real gateway would flip this on its callback; until one is
-            // wired up, anything but cash on delivery is treated as captured.
+            // Nothing is packed against money that has not arrived; the
+            // capture moves this on to `processing`.
+            'status' => $awaitingPayment ? 'pending' : 'processing',
             'payment_status' => $paid ? 'paid' : 'pending',
             'fulfillment_status' => 'unfulfilled',
             'currency' => 'INR',
@@ -120,6 +136,8 @@ class PlaceOrder
             'customer_note' => $data['note'] ?? null,
             'placed_at' => now(),
             'paid_at' => $paid ? now() : null,
+            'eta_min_at' => $eta[0] ?? null,
+            'eta_max_at' => $eta[1] ?? null,
         ]);
 
         $commissionTotal = 0.0;
@@ -192,6 +210,24 @@ class PlaceOrder
         $customer->refreshOrderStats();
 
         return $order;
+    }
+
+    /**
+     * The chosen delivery option's day count, or two nulls when the option
+     * carries none.
+     *
+     * @param  array<string, mixed>  $quote
+     * @return array{0: int|null, 1: int|null}
+     */
+    protected function deliveryDays(array $quote): array
+    {
+        foreach ((array) $quote['shipping_options'] as $option) {
+            if (($option['code'] ?? null) === ($quote['shipping_code'] ?? null)) {
+                return [$option['delivery_days_min'] ?? null, $option['delivery_days_max'] ?? null];
+            }
+        }
+
+        return [null, null];
     }
 
     /**

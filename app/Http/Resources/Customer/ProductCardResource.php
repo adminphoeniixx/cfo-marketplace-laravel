@@ -30,6 +30,10 @@ class ProductCardResource extends JsonResource
             'slug' => $this->slug,
             'brand' => $this->brand,
             'image' => $this->relationLoaded('images') ? $this->images->first()?->url : null,
+            // The tile still has to draw something when there is no
+            // photograph, and inventing one in the app is the app inventing
+            // content.
+            'emoji' => $this->emoji(),
             'price' => $price,
             'mrp' => $mrp,
             'discount_percent' => $mrp && $mrp > $price ? (int) round((1 - $price / $mrp) * 100) : 0,

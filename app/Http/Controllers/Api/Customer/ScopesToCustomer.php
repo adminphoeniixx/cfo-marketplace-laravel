@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Api\Customer;
 use App\Models\Cancellation;
 use App\Models\Cart;
 use App\Models\Customer;
+use App\Models\CustomerAddress;
 use App\Models\Order;
 use App\Models\Refund;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 /**
  * The single place the customer API decides "whose data is this".
@@ -105,6 +107,50 @@ trait ScopesToCustomer
         }
 
         return $cart;
+    }
+
+    /**
+     * The shopper's addresses, default first.
+     *
+     * @return Collection<int, CustomerAddress>
+     */
+    protected function addressesOf(Request $request): Collection
+    {
+        return $this->customer($request)->addresses()
+            ->orderByDesc('is_default_shipping')
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
+     * Where this basket is heading — one rule, used by the cart strip and the
+     * checkout picker alike.
+     *
+     * They used to answer this separately: the cart guessed "the default"
+     * while checkout remembered whatever id the app last sent, so the two
+     * screens could show different addresses for the same basket. In order:
+     * an address named on this request, the one already chosen for this
+     * basket, the default shipping address, then whatever exists.
+     *
+     * A choice arriving on the request is remembered on the basket, which is
+     * what makes it survive the app being closed.
+     *
+     * @param  Collection<int, CustomerAddress>  $addresses
+     */
+    protected function selectedAddress(Request $request, Cart $cart, Collection $addresses): ?CustomerAddress
+    {
+        $chosen = $request->filled('address_id')
+            ? $addresses->firstWhere('id', $request->integer('address_id'))
+            : null;
+
+        if ($chosen && $cart->selected_address_id !== $chosen->id) {
+            $cart->update(['selected_address_id' => $chosen->id]);
+        }
+
+        return $chosen
+            ?? $addresses->firstWhere('id', $cart->selected_address_id)
+            ?? $addresses->firstWhere('is_default_shipping', true)
+            ?? $addresses->first();
     }
 
     /**

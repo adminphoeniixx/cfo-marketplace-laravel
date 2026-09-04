@@ -29,16 +29,15 @@ class CheckoutController extends Controller
 
     public function options(Request $request): JsonResponse
     {
-        $customer = $this->customer($request);
         $cart = $this->cartFor($request);
 
-        $addresses = $customer->addresses()->orderByDesc('is_default_shipping')->get();
-        $address = $request->filled('address_id')
-            ? $addresses->firstWhere('id', $request->integer('address_id'))
-            : $addresses->first();
+        $addresses = $this->addressesOf($request);
+        // One rule for both screens, and a choice made here is remembered on
+        // the basket — so the cart's address strip agrees with this picker.
+        $address = $this->selectedAddress($request, $cart, $addresses);
 
         $items = $cart->activeItems()
-            ->with(['product.images', 'product.taxClass.rates', 'variant'])
+            ->with(['product.images', 'product.category:id,name,icon', 'product.taxClass.rates', 'variant'])
             ->get();
 
         $coupon = $cart->coupon_code
@@ -55,14 +54,12 @@ class CheckoutController extends Controller
         return response()->json([
             'addresses' => AddressResource::collection($addresses),
             'selected_address_id' => $address?->id,
+            // The whole address, not just its id: the review screen draws it,
+            // and looking it back up in the list is the app's work to do twice.
+            'selected_address' => $address ? new AddressResource($address) : null,
             'shipping_options' => $quote['shipping_options'],
             'selected_shipping_code' => $quote['shipping_code'],
-            'payment_methods' => PaymentMethod::active()->orderBy('position')->get()
-                ->map(fn (PaymentMethod $method) => [
-                    'code' => $method->code,
-                    'name' => $method->name,
-                    'description' => $method->description,
-                ]),
+            'payment_methods' => self::paymentMethods(),
             'coupon' => $quote['coupon'],
             'totals' => $quote['totals'],
             'items' => $quote['lines'],
@@ -86,7 +83,7 @@ class CheckoutController extends Controller
         // Orders record the label the shopper saw, not the code — that is what
         // the seller panel and the payouts read back.
         $data['payment_method_label'] = $method?->name;
-        $data['pay_on_delivery'] = self::isPayOnDelivery($method?->code);
+        $data['pay_on_delivery'] = PaymentMethod::isPayOnDelivery($method?->code);
 
         $order = $this->placeOrder->handle($customer, $this->cartFor($request), $data);
 
@@ -96,15 +93,25 @@ class CheckoutController extends Controller
     }
 
     /**
-     * Cash on delivery, whatever the panel called it.
+     * Ways to pay, as the payment screen draws them.
      *
-     * The codes belong to the admin's payment-method list, so this matches on
-     * shape rather than on one hardcoded spelling.
+     * `icon` comes from here rather than from a map inside the app, so a
+     * method the admin adds tomorrow arrives with a glyph instead of a gap,
+     * and `is_pay_on_delivery` saves the app from matching on code spellings
+     * to know whether to open a gateway.
+     *
+     * @return array<int, array<string, mixed>>
      */
-    public static function isPayOnDelivery(?string $code): bool
+    public static function paymentMethods(): array
     {
-        return $code !== null && (
-            str_contains($code, 'cash') || str_contains($code, 'cod')
-        );
+        return PaymentMethod::active()->orderBy('position')->get()
+            ->map(fn (PaymentMethod $method) => [
+                'code' => $method->code,
+                'name' => $method->name,
+                'description' => $method->description,
+                'icon' => $method->glyph(),
+                'is_pay_on_delivery' => PaymentMethod::isPayOnDelivery($method->code),
+            ])
+            ->all();
     }
 }

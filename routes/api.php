@@ -5,8 +5,10 @@ use App\Http\Controllers\Api\Customer\AuthController as CustomerAuthController;
 use App\Http\Controllers\Api\Customer\CartController;
 use App\Http\Controllers\Api\Customer\CatalogController as CustomerCatalogController;
 use App\Http\Controllers\Api\Customer\CheckoutController;
+use App\Http\Controllers\Api\Customer\InvoiceController;
 use App\Http\Controllers\Api\Customer\NotificationController as CustomerNotificationController;
 use App\Http\Controllers\Api\Customer\OrderController as CustomerOrderController;
+use App\Http\Controllers\Api\Customer\PaymentController;
 use App\Http\Controllers\Api\Customer\ProfileController as CustomerProfileController;
 use App\Http\Controllers\Api\Customer\ReferenceController;
 use App\Http\Controllers\Api\Customer\RequestController;
@@ -247,6 +249,23 @@ Route::prefix('customer')->name('api.customer.')->group(function () {
     Route::get('sellers/{vendor}', [CustomerCatalogController::class, 'seller'])->name('sellers.show');
     Route::get('reference', ReferenceController::class)->name('reference');
 
+    /*
+    | The invoice, reached by signature rather than by token — so it can be
+    | opened in a browser or handed to a download manager, neither of which
+    | carries the app's bearer token. The signature is the authority; it is
+    | minted only for the shopper whose order it is, and it expires.
+    */
+    Route::get('invoices/{order}', [InvoiceController::class, 'show'])
+        ->middleware('signed')->whereNumber('order')->name('invoices.show');
+
+    /*
+    | Razorpay's own account of a payment. Public by necessity — a gateway
+    | carries no token — and believed only because the body is signed. This is
+    | also what saves an order when the app dies between paying and saying so.
+    */
+    Route::post('payments/webhook/razorpay', [PaymentController::class, 'razorpayWebhook'])
+        ->name('payments.webhook.razorpay');
+
     /* ------------------------------------------------------------ getting in */
 
     Route::middleware('throttle:10,1')->group(function () {
@@ -296,6 +315,11 @@ Route::prefix('customer')->name('api.customer.')->group(function () {
         Route::get('checkout', [CheckoutController::class, 'options'])->name('checkout');
         Route::post('orders', [CheckoutController::class, 'store'])->name('orders.store');
 
+        // Opening and settling a payment. The webhook above is the third path
+        // and needs no token; these two are the app's own hands.
+        Route::post('payments/create-intent', [PaymentController::class, 'createIntent'])->name('payments.intent');
+        Route::post('payments/verify', [PaymentController::class, 'verify'])->name('payments.verify');
+
         Route::get('orders', [CustomerOrderController::class, 'index'])->name('orders.index');
         // Before {order}, or an order numbered "requests" would win the match.
         Route::get('requests', [RequestController::class, 'index'])->name('requests.index');
@@ -303,6 +327,7 @@ Route::prefix('customer')->name('api.customer.')->group(function () {
         Route::post('requests/{number}/withdraw', [RequestController::class, 'withdraw'])->name('requests.withdraw');
         Route::get('orders/{order}', [CustomerOrderController::class, 'show'])->name('orders.show');
         Route::get('orders/{order}/track', [CustomerOrderController::class, 'track'])->name('orders.track');
+        Route::get('orders/{order}/invoice', [InvoiceController::class, 'link'])->name('orders.invoice');
         Route::post('orders/{order}/reorder', [CustomerOrderController::class, 'reorder'])->name('orders.reorder');
         Route::post('orders/{order}/cancellations', [RequestController::class, 'storeCancellation'])->name('orders.cancellations');
         Route::post('orders/{order}/returns', [RequestController::class, 'storeRefund'])->name('orders.returns');

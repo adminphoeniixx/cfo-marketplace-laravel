@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Emoji;
 use Database\Factories\ProductFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -106,6 +107,19 @@ class Product extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+
+    /**
+     * A glyph for a product with no photograph, so the app never draws an
+     * empty tile. Its own name decides it where the words give anything away,
+     * and its category is the fallback — read off the relation only where one
+     * is already loaded, because a listing draws hundreds of these.
+     */
+    public function emoji(): string
+    {
+        $category = $this->relationLoaded('category') ? $this->category : null;
+
+        return Emoji::forProduct($this->name, $category?->icon, $category?->name);
     }
 
     /**

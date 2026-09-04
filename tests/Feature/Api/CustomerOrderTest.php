@@ -110,7 +110,11 @@ test('buying again fills the basket and says what it could not', function () {
 
     $this->postJson(route('api.customer.orders.reorder', ltrim($order->number, '#')))
         ->assertOk()
-        ->assertJsonPath('added', 1);
+        ->assertJsonCount(1, 'added')
+        ->assertJsonPath('added.0.status', 'added')
+        ->assertJsonPath('added.0.quantity', 1)
+        // The basket comes back with it, so the badge is right immediately.
+        ->assertJsonPath('cart.totals.items_count', 1);
 
     $gone->update(['status' => 'archived']);
 
@@ -118,8 +122,10 @@ test('buying again fills the basket and says what it could not', function () {
 
     $this->postJson(route('api.customer.orders.reorder', ltrim($order->number, '#')))
         ->assertOk()
-        ->assertJsonPath('added', 0)
-        ->assertJsonCount(1, 'skipped');
+        ->assertJsonCount(0, 'added')
+        ->assertJsonCount(1, 'skipped')
+        ->assertJsonPath('skipped.0.reason', 'No longer sold')
+        ->assertJsonPath('cart.totals.items_count', 0);
 });
 
 test('a whole order can be called off before it is packed', function () {

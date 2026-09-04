@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\BunnyCdn;
+use App\Services\Emoji;
 use Database\Factories\CategoryFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -37,6 +38,15 @@ class Category extends Model
             'is_active' => 'boolean',
             'is_featured' => 'boolean',
         ];
+    }
+
+    /**
+     * The tile's glyph: the admin's own if they set one, and something read
+     * off the name if they did not.
+     */
+    public function glyph(): string
+    {
+        return Emoji::forCategory($this->icon, $this->name);
     }
 
     protected static function booted(): void

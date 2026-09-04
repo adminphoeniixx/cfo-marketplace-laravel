@@ -22,6 +22,10 @@
     {
       "key": "token",
       "value": ""
+    },
+    {
+      "key": "razorpay_webhook_signature",
+      "value": ""
     }
   ],
   "item": [
@@ -1082,7 +1086,8 @@
                 "customer",
                 "cart"
               ]
-            }
+            },
+            "description": "The whole basket, priced — plus selected_address (the address strip) and available_coupon_count (how many rows cart.coupons returns)."
           }
         },
         {
@@ -1142,7 +1147,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Applies a code. 422 when the basket is under the minimum spend, and also when the code would take nothing off — a free-shipping coupon on a basket that already ships free. The response carries coupon.discount, coupon.shipping_discount and coupon.savings; savings is the figure to quote to the shopper."
           }
         },
         {
@@ -1190,7 +1196,8 @@
                 "cart",
                 "coupons"
               ]
-            }
+            },
+            "description": "Every live code judged against this basket: discount, shipping_discount, savings, usable and the reason it is not. The row count is what GET /cart returns as available_coupon_count."
           }
         },
         {
@@ -1361,16 +1368,17 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/customer/checkout",
+              "raw": "{{base_url}}/api/customer/checkout?address_id=",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "api",
                 "customer",
-                "checkout"
+                "checkout?address_id="
               ]
-            }
+            },
+            "description": "The review screen. Passing address_id chooses that address and remembers it on the basket, so GET /cart shows the same one. Answers with selected_address, display-ready shipping options (price_label, eta_label, note) and payment methods carrying icon."
           }
         },
         {
@@ -1420,14 +1428,21 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/customer/orders",
+              "raw": "{{base_url}}/api/customer/checkout?address_id=",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "api",
                 "customer",
-                "orders"
+                "checkout"
+              ],
+              "query": [
+                {
+                  "key": "address_id",
+                  "value": "",
+                  "description": "Optional. Choosing one remembers it on the basket."
+                }
               ]
             }
           }
@@ -1720,7 +1735,8 @@
                 "{order}",
                 "reorder"
               ]
-            }
+            },
+            "description": "Puts an old order's lines back in the basket. Always 200: `added[]` says what went in (with status added/partial and a warning), `skipped[]` says what could not and why, and `cart` is the full GET /cart payload."
           }
         },
         {
@@ -1783,6 +1799,197 @@
                 "{order}",
                 "track"
               ]
+            }
+          }
+        },
+        {
+          "name": "orders.invoice",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/customer/orders/{order}/invoice",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "customer",
+                "orders",
+                "{order}",
+                "invoice"
+              ]
+            },
+            "description": "A signed, seven-day URL to the order's printable HTML invoice. The URL itself needs no token."
+          }
+        },
+        {
+          "name": "invoices.show",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/customer/invoices/{order}?expires=&signature=",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "customer",
+                "invoices",
+                "{order}"
+              ],
+              "query": [
+                {
+                  "key": "expires",
+                  "value": ""
+                },
+                {
+                  "key": "signature",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "The invoice document. Reached with the signature from orders.invoice rather than a bearer token — paste the whole url it returned.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "payments.intent",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/customer/payments/create-intent",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "customer",
+                "payments",
+                "create-intent"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_number\": \"1043\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Opens a Razorpay order for an order whose `payment_required` is true. Repeating it returns the attempt already open."
+          }
+        },
+        {
+          "name": "payments.verify",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/customer/payments/verify",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "customer",
+                "payments",
+                "verify"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"razorpay_order_id\": \"order_XXXXXXXXXXXX\",\n  \"razorpay_payment_id\": \"pay_XXXXXXXXXXXX\",\n  \"razorpay_signature\": \"hmac_sha256(order_id|payment_id, key_secret)\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Settles the payment from what Razorpay Checkout handed the app. A signature that does not match is 422."
+          }
+        },
+        {
+          "name": "payments.webhook.razorpay",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Razorpay-Signature",
+                "value": "{{razorpay_webhook_signature}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/customer/payments/webhook/razorpay",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "customer",
+                "payments",
+                "webhook",
+                "razorpay"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"payment.captured\",\n  \"payload\": {\n    \"payment\": {\n      \"entity\": {\n        \"id\": \"pay_XXXXXXXXXXXX\",\n        \"order_id\": \"order_XXXXXXXXXXXX\",\n        \"method\": \"upi\"\n      }\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Razorpay's own callback. Public, and believed only with a valid X-Razorpay-Signature header (HMAC of the raw body under RAZORPAY_WEBHOOK_SECRET). No bearer token.",
+            "auth": {
+              "type": "noauth"
             }
           }
         }

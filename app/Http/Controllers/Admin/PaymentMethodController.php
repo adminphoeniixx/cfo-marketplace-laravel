@@ -27,7 +27,10 @@ class PaymentMethodController extends Controller
 
         $methods = PaymentMethod::orderBy('position')->orderBy('name')->get()
             ->map(fn (PaymentMethod $method) => [
-                ...$method->only(['id', 'name', 'code', 'description', 'is_active', 'position']),
+                ...$method->only(['id', 'name', 'code', 'description', 'icon', 'is_active', 'position']),
+                // What the shopper app actually draws: the admin's own glyph,
+                // or the one derived from the code where they set none.
+                'glyph' => $method->glyph(),
                 'orders_count' => (int) ($usage[$method->name]->total ?? 0),
                 'revenue' => (float) ($usage[$method->name]->revenue ?? 0),
             ]);
@@ -102,6 +105,9 @@ class PaymentMethodController extends Controller
                 Rule::unique('payment_methods', 'name')->ignore($payment?->id),
             ],
             'description' => ['nullable', 'string', 'max:255'],
+            // Drawn beside the method in the shopper app. Blank is fine — one
+            // is derived from the code instead.
+            'icon' => ['nullable', 'string', 'max:8'],
             'is_active' => ['boolean'],
             'position' => ['integer', 'min:0', 'max:999'],
         ]);

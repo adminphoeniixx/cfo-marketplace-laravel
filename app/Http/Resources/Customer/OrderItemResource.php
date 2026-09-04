@@ -4,6 +4,7 @@ namespace App\Http\Resources\Customer;
 
 use App\Models\OrderItem;
 use App\Services\BunnyCdn;
+use App\Services\Emoji;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -25,6 +26,10 @@ class OrderItemResource extends JsonResource
             'name' => $this->name,
             'sku' => $this->sku,
             'image' => BunnyCdn::display($this->image_path),
+            // Read off the line's own name rather than the product: an order
+            // outlives the listing it was placed against, and a delisted
+            // product must still draw something on the orders screen.
+            'emoji' => Emoji::forProduct($this->name),
             'options' => $this->options,
             'unit_price' => (float) $this->unit_price,
             'quantity' => (int) $this->quantity,

@@ -52,6 +52,7 @@ class ProductResource extends JsonResource
             'stock_quantity' => $this->track_inventory ? (int) $this->stock_quantity : null,
             'requires_shipping' => (bool) $this->requires_shipping,
             'tags' => $this->tags ?? [],
+            'emoji' => $this->emoji(),
             'images' => $this->whenLoaded('images', fn () => $this->images->map(fn ($image) => [
                 'id' => $image->id,
                 'url' => $image->url,
@@ -61,6 +62,7 @@ class ProductResource extends JsonResource
                 'id' => $this->category->id,
                 'name' => $this->category->name,
                 'slug' => $this->category->slug,
+                'icon' => $this->category->glyph(),
             ] : null),
             'vendor' => $this->whenLoaded('vendor', fn () => $this->vendor ? [
                 'id' => $this->vendor->id,

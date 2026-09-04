@@ -19,6 +19,8 @@ type Method = {
     name: string;
     code: string;
     description: string | null;
+    icon: string | null;
+    glyph: string;
     is_active: boolean;
     position: number;
     orders_count: number;
@@ -42,6 +44,7 @@ const editing = ref<Method | null>(null);
 const form = useForm({
     name: '',
     description: '',
+    icon: '',
     is_active: true,
     position: 0,
 });
@@ -53,6 +56,7 @@ const open = (method: Method | null) => {
     Object.assign(form, {
         name: method?.name ?? '',
         description: method?.description ?? '',
+        icon: method?.icon ?? '',
         is_active: method?.is_active ?? true,
         position: method?.position ?? 0,
     });
@@ -139,6 +143,7 @@ const destroy = (method: Method) =>
                     <p
                         class="text-[13px] font-medium text-[#303030] dark:text-[#e3e3e3]"
                     >
+                        <span class="mr-1">{{ method.glyph }}</span>
                         {{ method.name }}
                     </p>
                     <p v-if="method.description" class="text-xs text-[#8a8a8a]">
@@ -210,6 +215,13 @@ const destroy = (method: Method) =>
                 :rows="2"
                 :error="form.errors.description"
                 placeholder="Anything staff should know about this method"
+            />
+            <PTextField
+                v-model="form.icon"
+                label="Icon"
+                placeholder="⚡"
+                :error="form.errors.icon"
+                help-text="One emoji, drawn beside this method in the shopper app. Leave blank to derive one."
             />
             <PTextField
                 v-model="form.position"

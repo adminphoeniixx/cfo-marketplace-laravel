@@ -23,6 +23,9 @@ class CategoryResource extends JsonResource
             'name' => $this->name,
             'slug' => $this->slug,
             'image' => BunnyCdn::display($this->image_path),
+            // Something to draw before there is a photograph. Never null, so
+            // the app has no reason to keep a table of its own.
+            'icon' => $this->glyph(),
             'is_featured' => (bool) $this->is_featured,
             'products_count' => $this->when(isset($this->products_count), fn () => (int) $this->products_count),
             'children' => CategoryResource::collection($this->whenLoaded('children')),

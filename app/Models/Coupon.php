@@ -78,6 +78,21 @@ class Coupon extends Model
         return round(min($discount, $subtotal), 2);
     }
 
+    /**
+     * What this code is worth on a basket — items and delivery together.
+     *
+     * Zero is a real answer: a free-shipping code on a basket that already
+     * ships free takes nothing off, and the shopper deserves to be told that
+     * rather than left watching a total that does not move.
+     */
+    public function worthOn(float $subtotal, float $shipping): float
+    {
+        return round(
+            $this->discountOn($subtotal) + ($this->coversShipping($subtotal) ? max($shipping, 0) : 0),
+            2,
+        );
+    }
+
     public function coversShipping(float $subtotal): bool
     {
         return $this->type === 'free_shipping' && $subtotal >= (float) $this->min_spend;

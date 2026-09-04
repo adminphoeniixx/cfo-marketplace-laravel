@@ -35,6 +35,27 @@ return [
         ],
     ],
 
+    /*
+    | Razorpay, for taking money at checkout.
+    |
+    | Leave the keys unset and the marketplace behaves as it always has: a
+    | non-COD order is marked paid the moment it is placed. Set them and the
+    | order waits for a real capture instead — nothing else has to change,
+    | which is what makes this safe to switch on per environment.
+    */
+    'razorpay' => [
+        'key' => env('RAZORPAY_KEY_ID'),
+        'secret' => env('RAZORPAY_KEY_SECRET'),
+        // Set separately in the Razorpay dashboard; without it the webhook
+        // cannot be trusted and is refused rather than believed.
+        'webhook_secret' => env('RAZORPAY_WEBHOOK_SECRET'),
+        'currency' => env('RAZORPAY_CURRENCY', 'INR'),
+        // Kept under a typical gateway timeout, so an unreachable Razorpay
+        // comes back as this app's own error rather than the proxy's.
+        'connect_timeout' => (int) env('RAZORPAY_CONNECT_TIMEOUT', 5),
+        'timeout' => (int) env('RAZORPAY_TIMEOUT', 20),
+    ],
+
     'bunnycdn' => [
         'storage_zone' => env('BUNNYCDN_STORAGE_ZONE'),
         'api_key' => env('BUNNYCDN_API_KEY'),

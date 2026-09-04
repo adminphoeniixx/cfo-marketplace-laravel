@@ -2,6 +2,8 @@
 
 use App\Models\Coupon;
 use App\Models\ProductVariant;
+use App\Models\ShippingRate;
+use App\Models\ShippingZone;
 use App\Models\Vendor;
 
 beforeEach(function () {
@@ -174,4 +176,97 @@ test('one shopper cannot touch another shopper cart line', function () {
     actingAsCustomer();
 
     $this->patchJson(route('api.customer.cart.items.update', $item), ['quantity' => 9])->assertNotFound();
+});
+
+test('a free-shipping coupon is worth the delivery it covers', function () {
+    $zone = ShippingZone::create(['name' => 'TN', 'states' => ['Tamil Nadu'], 'is_active' => true, 'position' => 0]);
+    ShippingRate::create([
+        'shipping_zone_id' => $zone->id, 'name' => 'Standard delivery', 'type' => 'flat',
+        'rate' => 59, 'free_above_amount' => 999, 'delivery_days_min' => 4, 'delivery_days_max' => 7,
+        'is_active' => true, 'position' => 0,
+    ]);
+    $this->customer->addresses()->create([
+        'first_name' => 'Priya', 'address_line1' => '42 Beach Road', 'city' => 'Chennai',
+        'state' => 'Tamil Nadu', 'postcode' => '600090', 'country' => 'IN', 'is_default_shipping' => true,
+    ]);
+
+    Coupon::factory()->freeShipping()->create(['code' => 'FREESHIP', 'min_spend' => 499]);
+    $this->postJson(route('api.customer.cart.items.store'), ['product_id' => sellableProduct(['price' => 500])->id]);
+
+    $this->postJson(route('api.customer.cart.coupon.apply'), ['code' => 'FREESHIP'])
+        ->assertOk()
+        ->assertJsonPath('data.coupon.shipping_discount', 59)
+        ->assertJsonPath('data.coupon.savings', 59)
+        ->assertJsonPath('data.totals.shipping_total', 0)
+        ->assertJsonPath('data.totals.shipping_full_total', 59);
+});
+
+test('a coupon that would take nothing off is refused with the reason', function () {
+    $zone = ShippingZone::create(['name' => 'TN', 'states' => ['Tamil Nadu'], 'is_active' => true, 'position' => 0]);
+    ShippingRate::create([
+        'shipping_zone_id' => $zone->id, 'name' => 'Standard delivery', 'type' => 'flat',
+        'rate' => 59, 'free_above_amount' => 999, 'is_active' => true, 'position' => 0,
+    ]);
+    $this->customer->addresses()->create([
+        'first_name' => 'Priya', 'address_line1' => '42 Beach Road', 'city' => 'Chennai',
+        'state' => 'Tamil Nadu', 'postcode' => '600090', 'country' => 'IN', 'is_default_shipping' => true,
+    ]);
+
+    // Over the free-delivery threshold, so free shipping is already the price.
+    Coupon::factory()->freeShipping()->create(['code' => 'FREESHIP', 'min_spend' => 499]);
+    $this->postJson(route('api.customer.cart.items.store'), ['product_id' => sellableProduct(['price' => 1200])->id]);
+
+    $this->postJson(route('api.customer.cart.coupon.apply'), ['code' => 'FREESHIP'])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors('code');
+
+    // And the sheet greys it out rather than inviting the tap.
+    $row = collect($this->getJson(route('api.customer.cart.coupons'))->json('data'))->firstWhere('code', 'FREESHIP');
+
+    expect($row['usable'])->toBeFalse()
+        ->and((float) $row['savings'])->toBe(0.0)
+        ->and($row['reason'])->toContain('already free');
+});
+
+test('a rate outside the basket value band is not offered', function () {
+    $zone = ShippingZone::create(['name' => 'TN', 'states' => ['Tamil Nadu'], 'is_active' => true, 'position' => 0]);
+    ShippingRate::create([
+        'shipping_zone_id' => $zone->id, 'name' => 'Small basket courier', 'type' => 'flat',
+        'rate' => 40, 'max_order_amount' => 499, 'is_active' => true, 'position' => 0,
+    ]);
+    ShippingRate::create([
+        'shipping_zone_id' => $zone->id, 'name' => 'Standard delivery', 'type' => 'flat',
+        'rate' => 59, 'is_active' => true, 'position' => 1,
+    ]);
+    $this->customer->addresses()->create([
+        'first_name' => 'Priya', 'address_line1' => '42 Beach Road', 'city' => 'Chennai',
+        'state' => 'Tamil Nadu', 'postcode' => '600090', 'country' => 'IN', 'is_default_shipping' => true,
+    ]);
+
+    $this->postJson(route('api.customer.cart.items.store'), ['product_id' => sellableProduct(['price' => 1200])->id]);
+
+    $codes = collect($this->getJson(route('api.customer.cart'))->json('data.shipping_options'))->pluck('code');
+
+    expect($codes)->toContain('standard-delivery')->not->toContain('small-basket-courier');
+});
+
+test('a weight-based rate charges its base plus the weight, not every column', function () {
+    $zone = ShippingZone::create(['name' => 'TN', 'states' => ['Tamil Nadu'], 'is_active' => true, 'position' => 0]);
+    ShippingRate::create([
+        'shipping_zone_id' => $zone->id, 'name' => 'Heavy items', 'type' => 'weight_based',
+        'rate' => 99, 'per_kg_rate' => 20, 'per_item_rate' => 15, 'is_active' => true, 'position' => 0,
+    ]);
+    $this->customer->addresses()->create([
+        'first_name' => 'Priya', 'address_line1' => '42 Beach Road', 'city' => 'Chennai',
+        'state' => 'Tamil Nadu', 'postcode' => '600090', 'country' => 'IN', 'is_default_shipping' => true,
+    ]);
+
+    $this->postJson(route('api.customer.cart.items.store'), [
+        'product_id' => sellableProduct(['price' => 1000, 'weight' => 2])->id,
+        'quantity' => 2,
+    ]);
+
+    // 99 base + 20/kg × 4kg. The per-item column belongs to `item_based` and
+    // must not be added on top.
+    expect($this->getJson(route('api.customer.cart'))->json('data.shipping_options.0.rate'))->toEqual(179.0);
 });
