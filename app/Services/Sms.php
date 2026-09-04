@@ -95,6 +95,15 @@ class Sms
             return false;
         }
 
+        // The provider's own id for this message, and never the code itself.
+        // It is the only handle anybody has when a shopper says the text never
+        // arrived — without it a missing message cannot be chased at all.
+        Log::info('Sign-in code handed to the SMS provider.', [
+            'phone' => $phone,
+            // MSG91 v5 puts it in `message`; other providers use `request_id`.
+            'request_id' => $response->json('request_id') ?? $response->json('message'),
+        ]);
+
         return true;
     }
 
