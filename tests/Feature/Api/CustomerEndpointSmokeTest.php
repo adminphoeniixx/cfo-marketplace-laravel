@@ -14,6 +14,7 @@ use App\Models\PaymentMethod;
 use App\Models\Product;
 use App\Models\ProductReview;
 use App\Models\Refund;
+use App\Models\Ticket;
 use App\Models\Vendor;
 use App\Models\WalletTransaction;
 use Illuminate\Notifications\Notification;
@@ -224,6 +225,12 @@ function shopperFixture(): array
         'customer_id' => $customer->id, 'amount' => 500, 'description' => 'Refund for #1001',
     ]);
 
+    $ticket = Ticket::factory()->create([
+        'customer_id' => $customer->id,
+        'subject' => 'My parcel has not arrived',
+    ]);
+    $ticket->addMessage('It was due on Tuesday.', from: $customer);
+
     Banner::factory()->create(['title' => 'Festive edit']);
     Faq::factory()->create(['question' => 'When will my order arrive?']);
     LegalPage::where('slug', 'privacy')
@@ -239,6 +246,7 @@ function shopperFixture(): array
         'line' => $line,
         'saved_line' => $savedLine,
         'saved_method' => $saved,
+        'ticket' => $ticket,
         'delivered' => $delivered,
         'open' => $open,
         'unpaid' => $unpaid,
@@ -437,6 +445,17 @@ function shopperCalls(array $f): array
         'api.customer.payment-methods.default' => ['PATCH', route('api.customer.payment-methods.default', $f['saved_method']->id), []],
         'api.customer.payment-methods.destroy' => ['DELETE', route('api.customer.payment-methods.destroy', $f['saved_method']->id), []],
         'api.customer.wallet' => ['GET', route('api.customer.wallet'), []],
+
+        // Support tickets.
+        'api.customer.support.tickets.index' => ['GET', route('api.customer.support.tickets.index'), []],
+        'api.customer.support.tickets.store' => ['POST', route('api.customer.support.tickets.store'), [
+            'subject' => 'Wrong size', 'message' => 'The saree is a size small.', 'category' => 'order',
+        ], 201],
+        'api.customer.support.tickets.show' => ['GET', route('api.customer.support.tickets.show', $f['ticket']->number), []],
+        'api.customer.support.tickets.reply' => ['POST', route('api.customer.support.tickets.reply', $f['ticket']->number), [
+            'message' => 'Still nothing, I am afraid.',
+        ]],
+        'api.customer.support.tickets.close' => ['POST', route('api.customer.support.tickets.close', $f['ticket']->number), []],
 
         // The bell, and what rings it.
         'api.customer.notifications.index' => ['GET', route('api.customer.notifications.index'), []],

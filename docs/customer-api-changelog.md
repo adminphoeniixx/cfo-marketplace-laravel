@@ -15,6 +15,21 @@ step with both.
 
 ---
 
+## 2026-09-05
+
+### Added
+
+- **Support tickets.** `GET`/`POST /support/tickets`,
+  `GET /support/tickets/{number}`,
+  `POST /support/tickets/{number}/replies` and `.../close`. The help screen
+  could offer answers, a phone number and a chat link; anything an FAQ did not
+  cover became a call nobody wrote down. A ticket can be attached to one of
+  your own orders, `status_label` is the sentence to put on screen, and
+  replying to a resolved ticket reopens it. Staff answer as "Support", and
+  internal notes never leave the panel. 85 endpoints now.
+
+---
+
 ## 2026-09-04 (later)
 
 The app team's second gap list: everything the app was still drawing from its

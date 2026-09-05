@@ -110,6 +110,13 @@ const allGroups = computed<NavGroup[]>(() => [
                 icon: 'customers',
                 section: 'customers',
             },
+            {
+                label: 'Support',
+                href: '/admin/tickets',
+                match: '/admin/tickets',
+                icon: 'notifications',
+                section: 'tickets',
+            },
         ],
     },
     {

@@ -564,6 +564,41 @@ flag as the profile's `accepts_marketing`.
 
 ---
 
+## Support tickets
+
+| Method | Path | |
+|---|---|---|
+| GET | `/support/tickets` | `?filter=open` for the unfinished ones. Newest reply first. |
+| POST | `/support/tickets` | `subject`, `message`, `category`, optional `order_number`. |
+| GET | `/support/tickets/{number}` | The thread. |
+| POST | `/support/tickets/{number}/replies` | `message`. Refused on a closed ticket. |
+| POST | `/support/tickets/{number}/close` | The shopper is done with it. |
+
+`category` is one of `order`, `delivery`, `return`, `payment`, `product`,
+`account`, `other` — the same keys `GET /support/config` will eventually
+label. `order_number` attaches the ticket to one of **your own** orders; naming
+somebody else's is a `422`, not a silent miss.
+
+**`status` is about who the ticket is waiting on**, and `status_label` says it
+in the words to put on screen:
+
+| `status` | `status_label` | Means |
+|---|---|---|
+| `open` | We are looking into it | Support owes a reply |
+| `pending` | Waiting for your reply | The shopper does |
+| `resolved` | Resolved | Support believes it is done |
+| `closed` | Closed | It is done. `can_reply` is false |
+
+Replying to a `resolved` ticket **reopens it** — support's opinion that it is
+finished does not settle it. A `closed` one cannot be reopened; open a new
+ticket instead.
+
+Staff answer as **"Support"**, never as a named person, and internal notes
+between staff are filtered out in the query — there is no shape of these
+endpoints that returns one.
+
+---
+
 ## Errors
 
 Standard Laravel shapes.

@@ -21,6 +21,7 @@ use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\ShippingController;
 use App\Http\Controllers\Admin\TaxController;
 use App\Http\Controllers\Admin\TeamController;
+use App\Http\Controllers\Admin\TicketController;
 use App\Http\Controllers\Admin\UploadController;
 use App\Http\Controllers\Admin\VendorController;
 use Illuminate\Support\Facades\Route;
@@ -177,6 +178,18 @@ Route::middleware(['auth', 'verified', 'deny.vendor'])->prefix('admin')->name('a
         Route::put('payments/{payment}', [PaymentMethodController::class, 'update'])->name('payments.update');
         Route::patch('payments/{payment}/toggle', [PaymentMethodController::class, 'toggle'])->name('payments.toggle');
         Route::delete('payments/{payment}', [PaymentMethodController::class, 'destroy'])->name('payments.destroy');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Support tickets
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('role.can:tickets')->group(function () {
+        Route::get('tickets', [TicketController::class, 'index'])->name('tickets.index');
+        Route::get('tickets/{ticket}', [TicketController::class, 'show'])->name('tickets.show');
+        Route::post('tickets/{ticket}/replies', [TicketController::class, 'reply'])->name('tickets.reply');
+        Route::patch('tickets/{ticket}', [TicketController::class, 'update'])->name('tickets.update');
     });
 
     /*

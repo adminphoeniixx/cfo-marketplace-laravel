@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\Customer\ProfileController as CustomerProfileContro
 use App\Http\Controllers\Api\Customer\ReferenceController;
 use App\Http\Controllers\Api\Customer\RequestController;
 use App\Http\Controllers\Api\Customer\ReviewController;
+use App\Http\Controllers\Api\Customer\TicketController;
 use App\Http\Controllers\Api\Customer\WalletController;
 use App\Http\Controllers\Api\Customer\WishlistController;
 use App\Http\Controllers\Api\Seller\AnalyticsController;
@@ -322,6 +323,16 @@ Route::prefix('customer')->name('api.customer.')->group(function () {
             ->whereNumber('method')->name('payment-methods.default');
 
         Route::get('wallet', [WalletController::class, 'wallet'])->name('wallet');
+
+        /*
+        | Support tickets. `/support/config` beside these is open to anybody;
+        | a ticket belongs to one shopper, so these are not.
+        */
+        Route::get('support/tickets', [TicketController::class, 'index'])->name('support.tickets.index');
+        Route::post('support/tickets', [TicketController::class, 'store'])->name('support.tickets.store');
+        Route::get('support/tickets/{number}', [TicketController::class, 'show'])->name('support.tickets.show');
+        Route::post('support/tickets/{number}/replies', [TicketController::class, 'reply'])->name('support.tickets.reply');
+        Route::post('support/tickets/{number}/close', [TicketController::class, 'close'])->name('support.tickets.close');
 
         Route::get('notification-preferences', [CustomerProfileController::class, 'notificationPreferences'])
             ->name('notification-preferences');

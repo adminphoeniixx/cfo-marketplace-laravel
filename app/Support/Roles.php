@@ -55,6 +55,7 @@ class Roles
         'cancellations' => ['label' => 'Cancellations', 'group' => 'Sales'],
         'refunds' => ['label' => 'Refunds', 'group' => 'Sales'],
         'customers' => ['label' => 'Customers', 'group' => 'Sales'],
+        'tickets' => ['label' => 'Support', 'group' => 'Sales'],
         'products' => ['label' => 'Products', 'group' => 'Catalog'],
         'categories' => ['label' => 'Categories', 'group' => 'Catalog'],
         'attributes' => ['label' => 'Attributes', 'group' => 'Catalog'],
@@ -75,9 +76,11 @@ class Roles
     public const DEFAULTS = [
         'manager' => [
             'analytics', 'orders', 'cancellations', 'refunds', 'customers',
-            'products', 'categories', 'attributes', 'vendors', 'payouts',
+            'tickets', 'products', 'categories', 'attributes', 'vendors', 'payouts',
         ],
-        'staff' => ['orders', 'cancellations', 'refunds', 'customers'],
+        // Support desk: answering people is the whole of this role, so tickets
+        // are theirs by default rather than something to be granted.
+        'staff' => ['orders', 'cancellations', 'refunds', 'customers', 'tickets'],
         // Everything the seller app offers. The API enforces this list too, so
         // narrowing it here closes the matching screen in the app as well as
         // the section in the panel.
