@@ -519,6 +519,33 @@ Two defaults follow from the situation, and the app may override either:
 
 ---
 
+## Support
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/support/tickets` | `?direction=incoming\|outgoing`, `?filter=open`. |
+| POST | `/support/tickets` | `subject`, `message`, `category`. Always to the marketplace. |
+| GET | `/support/tickets/{number}` | The thread. |
+| POST | `/support/tickets/{number}/replies` | `message`, and `resolve` on an incoming one. |
+
+Two piles, one endpoint:
+
+- **`incoming`** — shoppers writing to your store. You answer them, and
+  `resolve` closes it off. The shopper can write back, which reopens it.
+- **`outgoing`** — your store writing to the marketplace. A payout that has not
+  landed, a listing taken down. You cannot resolve these; the marketplace does.
+
+`status_label` is written from your side of the desk: on an incoming ticket
+"open" means *you* owe a reply, on an outgoing one it means you are waiting.
+
+You see what the shopper sees. Marketplace staff talking among themselves is
+filtered out in the query, and a store only ever reads its own post — another
+store's ticket number is a 404.
+
+Gated on the `tickets` section, which the vendor role holds by default.
+
+---
+
 ## Pagination
 
 List endpoints return Laravel's standard shape:

@@ -11,9 +11,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
 /**
+ * @property Vendor|null $vendor
+ * @property User|null $opener
+ *
  * The relations are genuinely nullable — a ticket need not be about an order
  * and need not be assigned — which the generic relation types do not say.
- *
  * @property Customer|null $customer
  * @property Order|null $order
  * @property User|null $assignee
@@ -35,6 +37,19 @@ class Ticket extends Model
     use HasFactory;
 
     public const STATUSES = ['open', 'pending', 'resolved', 'closed'];
+
+    /**
+     * Who has to answer.
+     *
+     * A shopper asking where their parcel is wants the *seller*; a shopper
+     * asking why a refund has not landed wants the marketplace. Routing that
+     * at the moment it is written is the difference between an answer and a
+     * ticket forwarded twice.
+     */
+    public const AUDIENCES = ['vendor', 'marketplace'];
+
+    /** Which side started it. */
+    public const OPENED_BY = ['customer', 'vendor', 'staff'];
 
     /**
      * What the shopper is writing in about, in their own words.
@@ -88,6 +103,25 @@ class Ticket extends Model
     }
 
     /**
+     * The store involved: the one being written to where `audience` is
+     * `vendor`, and the author's own where a seller wrote to the marketplace.
+     *
+     * @return BelongsTo<Vendor, $this>
+     */
+    public function vendor(): BelongsTo
+    {
+        return $this->belongsTo(Vendor::class);
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function opener(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'opened_by_user_id');
+    }
+
+    /**
      * @return BelongsTo<User, $this>
      */
     public function assignee(): BelongsTo
@@ -106,9 +140,27 @@ class Ticket extends Model
      */
     public function customerName(string $fallback = 'A shopper', string $column = 'first_name'): string
     {
+        // A seller writing to the marketplace has no shopper in the
+        // conversation at all, so there is nothing to look up.
+        if ($this->customer_id === null) {
+            return $fallback;
+        }
+
         $name = Customer::withTrashed()->whereKey($this->customer_id)->value($column);
 
         return is_string($name) && $name !== '' ? $name : $fallback;
+    }
+
+    /**
+     * Who opened it, however they signed in.
+     */
+    public function openerName(): string
+    {
+        if ($this->opened_by === 'vendor') {
+            return (string) (Vendor::whereKey($this->vendor_id)->value('name') ?: 'A seller');
+        }
+
+        return $this->customerName();
     }
 
     /**
@@ -128,6 +180,40 @@ class Ticket extends Model
     public function scopeUnfinished(Builder $query): Builder
     {
         return $query->whereIn('status', ['open', 'pending']);
+    }
+
+    /**
+     * Addressed to the marketplace — from a shopper or from one of its sellers.
+     *
+     * @param  Builder<$this>  $query
+     * @return Builder<$this>
+     */
+    public function scopeForMarketplace(Builder $query): Builder
+    {
+        return $query->where('audience', 'marketplace');
+    }
+
+    /**
+     * Addressed to one store, which is the only pile that store may read.
+     *
+     * @param  Builder<$this>  $query
+     * @return Builder<$this>
+     */
+    public function scopeForVendor(Builder $query, int $vendorId): Builder
+    {
+        return $query->where('audience', 'vendor')->where('vendor_id', $vendorId);
+    }
+
+    /** Raised by a store, and waiting on the marketplace. */
+    public function isFromVendor(): bool
+    {
+        return $this->opened_by === 'vendor';
+    }
+
+    /** Who is expected to answer, in words. */
+    public function audienceLabel(): string
+    {
+        return $this->audience === 'vendor' ? 'The seller' : 'The marketplace';
     }
 
     public function isFinished(): bool
@@ -156,6 +242,11 @@ class Ticket extends Model
      */
     public function addMessage(string $body, ?Customer $from = null, ?User $staff = null, bool $internal = false): TicketMessage
     {
+        // "Answering" means the side the ticket is addressed to. A seller
+        // replying to a shopper is answering; a seller writing to the
+        // marketplace is asking, even though both are `User` logins.
+        $isAnswer = $staff !== null && ! ($this->isFromVendor() && $staff->isVendor());
+
         $message = $this->messages()->create([
             'customer_id' => $from?->id,
             'user_id' => $staff?->id,
@@ -171,13 +262,13 @@ class Ticket extends Model
 
         $this->forceFill([
             'last_reply_at' => now(),
-            'status' => $staff !== null ? 'pending' : 'open',
-            'first_responded_at' => $staff !== null
+            'status' => $isAnswer ? 'pending' : 'open',
+            'first_responded_at' => $isAnswer
                 ? ($this->first_responded_at ?? now())
                 : $this->first_responded_at,
-            // A shopper writing back on something already answered has not
-            // finished with it, whatever support decided.
-            'closed_at' => $staff !== null ? $this->closed_at : null,
+            // Whoever raised it writing back on something already answered has
+            // not finished with it, whatever the other side decided.
+            'closed_at' => $isAnswer ? $this->closed_at : null,
         ])->save();
 
         return $message;

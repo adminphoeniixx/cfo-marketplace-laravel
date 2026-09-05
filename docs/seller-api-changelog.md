@@ -15,6 +15,20 @@ with both.
 
 ---
 
+## 2026-09-05
+
+### Added
+
+- **Support tickets, both directions.** `GET`/`POST /support/tickets`,
+  `GET /support/tickets/{number}`, `POST /support/tickets/{number}/replies`.
+  Shoppers can now write to a store about an order or a product, and a store
+  can write to the marketplace — which it had no way to do at all. One
+  `direction` filter separates the two, `status_label` reads from the store's
+  side of the desk, and `resolve` is accepted only on the incoming pile.
+  Gated on a new `tickets` section, held by the vendor role by default.
+
+---
+
 ## 2026-09-04
 
 ### Added

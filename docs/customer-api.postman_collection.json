@@ -2405,7 +2405,7 @@
                         },
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n  \"subject\": \"My parcel has not arrived\",\n  \"message\": \"It was due on Tuesday and there is no update.\",\n  \"category\": \"delivery\",\n  \"order_number\": \"1001\"\n}",
+                            "raw": "{\n  \"subject\": \"My parcel has not arrived\",\n  \"message\": \"It was due on Tuesday and there is no update.\",\n  \"category\": \"delivery\",\n  \"order_number\": \"1001\",\n  \"vendor_id\": 1\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"

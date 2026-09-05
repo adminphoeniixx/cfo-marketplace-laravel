@@ -42,6 +42,14 @@ class NotificationController extends Controller
                 ...array_intersect_key($notification->data, array_flip(
                     ['title', 'body', 'url', 'tone', 'kind']
                 )),
+                // Notifications are written once and read from two panels, so
+                // the stored link points at /admin. A seller following it
+                // verbatim lands on a screen they are not allowed to open —
+                // every seller-visible notification has a mirror under
+                // /seller, which is where the same id belongs.
+                'url' => $this->panel === 'seller'
+                    ? Str::replaceStart('/admin/', '/seller/', (string) ($notification->data['url'] ?? ''))
+                    : ($notification->data['url'] ?? ''),
             ]);
 
         return Inertia::render("{$this->panel}/notifications/Index", [

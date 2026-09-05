@@ -20,6 +20,9 @@ function vendorHolds(array $sections): void
 test('every section the seller app uses is on by default', function () {
     expect(Roles::forRole('vendor'))->toBe([
         'analytics', 'orders', 'cancellations', 'refunds',
+        // Shoppers write to stores, and a store without this hears nothing
+        // about a question addressed to it.
+        'tickets',
         'products', 'shipping', 'payouts', 'team',
     ]);
 });

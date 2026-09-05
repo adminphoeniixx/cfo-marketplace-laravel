@@ -59,6 +59,18 @@ const allGroups = computed<NavGroup[]>(() => [
         ],
     },
     {
+        label: 'Support',
+        items: [
+            {
+                label: 'Tickets',
+                href: '/seller/tickets',
+                match: '/seller/tickets',
+                icon: 'notifications',
+                section: 'tickets',
+            },
+        ],
+    },
+    {
         label: 'Catalog',
         items: [
             {

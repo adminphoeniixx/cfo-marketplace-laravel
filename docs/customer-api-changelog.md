@@ -27,6 +27,15 @@ step with both.
   your own orders, `status_label` is the sentence to put on screen, and
   replying to a resolved ticket reopens it. Staff answer as "Support", and
   internal notes never leave the panel. 85 endpoints now.
+- **A ticket now has an audience.** `POST /support/tickets` takes an optional
+  `vendor_id` — or works the seller out from `order_number` where the order has
+  one — and the ticket goes to that store rather than to the marketplace.
+  Send neither and it goes to the marketplace as before. Responses carry
+  `audience`, `audience_label` and `seller`. **What an app must do:** offer the
+  seller as the recipient on anything about a parcel or a product; you may only
+  name a seller the shopper has bought from. A store's replies are attributed
+  to the store by name, so `author_type` is now `customer`, `vendor` or
+  `support`.
 
 ---
 

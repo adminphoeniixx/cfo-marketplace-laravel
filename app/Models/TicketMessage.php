@@ -68,14 +68,20 @@ class TicketMessage extends Model
         return $query->where('is_internal', false);
     }
 
-    /** Who wrote it, as either side should see it. */
+    /**
+     * Who wrote it, as the other side should see it.
+     *
+     * Never a staff member's own name: whoever writes in is dealing with a
+     * store or with the marketplace, and a first name here is a detail nobody
+     * needs and support cannot take back. A seller answering a shopper is
+     * named, though — the shopper bought from them and knows who they are.
+     */
     public function authorName(): string
     {
-        if ($this->user_id) {
-            // Staff answer as the marketplace, not as a named person: a
-            // shopper is dealing with the store, and a first name here is a
-            // detail nobody needs and support cannot take back.
-            return 'Support';
+        if ($this->user_id !== null) {
+            return $this->user->isVendor()
+                ? (string) ($this->user->vendor?->name ?: 'The seller')
+                : 'Support';
         }
 
         // Branching on the id rather than the relation: `nullOnDelete` means
@@ -86,6 +92,10 @@ class TicketMessage extends Model
 
     public function authorType(): string
     {
-        return $this->user_id ? 'support' : 'customer';
+        if ($this->user_id === null) {
+            return 'customer';
+        }
+
+        return $this->user->isVendor() ? 'vendor' : 'support';
     }
 }

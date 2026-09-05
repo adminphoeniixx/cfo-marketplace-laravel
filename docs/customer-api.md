@@ -579,6 +579,25 @@ flag as the profile's `accepts_marketing`.
 label. `order_number` attaches the ticket to one of **your own** orders; naming
 somebody else's is a `422`, not a silent miss.
 
+### Who answers it
+
+A ticket goes to **one of two places**, and `audience` says which:
+
+- **`vendor`** — send `vendor_id`, or an `order_number` whose order has a
+  single seller and the seller is worked out for you. Where is my parcel, does
+  this run small: the seller's to answer.
+- **`marketplace`** — send neither. Refunds, payments, the account itself.
+
+`audience_label` is the sentence to show ("The seller" / "The marketplace") and
+`seller` carries the store's id and name when there is one.
+
+**You may only write to a seller you have bought from.** Any other `vendor_id`
+is a `422` — nothing here opens a channel to a stranger's inbox.
+
+Replies from a store are attributed to **the store by name**; replies from the
+marketplace come back as **"Support"**. `author_type` is `customer`, `vendor`
+or `support`.
+
 **`status` is about who the ticket is waiting on**, and `status_label` says it
 in the words to put on screen:
 

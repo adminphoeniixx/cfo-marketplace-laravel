@@ -11,6 +11,7 @@ use App\Models\Refund;
 use App\Models\ShippingRate;
 use App\Models\ShippingZone;
 use App\Models\TaxClass;
+use App\Models\Ticket;
 use App\Models\User;
 use App\Models\VendorPayout;
 use Illuminate\Http\UploadedFile;
@@ -120,6 +121,17 @@ function storeFixture(): array
     ]);
     $refund->items()->create(['order_item_id' => $item->id, 'quantity' => 1, 'amount' => 1000]);
 
+    // Two piles of post: a shopper writing to this store, and this store
+    // writing to the marketplace.
+    $incoming = Ticket::factory()->create([
+        'customer_id' => $customer->id,
+        'audience' => 'vendor',
+        'vendor_id' => $store->id,
+        'opened_by' => 'customer',
+        'subject' => 'Where is my parcel?',
+    ]);
+    $incoming->addMessage('It was due on Tuesday.', from: $customer);
+
     $zone = ShippingZone::factory()->create(['is_active' => true]);
     $rate = ShippingRate::factory()->create([
         'shipping_zone_id' => $zone->id,
@@ -163,6 +175,7 @@ function storeFixture(): array
         'order' => $order,
         'item' => $item,
         'payout' => $payout,
+        'ticket' => $incoming,
         'cancellation' => $cancellation,
         'refund' => $refund,
         'zone' => $zone,
@@ -298,6 +311,19 @@ function storeCalls(array $f): array
         'api.seller.refunds.respond' => ['POST', route('api.seller.refunds.respond', $f['refund']->id), [
             'note' => 'Return received in good order.',
         ], 201],
+
+        // Support: what shoppers asked this store, and what it asked the
+        // marketplace.
+        'api.seller.support.tickets.index' => ['GET', route('api.seller.support.tickets.index'), []],
+        'api.seller.support.tickets.store' => ['POST', route('api.seller.support.tickets.store'), [
+            'subject' => 'August payout has not landed',
+            'message' => 'The panel says paid but nothing has arrived.',
+            'category' => 'payment',
+        ], 201],
+        'api.seller.support.tickets.show' => ['GET', route('api.seller.support.tickets.show', $f['ticket']->number), []],
+        'api.seller.support.tickets.reply' => ['POST', route('api.seller.support.tickets.reply', $f['ticket']->number), [
+            'message' => 'Posted this morning, tracking to follow.',
+        ]],
 
         // Delivery.
         'api.seller.shipping.zones' => ['GET', route('api.seller.shipping.zones'), []],

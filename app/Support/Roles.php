@@ -86,6 +86,9 @@ class Roles
         // the section in the panel.
         'vendor' => [
             'analytics', 'orders', 'cancellations', 'refunds',
+            // Shoppers write to stores now, and a store that does not hold
+            // this hears nothing about a question addressed to it.
+            'tickets',
             'products', 'shipping', 'payouts', 'team',
         ],
     ];

@@ -8,6 +8,7 @@ use App\Http\Controllers\Seller\OrderController;
 use App\Http\Controllers\Seller\ProductController;
 use App\Http\Controllers\Seller\RegistrationController;
 use App\Http\Controllers\Seller\StoreController;
+use App\Http\Controllers\Seller\TicketController as SellerTicketController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -50,6 +51,17 @@ Route::middleware(['auth', 'verified', 'seller.panel'])
     ->name('seller.')
     ->group(function () {
         Route::redirect('/', '/seller/orders')->name('home');
+
+        /*
+        | Two piles of post: shoppers writing to this store, and this store
+        | writing to the marketplace.
+        */
+        Route::middleware('seller.panel:tickets')->group(function () {
+            Route::get('tickets', [SellerTicketController::class, 'index'])->name('tickets.index');
+            Route::post('tickets', [SellerTicketController::class, 'store'])->name('tickets.store');
+            Route::get('tickets/{ticket}', [SellerTicketController::class, 'show'])->name('tickets.show');
+            Route::post('tickets/{ticket}/replies', [SellerTicketController::class, 'reply'])->name('tickets.reply');
+        });
 
         // Reused from the token API as-is: it takes the store from the signed-in
         // user and files every upload under that store's own folder.

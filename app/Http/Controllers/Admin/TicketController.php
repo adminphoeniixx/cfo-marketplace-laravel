@@ -7,6 +7,8 @@ use App\Models\Ticket;
 use App\Models\TicketMessage;
 use App\Models\User;
 use App\Notifications\TicketAnswered;
+use App\Notifications\TicketAnsweredByMarketplace;
+use App\Services\Notifier;
 use App\Support\Roles;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -31,9 +33,15 @@ class TicketController extends Controller
             'status' => ['nullable', Rule::in(Ticket::STATUSES)],
             'category' => ['nullable', Rule::in(array_keys(Ticket::CATEGORIES))],
             'assigned' => ['nullable', 'string', 'max:20'],
+            // Oversight, off by default: a shopper's question to a seller is
+            // that seller's to answer, and mixing them into this queue would
+            // put every question about a saree in front of staff who cannot
+            // answer it.
+            'audience' => ['nullable', Rule::in(Ticket::AUDIENCES)],
         ]);
 
         $tickets = Ticket::query()
+            ->where('audience', $filters['audience'] ?? 'marketplace')
             ->when($filters['search'] ?? null, fn ($query, string $term) => $query
                 ->where(fn ($inner) => $inner
                     ->whereLike('number', "%{$term}%", caseSensitive: false)
@@ -44,7 +52,7 @@ class TicketController extends Controller
                 fn ($query) => $query->where('assigned_to', $request->user()->id))
             ->when(($filters['assigned'] ?? null) === 'nobody',
                 fn ($query) => $query->whereNull('assigned_to'))
-            ->with(['customer:id,first_name,last_name,email', 'assignee:id,name', 'order:id,number'])
+            ->with(['customer:id,first_name,last_name,email', 'assignee:id,name', 'order:id,number', 'vendor:id,name'])
             // Oldest reply first among the unfinished: the person who has been
             // waiting longest is the one to answer next.
             ->orderByRaw("case when status in ('open','pending') then 0 else 1 end")
@@ -57,10 +65,14 @@ class TicketController extends Controller
             'filters' => $filters,
             'categories' => Ticket::CATEGORIES,
             'statuses' => Ticket::STATUSES,
+            'audiences' => Ticket::AUDIENCES,
             'summary' => [
-                'open' => Ticket::where('status', 'open')->count(),
-                'pending' => Ticket::where('status', 'pending')->count(),
-                'unassigned' => Ticket::unfinished()->whereNull('assigned_to')->count(),
+                'open' => Ticket::forMarketplace()->where('status', 'open')->count(),
+                'pending' => Ticket::forMarketplace()->where('status', 'pending')->count(),
+                'unassigned' => Ticket::forMarketplace()->unfinished()->whereNull('assigned_to')->count(),
+                // What the stores are carrying, for a lead who wants to know
+                // whether sellers are keeping up — not a queue to work.
+                'with_sellers' => Ticket::where('audience', 'vendor')->unfinished()->count(),
                 // The one number a support lead actually manages to.
                 'oldest_waiting_hours' => $this->oldestWaitingHours(),
             ],
@@ -134,9 +146,17 @@ class TicketController extends Controller
         }
 
         if (! $internal) {
-            // Told to the shopper, in the app and by email — somebody who
-            // wrote in on Monday is not holding the app open on Tuesday.
+            // Told to whoever raised it. A seller's ticket has no shopper in
+            // it at all, and their own panel is where they will look.
             $ticket->customer?->notify(new TicketAnswered($ticket->fresh(), $data['body']));
+
+            if ($ticket->isFromVendor() && $ticket->vendor_id !== null) {
+                Notifier::sendPerStore(
+                    [$ticket->vendor_id],
+                    fn () => new TicketAnsweredByMarketplace($ticket->fresh()),
+                    $request->user(),
+                );
+            }
         }
 
         return back()->with('success', $internal ? 'Note added.' : 'Reply sent.');
@@ -170,7 +190,8 @@ class TicketController extends Controller
      */
     protected function oldestWaitingHours(): ?float
     {
-        $oldest = Ticket::where('status', 'open')->orderBy('last_reply_at')->value('last_reply_at');
+        $oldest = Ticket::forMarketplace()->where('status', 'open')
+            ->orderBy('last_reply_at')->value('last_reply_at');
 
         return $oldest
             ? round(now()->diffInMinutes($oldest, absolute: true) / 60, 1)
@@ -199,6 +220,13 @@ class TicketController extends Controller
                 'total_spent' => (float) ($ticket->customer->total_spent ?? 0),
             ] : null,
             'order_number' => $ticket->relationLoaded('order') ? $ticket->order?->number : null,
+            'audience' => $ticket->audience,
+            'opened_by' => $ticket->opened_by,
+            // Who raised it, whichever side that was.
+            'from' => $ticket->openerName(),
+            'seller' => $ticket->relationLoaded('vendor') && $ticket->vendor
+                ? ['id' => $ticket->vendor->id, 'name' => $ticket->vendor->name]
+                : null,
             'assignee' => $ticket->relationLoaded('assignee') && $ticket->assignee
                 ? ['id' => $ticket->assignee->id, 'name' => $ticket->assignee->name]
                 : null,

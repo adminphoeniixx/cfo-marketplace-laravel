@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\Seller\ProfileController;
 use App\Http\Controllers\Api\Seller\RefundController;
 use App\Http\Controllers\Api\Seller\ShippingController;
 use App\Http\Controllers\Api\Seller\TeamController;
+use App\Http\Controllers\Api\Seller\TicketController as SellerTicketController;
 use App\Http\Controllers\Api\Seller\UploadController;
 use Illuminate\Support\Facades\Route;
 
@@ -131,6 +132,17 @@ Route::prefix('seller')->name('api.seller.')->group(function () {
                 Route::get('catalog/categories', [CatalogController::class, 'categories'])->name('catalog.categories');
                 Route::get('catalog/attributes', [CatalogController::class, 'attributes'])->name('catalog.attributes');
                 Route::get('catalog/tax-classes', [CatalogController::class, 'taxClasses'])->name('catalog.tax-classes');
+            });
+
+            /*
+            | The store's two piles of post: shoppers writing to it, and it
+            | writing to the marketplace.
+            */
+            Route::middleware('seller.section:tickets')->group(function () {
+                Route::get('support/tickets', [SellerTicketController::class, 'index'])->name('support.tickets.index');
+                Route::post('support/tickets', [SellerTicketController::class, 'store'])->name('support.tickets.store');
+                Route::get('support/tickets/{number}', [SellerTicketController::class, 'show'])->name('support.tickets.show');
+                Route::post('support/tickets/{number}/replies', [SellerTicketController::class, 'reply'])->name('support.tickets.reply');
             });
 
             Route::middleware('seller.section:analytics')->group(function () {
