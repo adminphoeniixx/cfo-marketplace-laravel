@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\DeliveryPartner;
 use App\Models\Order;
+use App\Services\Couriers\Couriers;
 use Closure;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,7 +22,11 @@ class DeliveryPartnerController extends Controller
     {
         $data = $this->validated($request);
 
-        $partner = DeliveryPartner::create([...$data, 'code' => Str::slug($data['name'])]);
+        $partner = DeliveryPartner::create([
+            ...$data,
+            'code' => Str::slug($data['name']),
+            'credentials' => $this->credentials($data, null) ?: null,
+        ]);
 
         return back()->with('success', "Delivery partner \"{$partner->name}\" added.");
     }
@@ -31,7 +36,16 @@ class DeliveryPartnerController extends Controller
         $data = $this->validated($request, $partner);
         $previousName = $partner->name;
 
-        $partner->update([...$data, 'code' => Str::slug($data['name'])]);
+        $credentials = $this->credentials($data, $partner);
+
+        $partner->update([
+            ...$data,
+            'code' => Str::slug($data['name']),
+            'credentials' => $credentials ?: null,
+            // Changed keys are unproven keys until somebody presses Test.
+            'connected_at' => $credentials === ($partner->credentials ?? []) ? $partner->connected_at : null,
+            'connection_error' => null,
+        ]);
 
         // Fulfilled orders store the courier's name, so a rename must follow.
         if ($previousName !== $partner->name) {
@@ -39,6 +53,42 @@ class DeliveryPartnerController extends Controller
         }
 
         return back()->with('success', 'Delivery partner updated.');
+    }
+
+    /**
+     * Ask the courier whether these credentials are real.
+     *
+     * A courier that accepts a booking and delivers nothing is a failure this
+     * marketplace has already met once. Pressing this before a parcel depends
+     * on it is the whole point — and it ships nothing, so it is safe to press
+     * as often as you like.
+     */
+    public function test(DeliveryPartner $partner): RedirectResponse
+    {
+        $client = Couriers::for($partner);
+
+        if ($client === null) {
+            $partner->forceFill([
+                'connected_at' => null,
+                'connection_error' => 'No courier selected, or its credentials are incomplete.',
+            ])->save();
+
+            return back()->with('error', "\"{$partner->name}\" has nothing to connect with yet.");
+        }
+
+        $ok = $client->ping();
+
+        $partner->forceFill([
+            'connected_at' => $ok ? now() : null,
+            'connection_error' => $ok ? null : 'The courier refused these credentials.',
+        ])->save();
+
+        return back()->with(
+            $ok ? 'success' : 'error',
+            $ok
+                ? "\"{$partner->name}\" answered. Bookings will go through it."
+                : "\"{$partner->name}\" refused these credentials. Nothing was shipped."
+        );
     }
 
     public function toggle(DeliveryPartner $partner): RedirectResponse
@@ -82,6 +132,35 @@ class DeliveryPartnerController extends Controller
             'notes' => ['nullable', 'string', 'max:255'],
             'is_active' => ['boolean'],
             'position' => ['integer', 'min:0', 'max:999'],
+            // Null keeps a partner what every partner used to be: a label, a
+            // link and a phone number.
+            'driver' => ['nullable', Rule::in(array_keys(Couriers::DRIVERS))],
+            'credentials' => ['nullable', 'array'],
+            'credentials.*' => ['nullable', 'string', 'max:500'],
         ]);
+    }
+
+    /**
+     * Merge what was typed over what is stored.
+     *
+     * A secret is written once and shown back as a row of dots, so the form
+     * posts a blank for it whenever nobody retyped it. Taking that blank
+     * literally would wipe a working token every time somebody corrected a
+     * pickup name.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, string>
+     */
+    private function credentials(array $data, ?DeliveryPartner $partner): array
+    {
+        // `$partner` is null when adding, which is the only reason for the
+        // check — the column itself is nullable and handled below.
+        $existing = $partner instanceof DeliveryPartner ? ($partner->credentials ?? []) : [];
+        $submitted = array_filter(
+            (array) ($data['credentials'] ?? []),
+            fn ($value) => is_string($value) && trim($value) !== '',
+        );
+
+        return [...$existing, ...$submitted];
     }
 }

@@ -1,8 +1,9 @@
 <?php
 
+use App\Models\DeliveryPartner;
 use App\Models\Order;
 use App\Models\Vendor;
-use App\Services\Delhivery;
+use App\Services\Couriers\Couriers;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
@@ -21,6 +22,10 @@ beforeEach(function () {
         'services.delhivery.pickup_name' => 'CFO Noida',
         'services.delhivery.seller_name' => 'CFO',
     ]);
+
+    // A courier row with a driver is what makes an order bookable now; the
+    // credentials still fall back to the environment above.
+    DeliveryPartner::where('name', 'Delhivery')->update(['driver' => 'delhivery']);
 });
 
 /** An order of this store's, ready to be handed over. */
@@ -85,7 +90,7 @@ test('fulfilling books a waybill and puts it on the order', function () {
         ->and($order->fresh()->carrier)->toBe('delhivery')
         // On the timeline, so the shopper's order page says it too.
         ->and($order->events()->where('type', 'shipment')->first()->title)
-        ->toBe('Booked with Delhivery');
+        ->toBe('Booked with delhivery');
 
     Http::assertSent(function ($request) {
         // Their own shape: a form body whose `data` field is JSON. Sending it
@@ -261,6 +266,8 @@ test('serviceability answers what a pincode will take', function () {
         ]),
     ]);
 
-    expect(Delhivery::serviceability('600090'))
+    $client = Couriers::forCarrier('Delhivery');
+
+    expect($client?->serviceability('600090'))
         ->toBe(['serviceable' => true, 'cod' => true, 'prepaid' => true, 'pickup' => false]);
 });

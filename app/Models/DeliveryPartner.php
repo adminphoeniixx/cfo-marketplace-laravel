@@ -7,8 +7,13 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
+/**
+ * @property array<string, mixed>|null $credentials
+ * @property Carbon|null $connected_at
+ */
 class DeliveryPartner extends Model
 {
     /** @use HasFactory<DeliveryPartnerFactory> */
@@ -18,7 +23,11 @@ class DeliveryPartner extends Model
 
     protected function casts(): array
     {
-        return ['is_active' => 'boolean'];
+        return [
+            // Ciphertext in Postgres: a database dump gives up nothing, and
+            // rotating a key is a form field rather than a release.
+            'credentials' => 'encrypted:array',
+            'connected_at' => 'datetime', 'is_active' => 'boolean'];
     }
 
     /**

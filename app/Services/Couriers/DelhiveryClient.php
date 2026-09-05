@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Couriers;
 
 use App\Models\Order;
 use Illuminate\Http\Client\ConnectionException;
@@ -18,16 +18,16 @@ use RuntimeException;
  * status — belongs to `BookShipment` and `SyncShipments`, so this class never
  * writes to the database.
  *
- * Inert without a token, like the payment gateway: the seller types a waybill
- * in by hand and nothing else changes. That is what lets the demo and the test
- * suite run without a courier account.
+ * Constructed with credentials rather than reading them: they come from the
+ * courier's own row in the panel, or from the environment where somebody set
+ * them there first. `Couriers` decides which.
  *
  * Delhivery's own oddity, kept in one place: `create.json` wants a *form* body
  * whose `data` field is JSON, not a JSON body. Sending it as JSON returns a
  * cheerful 200 with `success: false` and no waybill, which is exactly the kind
  * of failure that gets deployed.
  */
-class Delhivery
+class DelhiveryClient implements CourierClient
 {
     /** What Delhivery calls the state a parcel is in, in this marketplace's words. */
     private const STATUS_MAP = [
@@ -44,9 +44,34 @@ class Delhivery
         'Cancelled' => 'cancelled',
     ];
 
-    public static function enabled(): bool
+    /**
+     * @param  string  $token  Delhivery's API token.
+     * @param  string  $pickupName  A warehouse registered in their panel — a
+     *                              name they do not know refuses every booking.
+     * @param  string|null  $sellerName  Printed on the label as the sender.
+     */
+    public function __construct(
+        private readonly string $token,
+        private readonly string $pickupName,
+        private readonly ?string $sellerName = null,
+        private readonly string $baseUrl = 'https://track.delhivery.com',
+        private readonly int $connectTimeout = 5,
+        private readonly int $timeout = 30,
+    ) {}
+
+    /**
+     * Ask for a pincode nobody could mistake for a booking.
+     *
+     * Delhivery has no "who am I" endpoint, so serviceability stands in: it is
+     * a GET, it changes nothing, and a bad token comes back 401.
+     */
+    public function ping(): bool
     {
-        return self::config('token') !== null && self::config('pickup_name') !== null;
+        try {
+            return $this->request()->get('/c/api/pin-codes/json/', ['filter_codes' => '110001'])->successful();
+        } catch (ConnectionException) {
+            return false;
+        }
     }
 
     /**
@@ -55,10 +80,10 @@ class Delhivery
      * @return array{serviceable: bool, cod: bool, prepaid: bool, pickup: bool}|null
      *                                                                               Null where the question could not be asked.
      */
-    public static function serviceability(string $pincode): ?array
+    public function serviceability(string $pincode): ?array
     {
         try {
-            $response = self::request()->get('/c/api/pin-codes/json/', ['filter_codes' => $pincode]);
+            $response = $this->request()->get('/c/api/pin-codes/json/', ['filter_codes' => $pincode]);
         } catch (ConnectionException $e) {
             Log::warning('Delhivery unreachable for a serviceability check.', [
                 'pincode' => $pincode, 'error' => $e->getMessage(),
@@ -95,7 +120,7 @@ class Delhivery
      *
      * @throws RuntimeException When Delhivery refuses or cannot be reached.
      */
-    public static function createShipment(Order $order, array $overrides = []): string
+    public function createShipment(Order $order, array $overrides = []): string
     {
         $address = (array) $order->shipping_address;
         $isCod = $order->isPayOnDelivery() && $order->payment_status !== 'paid';
@@ -120,19 +145,19 @@ class Delhivery
             'weight' => (string) ($overrides['weight'] ?? 500),
             'shipment_width' => (string) ($overrides['width'] ?? 20),
             'shipment_height' => (string) ($overrides['height'] ?? 15),
-            'seller_name' => $overrides['seller_name'] ?? self::config('seller_name') ?? config('app.name'),
+            'seller_name' => $overrides['seller_name'] ?? $this->sellerName ?? config('app.name'),
             'shipping_mode' => 'Surface',
         ];
 
         $payload = [
             'shipments' => [$shipment],
-            'pickup_location' => ['name' => self::config('pickup_name')],
+            'pickup_location' => ['name' => $this->pickupName],
         ];
 
         try {
             // Form-encoded with a JSON `data` field: Delhivery's own shape, and
             // the reason this method exists rather than a one-line post.
-            $response = self::request()
+            $response = $this->request()
                 ->asForm()
                 ->post('/api/cmu/create.json', [
                     'format' => 'json',
@@ -171,10 +196,10 @@ class Delhivery
      *                                                                                                                                           Null where Delhivery could not be asked, which is not the same as
      *                                                                                                                                           "nothing has happened" and must not be treated as it.
      */
-    public static function track(string $waybill): ?array
+    public function track(string $waybill): ?array
     {
         try {
-            $response = self::request()->get('/api/v1/packages/json/', ['waybill' => $waybill]);
+            $response = $this->request()->get('/api/v1/packages/json/', ['waybill' => $waybill]);
         } catch (ConnectionException $e) {
             Log::warning('Delhivery unreachable while tracking.', [
                 'waybill' => $waybill, 'error' => $e->getMessage(),
@@ -216,10 +241,10 @@ class Delhivery
     /**
      * Call a booking off. Only possible before the parcel is collected.
      */
-    public static function cancel(string $waybill): bool
+    public function cancel(string $waybill): bool
     {
         try {
-            $response = self::request()->post('/api/p/edit', [
+            $response = $this->request()->post('/api/p/edit', [
                 'waybill' => $waybill,
                 'cancellation' => 'true',
             ]);
@@ -238,10 +263,10 @@ class Delhivery
      * The label, as a URL the browser can open with the token attached by us
      * rather than by the caller.
      */
-    public static function packingSlip(string $waybill): ?string
+    public function packingSlip(string $waybill): ?string
     {
         try {
-            $response = self::request()->get('/api/p/packing_slip', ['wbns' => $waybill, 'pdf' => 'true']);
+            $response = $this->request()->get('/api/p/packing_slip', ['wbns' => $waybill, 'pdf' => 'true']);
         } catch (ConnectionException) {
             return null;
         }
@@ -251,28 +276,15 @@ class Delhivery
         return is_string($url) ? $url : null;
     }
 
-    private static function request(): PendingRequest
+    private function request(): PendingRequest
     {
-        $token = self::config('token');
-
-        if ($token === null) {
-            throw new RuntimeException('Delhivery is not configured.');
-        }
-
-        return Http::baseUrl((string) self::config('base_url'))
+        return Http::baseUrl($this->baseUrl)
             ->withHeaders([
                 // Their own scheme: "Token <key>", not Bearer.
-                'Authorization' => 'Token '.$token,
+                'Authorization' => 'Token '.$this->token,
                 'Accept' => 'application/json',
             ])
-            ->connectTimeout((int) self::config('connect_timeout', 5))
-            ->timeout((int) self::config('timeout', 30));
-    }
-
-    private static function config(string $key, mixed $default = null): mixed
-    {
-        $value = config("services.delhivery.{$key}", $default);
-
-        return is_string($value) && trim($value) === '' ? $default : $value;
+            ->connectTimeout($this->connectTimeout)
+            ->timeout($this->timeout);
     }
 }

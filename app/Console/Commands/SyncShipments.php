@@ -2,9 +2,11 @@
 
 namespace App\Console\Commands;
 
+use App\Models\DeliveryPartner;
 use App\Models\Order;
-use App\Services\Delhivery;
+use App\Services\Couriers\Couriers;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Ask Delhivery where every parcel in flight has got to.
@@ -24,15 +26,24 @@ class SyncShipments extends Command
 
     public function handle(): int
     {
-        if (! Delhivery::enabled()) {
-            $this->components->warn('Delhivery is not configured; nothing to sync.');
+        // Every courier this marketplace can actually speak to. A partner
+        // that is only a name and a link has nothing to be asked.
+        $carriers = DeliveryPartner::query()
+            ->whereNotNull('driver')
+            ->where('is_active', true)
+            ->pluck('name')
+            ->map(fn (string $name) => mb_strtolower($name))
+            ->all();
+
+        if ($carriers === []) {
+            $this->components->warn('No courier is connected; nothing to sync.');
 
             return self::SUCCESS;
         }
 
         $orders = Order::query()
             ->whereNotNull('tracking_number')
-            ->whereRaw('lower(carrier) = ?', ['delhivery'])
+            ->whereIn(DB::raw('lower(carrier)'), $carriers)
             // Anything still moving. A delivered or called-off parcel has
             // nothing left to tell us, and asking anyway is a request per
             // order per run, for ever.
@@ -44,7 +55,8 @@ class SyncShipments extends Command
         $updated = 0;
 
         foreach ($orders as $order) {
-            $tracking = Delhivery::track((string) $order->tracking_number);
+            $courier = Couriers::forCarrier($order->carrier);
+            $tracking = $courier?->track((string) $order->tracking_number);
 
             if ($tracking === null) {
                 // Unreachable is not "nothing happened", and must never be
@@ -86,7 +98,7 @@ class SyncShipments extends Command
                 'shipment',
                 (string) ($scan['status'] ?? 'Update from the courier'),
                 trim(((string) ($scan['instructions'] ?? '')).' '.($scan['location'] ? '· '.$scan['location'] : '')) ?: null,
-                ['carrier' => 'delhivery', 'scan_at' => $at, 'source' => 'delhivery-api'],
+                ['carrier' => $order->carrier, 'scan_at' => $at, 'source' => 'courier-api'],
             );
 
             $changed = true;

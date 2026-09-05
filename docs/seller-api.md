@@ -336,11 +336,11 @@ Fulfilment only moves your own lines. The order-level status is recomputed from
 **every** line, so a two-vendor order stays `partially_fulfilled` until the
 other seller ships too.
 
-### Delhivery books its own waybill
+### A connected courier books its own waybill
 
-Where the marketplace has Delhivery credentials configured, fulfilling with
-`carrier: "delhivery"` and **no** `tracking_number` books the parcel and puts
-the waybill on the order — so the app can leave the tracking field empty and
+Couriers are connected in the marketplace's admin panel — Delhivery and
+Shiprocket today. Fulfilling with a **connected** `carrier` and **no**
+`tracking_number` books the parcel and puts the waybill on the order — so the app can leave the tracking field empty and
 read `tracking_number` back from the response.
 
 - Send a `tracking_number` and it is left alone. A seller who has a waybill
@@ -349,8 +349,8 @@ read `tracking_number` back from the response.
 - A refusal is **not** an error. The fulfilment stands, `tracking_number` stays
   null, and why it was refused is on the order timeline as a `shipment` event.
   Show the field so a waybill can still be typed in.
-- With no credentials configured nothing is booked and nothing changes, which
-  is how this worked before.
+- A courier that is only a name and a tracking link books nothing, and that is
+  not a failure — `GET /delivery-partners` is still the picker to show.
 
 Once booked, `shipments:sync` follows the parcel every fifteen minutes: each
 courier scan becomes a timeline event, and `shipped_at` / `delivered_at` come

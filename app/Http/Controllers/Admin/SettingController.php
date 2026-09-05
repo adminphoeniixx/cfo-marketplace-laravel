@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\DeliveryPartner;
 use App\Models\Order;
 use App\Models\Setting;
+use App\Services\Couriers\Couriers;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -53,13 +54,30 @@ class SettingController extends Controller
 
         $partners = DeliveryPartner::orderBy('position')->orderBy('name')->get()
             ->map(fn (DeliveryPartner $partner) => [
-                ...$partner->only(['id', 'name', 'code', 'tracking_url', 'support_phone', 'notes', 'is_active', 'position']),
+                ...$partner->only(['id', 'name', 'code', 'tracking_url', 'support_phone', 'notes', 'is_active', 'position', 'driver']),
                 'orders_count' => (int) ($shipments[$partner->name] ?? 0),
+                /*
+                | Which credential fields are filled, never their values.
+                |
+                | A token that has been typed once is shown back as "set" and
+                | nothing else — there is no shape of this screen that reads a
+                | secret out of the database and puts it in a page's props.
+                */
+                'credentials_set' => array_keys(array_filter(
+                    $partner->credentials ?? [],
+                    fn ($value) => is_string($value) && trim($value) !== '',
+                )),
+                'connected_at' => $partner->connected_at?->toIso8601String(),
+                'connection_error' => $partner->connection_error,
             ]);
 
         $since = RecordHeartbeat::secondsSinceLastRun();
 
         return Inertia::render('admin/Settings', [
+            // What the marketplace knows how to talk to, and what each needs
+            // told. The form is built from this, so adding a courier is a
+            // client and a registry entry rather than a forgotten input.
+            'courierDrivers' => Couriers::DRIVERS,
             'settings' => [...$this->defaults, ...$stored],
             'deliveryPartners' => $partners,
             // Couriers sitting on orders that are not in the managed list.

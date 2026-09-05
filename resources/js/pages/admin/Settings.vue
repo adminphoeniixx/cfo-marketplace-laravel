@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, router, useForm } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import PageHeader from '@/components/admin/PageHeader.vue';
 import PBadge from '@/components/admin/PBadge.vue';
 import PButton from '@/components/admin/PButton.vue';
@@ -18,6 +18,10 @@ type DeliveryPartner = {
     code: string;
     tracking_url: string | null;
     support_phone: string | null;
+    driver: string | null;
+    credentials_set: string[];
+    connected_at: string | null;
+    connection_error: string | null;
     notes: string | null;
     is_active: boolean;
     position: number;
@@ -28,6 +32,13 @@ const props = defineProps<{
     settings: Record<string, string>;
     deliveryPartners: DeliveryPartner[];
     unlistedPartners: string[];
+    courierDrivers: Record<
+        string,
+        {
+            label: string;
+            fields: Record<string, { label: string; secret: boolean; help: string }>;
+        }
+    >;
     scheduler: {
         last_run_at: string | null;
         seconds_ago: number | null;
@@ -79,14 +90,41 @@ const submit = () => form.put('/admin/settings', { preserveScroll: true });
 const showPartner = ref(false);
 const editingPartner = ref<DeliveryPartner | null>(null);
 
-const partnerForm = useForm({
+const partnerForm = useForm<{
+    name: string;
+    tracking_url: string;
+    support_phone: string;
+    notes: string;
+    is_active: boolean;
+    position: number;
+    driver: string;
+    credentials: Record<string, string>;
+}>({
     name: '',
     tracking_url: '',
     support_phone: '',
     notes: '',
     is_active: true,
     position: 0,
+    driver: '',
+    credentials: {},
 });
+
+/** The fields the chosen courier asks for, or none for a link-only partner. */
+const driverFields = computed(() =>
+    partnerForm.driver ? (props.courierDrivers[partnerForm.driver]?.fields ?? {}) : {},
+);
+
+/** Already stored, so the input can say so instead of showing the secret. */
+const alreadySet = (key: string) =>
+    (editingPartner.value?.credentials_set ?? []).includes(key);
+
+const testPartner = (partner: DeliveryPartner) =>
+    router.post(
+        `/admin/settings/delivery-partners/${partner.id}/test`,
+        {},
+        { preserveScroll: true },
+    );
 
 const openPartner = (partner: DeliveryPartner | null) => {
     editingPartner.value = partner;
@@ -99,6 +137,10 @@ const openPartner = (partner: DeliveryPartner | null) => {
         notes: partner?.notes ?? '',
         is_active: partner?.is_active ?? true,
         position: partner?.position ?? 0,
+        driver: partner?.driver ?? '',
+        // Never prefilled: a secret is written once and shown back as the fact
+        // that it exists.
+        credentials: {},
     });
 
     showPartner.value = true;
@@ -348,6 +390,23 @@ const destroyPartner = (partner: DeliveryPartner) =>
                                         tone="neutral"
                                         >Hidden</PBadge
                                     >
+                                    <!--
+                                    | Three states worth telling apart: not
+                                    | connected at all, connected and proven,
+                                    | and credentials nobody has tested — which
+                                    | is exactly how a courier that accepts a
+                                    | booking and delivers nothing looks.
+                                    -->
+                                    <PBadge
+                                        v-if="partner.driver && partner.connected_at"
+                                        tone="success"
+                                        >Connected</PBadge
+                                    >
+                                    <PBadge
+                                        v-else-if="partner.driver"
+                                        tone="warning"
+                                        >Untested</PBadge
+                                    >
                                 </p>
                                 <p class="truncate text-xs text-[#8a8a8a]">
                                     {{
@@ -361,12 +420,24 @@ const destroyPartner = (partner: DeliveryPartner) =>
                                         · {{ partner.support_phone }}
                                     </template>
                                 </p>
+                                <p
+                                    v-if="partner.connection_error"
+                                    class="text-xs text-[#e51c00]"
+                                >
+                                    {{ partner.connection_error }}
+                                </p>
                             </div>
                             <div class="flex gap-1.5">
                                 <PButton
                                     size="slim"
                                     @click="openPartner(partner)"
                                     >Edit</PButton
+                                >
+                                <PButton
+                                    v-if="partner.driver"
+                                    size="slim"
+                                    @click="testPartner(partner)"
+                                    >Test</PButton
                                 >
                                 <PButton
                                     size="slim"
@@ -446,6 +517,42 @@ const destroyPartner = (partner: DeliveryPartner) =>
                 label="Support phone"
                 :error="partnerForm.errors.support_phone"
             />
+
+            <!--
+            | Connecting a courier is two separate things: credentials, and
+            | code that knows that courier's API. Only the drivers listed here
+            | have the second, so a partner with none stays what every partner
+            | used to be — a label, a link and a phone number.
+            -->
+            <PSelect
+                v-model="partnerForm.driver"
+                label="Connection"
+                :options="[
+                    { value: '', label: 'Not connected — tracking link only' },
+                    ...Object.entries(courierDrivers).map(([value, d]) => ({
+                        value,
+                        label: d.label,
+                    })),
+                ]"
+                :error="partnerForm.errors.driver"
+                help-text="Connected couriers book the waybill themselves and report their own scans."
+            />
+
+            <div v-if="partnerForm.driver" class="space-y-3 rounded-lg bg-[#f7f7f7] p-3 dark:bg-[#282828]">
+                <PTextField
+                    v-for="(field, key) in driverFields"
+                    :key="key"
+                    v-model="partnerForm.credentials[key]"
+                    :label="field.label"
+                    :type="field.secret ? 'password' : 'text'"
+                    :placeholder="alreadySet(key) ? '•••••••• (leave blank to keep)' : ''"
+                    :help-text="field.help"
+                />
+                <p class="text-xs text-[#8a8a8a]">
+                    Stored encrypted. Save, then press Test — nothing is shipped
+                    by testing.
+                </p>
+            </div>
             <PTextarea
                 v-model="partnerForm.notes"
                 label="Notes"

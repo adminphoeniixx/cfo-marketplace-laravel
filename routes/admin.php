@@ -249,6 +249,9 @@ Route::middleware(['auth', 'verified', 'deny.vendor'])->prefix('admin')->name('a
             ->name('delivery-partners.update');
         Route::patch('settings/delivery-partners/{partner}/toggle', [DeliveryPartnerController::class, 'toggle'])
             ->name('delivery-partners.toggle');
+        // Ships nothing; only asks the courier whether the keys are real.
+        Route::post('settings/delivery-partners/{partner}/test', [DeliveryPartnerController::class, 'test'])
+            ->name('delivery-partners.test');
         Route::delete('settings/delivery-partners/{partner}', [DeliveryPartnerController::class, 'destroy'])
             ->name('delivery-partners.destroy');
     });

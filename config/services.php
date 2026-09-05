@@ -59,10 +59,12 @@ return [
     /*
     | Delhivery, for actually shipping things.
     |
-    | Inert until `DELHIVERY_API_TOKEN` is set, exactly like the gateway: with
-    | no token the seller types a waybill in by hand, which is what happened
-    | before this existed. `DELHIVERY_PICKUP_NAME` must match a warehouse
-    | registered in the Delhivery panel, or every booking is refused.
+    | A *fallback* now: credentials belong on the courier's own row in the
+    | admin panel, and these are read only where that row has none. With
+    | neither, the seller types a waybill in by hand — which is what happened
+    | before any of this existed. `DELHIVERY_PICKUP_NAME` must match a
+    | warehouse registered in the Delhivery panel, or every booking is
+    | refused.
     |
     | Point `DELHIVERY_BASE_URL` at https://staging-express.delhivery.com while
     | testing; the default is production.
@@ -76,6 +78,21 @@ return [
         'seller_name' => env('DELHIVERY_SELLER_NAME'),
         'connect_timeout' => (int) env('DELHIVERY_CONNECT_TIMEOUT', 5),
         'timeout' => (int) env('DELHIVERY_TIMEOUT', 30),
+    ],
+
+    /*
+    | Shiprocket — an aggregator, so one login reaches most Indian couriers.
+    |
+    | Like Delhivery above, this is now only a *fallback*: credentials belong
+    | on the courier's own row in the admin panel, where adding one is a form
+    | rather than a deploy. These stay for a marketplace that set them first.
+    */
+    'shiprocket' => [
+        'email' => env('SHIPROCKET_EMAIL'),
+        'password' => env('SHIPROCKET_PASSWORD'),
+        'pickup_location' => env('SHIPROCKET_PICKUP_LOCATION'),
+        // Their serviceability check needs a pickup pincode to answer at all.
+        'pickup_postcode' => env('SHIPROCKET_PICKUP_POSTCODE'),
     ],
 
     /*
