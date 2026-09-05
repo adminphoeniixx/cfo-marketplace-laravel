@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Console\Commands\RecordHeartbeat;
 use App\Http\Controllers\Controller;
 use App\Models\DeliveryPartner;
 use App\Models\Order;
@@ -56,11 +57,29 @@ class SettingController extends Controller
                 'orders_count' => (int) ($shipments[$partner->name] ?? 0),
             ]);
 
+        $since = RecordHeartbeat::secondsSinceLastRun();
+
         return Inertia::render('admin/Settings', [
             'settings' => [...$this->defaults, ...$stored],
             'deliveryPartners' => $partners,
             // Couriers sitting on orders that are not in the managed list.
             'unlistedPartners' => $shipments->keys()->diff($partners->pluck('name'))->values(),
+            /*
+            | Whether anything runs on its own.
+            |
+            | Courier tracking, and everything scheduled after it, happens only
+            | because a process inside the web container calls `schedule:run`
+            | every minute. Until this was shown here, knowing whether it did
+            | meant reading a Dockerfile and believing it.
+            |
+            | Five minutes of slack: the tick is every minute, and a container
+            | restart or a slow minute should not raise an alarm.
+            */
+            'scheduler' => [
+                'last_run_at' => $stored[RecordHeartbeat::KEY] ?? null,
+                'seconds_ago' => $since,
+                'healthy' => $since !== null && $since < 300,
+            ],
         ]);
     }
 

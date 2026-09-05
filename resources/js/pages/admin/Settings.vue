@@ -28,7 +28,31 @@ const props = defineProps<{
     settings: Record<string, string>;
     deliveryPartners: DeliveryPartner[];
     unlistedPartners: string[];
+    scheduler: {
+        last_run_at: string | null;
+        seconds_ago: number | null;
+        healthy: boolean;
+    };
 }>();
+
+/** "42 seconds ago", "6 minutes ago" — or nothing, if it has never run. */
+const schedulerAge = () => {
+    const seconds = props.scheduler.seconds_ago;
+
+    if (seconds === null) {
+        return 'never';
+    }
+
+    if (seconds < 90) {
+        return `${seconds} second${seconds === 1 ? '' : 's'} ago`;
+    }
+
+    const minutes = Math.round(seconds / 60);
+
+    return minutes < 90
+        ? `${minutes} minute${minutes === 1 ? '' : 's'} ago`
+        : `${Math.round(minutes / 60)} hour${Math.round(minutes / 60) === 1 ? '' : 's'} ago`;
+};
 
 const form = useForm({
     store_name: props.settings.store_name ?? '',
@@ -129,6 +153,34 @@ const destroyPartner = (partner: DeliveryPartner) =>
                 >
             </template>
         </PageHeader>
+
+        <!--
+        | Whether anything runs on its own. Courier tracking, and everything
+        | scheduled after it, happens only because a process inside the web
+        | container calls `schedule:run` every minute — and until this line
+        | existed, knowing whether it did meant reading a Dockerfile.
+        -->
+        <div
+            class="mb-4 flex items-center gap-2 rounded-lg border px-3 py-2 text-[13px]"
+            :class="
+                scheduler.healthy
+                    ? 'border-[#e3e3e3] bg-white text-[#616161] dark:border-[#2a2a2a] dark:bg-[#232323] dark:text-[#b5b5b5]'
+                    : 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200'
+            "
+        >
+            <span
+                class="size-2 shrink-0 rounded-full"
+                :class="scheduler.healthy ? 'bg-emerald-500' : 'bg-amber-500'"
+            />
+            <span>
+                <strong>Background jobs</strong> — last ran {{ schedulerAge() }}.
+                <template v-if="!scheduler.healthy">
+                    Courier tracking and anything else on a schedule is not
+                    running. Check that the web container is up and that
+                    <code>WITH_SCHEDULER</code> is not set to false.
+                </template>
+            </span>
+        </div>
 
         <div class="grid gap-4 lg:grid-cols-3">
             <div class="min-w-0 space-y-4 lg:col-span-2">

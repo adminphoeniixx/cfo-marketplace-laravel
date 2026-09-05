@@ -418,6 +418,19 @@ Nothing below blocks the app; each is either a decision or a credential.
   those may be invented. They 404 until published, and `GET /legal` will not
   list them, so the app needs no change when they go live.
 
+**Operational**
+
+- **The scheduler already runs.** Supercronic calls `schedule:run` every minute
+  inside the web container, gated on `WITH_SCHEDULER`, which the image defaults
+  to `true` — no second container is needed, and two queue workers run there
+  too. Store settings shows when it last ticked, so this is checkable rather
+  than inferred from a Dockerfile.
+- **Mail is not queued.** Every notification is sent inside the request that
+  triggered it. `Notifier` and both password-reset endpoints catch a transport
+  failure and log it, so a dead relay no longer 500s a sign-up — but with
+  workers already running, moving notifications onto the queue would be the
+  better fix when somebody has an afternoon.
+
 **Deliberately not built**
 
 - **Store credit cannot be spent at checkout.** `GET /wallet` is truthful and

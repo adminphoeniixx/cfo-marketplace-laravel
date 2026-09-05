@@ -9,6 +9,12 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 /*
+| A tick, once a minute, so "is the scheduler running in production?" is a
+| question with an answer. Everything else below only runs because this does.
+*/
+Schedule::command('system:heartbeat')->everyMinute()->withoutOverlapping();
+
+/*
 | Where every parcel has got to.
 |
 | Every fifteen minutes is often enough that a shopper opening the app sees
