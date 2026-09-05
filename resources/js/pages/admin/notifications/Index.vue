@@ -33,6 +33,7 @@ const props = defineProps<{
     };
     filters: Record<string, string>;
     counts: { all: number; unread: number };
+    kinds: { value: string; label: string; count: number }[];
     push: { enabled: boolean; publicKey: string | null; devices: number };
 }>();
 
@@ -50,13 +51,24 @@ const {
 } = useWebPush(props.push.publicKey);
 
 const activeFilter = computed(() => props.filters.filter ?? '');
+const activeKind = computed(() => props.filters.kind ?? '');
 
-const setFilter = (filter: string) =>
-    router.get(`${base}/notifications`, filter ? { filter } : {}, {
-        preserveScroll: true,
-        preserveState: true,
-        replace: true,
-    });
+/** Read/unread and kind narrow together, so both survive a click on either. */
+const go = (params: { filter?: string; kind?: string }) =>
+    router.get(
+        `${base}/notifications`,
+        Object.fromEntries(
+            Object.entries({
+                filter: activeFilter.value,
+                kind: activeKind.value,
+                ...params,
+            }).filter(([, value]) => value),
+        ),
+        { preserveScroll: true, preserveState: true, replace: true },
+    );
+
+const setFilter = (filter: string) => go({ filter });
+const setKind = (kind: string) => go({ kind });
 
 const open = (row: Row) => {
     if (!row.read) {
@@ -217,6 +229,30 @@ const pushLabel = computed(() => {
                 {{ tab.label }}
                 <span class="text-[#8a8a8a]">{{ tab.count }}</span>
             </button>
+
+            <!--
+            | What kind of news, from the kinds this person has actually been
+            | sent. The server has filtered on this since the beginning; there
+            | was simply no way to ask for it.
+            -->
+            <template v-if="kinds.length > 1">
+                <span class="mx-1 h-4 w-px bg-[#e3e3e3] dark:bg-[#3a3a3a]" />
+                <button
+                    v-for="kind in [{ value: '', label: 'Everything', count: counts.all }, ...kinds]"
+                    :key="kind.value"
+                    type="button"
+                    class="rounded-lg px-2.5 py-1 text-[13px] transition"
+                    :class="
+                        activeKind === kind.value
+                            ? 'bg-[#f1f1f1] font-medium text-[#303030] dark:bg-[#303030] dark:text-white'
+                            : 'text-[#616161] hover:bg-[#f1f1f1] dark:text-[#b5b5b5] dark:hover:bg-[#303030]'
+                    "
+                    @click="setKind(kind.value)"
+                >
+                    {{ kind.label }}
+                    <span class="text-[#8a8a8a]">{{ kind.count }}</span>
+                </button>
+            </template>
         </div>
 
         <ul v-if="notifications.data.length">

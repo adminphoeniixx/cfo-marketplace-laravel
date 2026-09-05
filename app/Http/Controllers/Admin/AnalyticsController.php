@@ -7,6 +7,7 @@ use App\Models\Cancellation;
 use App\Models\Customer;
 use App\Models\Order;
 use App\Models\Refund;
+use App\Models\Ticket;
 use App\Models\Vendor;
 use Illuminate\Contracts\Database\Query\Builder as BuilderContract;
 use Illuminate\Database\Query\Builder;
@@ -93,8 +94,61 @@ class AnalyticsController extends Controller
                 'cancellations_value' => (float) Cancellation::where('status', 'approved')
                     ->whereBetween('created_at', [$from, $to])->sum('total_amount'),
             ] : null,
+            // Support is the marketplace's own desk, not a seller's, so it
+            // does not appear when the screen is filtered to one store.
+            'support' => $storeWide ? $this->support($from, $to) : null,
             'exports' => $this->exportsFor($request),
         ]);
+    }
+
+    /**
+     * How the support desk did over the window.
+     *
+     * `first_response_hours` is the median rather than the mean, because one
+     * ticket answered a fortnight late drags an average somewhere nobody
+     * recognises while the median still describes the ordinary case. Both are
+     * over tickets *opened* in the window that have since been answered —
+     * anything still waiting has no first response to measure, and counting it
+     * as zero would flatter the number exactly when it should not.
+     *
+     * @return array<string, mixed>
+     */
+    protected function support(Carbon $from, Carbon $to): array
+    {
+        $opened = Ticket::whereBetween('created_at', [$from, $to]);
+
+        $answered = Ticket::whereBetween('created_at', [$from, $to])
+            ->whereNotNull('first_responded_at')
+            ->get(['created_at', 'first_responded_at'])
+            ->map(fn (Ticket $ticket) => $ticket->hoursToFirstReply())
+            ->filter(fn (?float $hours) => $hours !== null)
+            ->sort()
+            ->values();
+
+        return [
+            'opened' => (clone $opened)->count(),
+            'resolved' => Ticket::whereIn('status', ['resolved', 'closed'])
+                ->whereBetween('created_at', [$from, $to])
+                ->count(),
+            // Right now, not over the window: an open ticket is a person
+            // waiting today, whatever month they wrote in.
+            'open_now' => Ticket::unfinished()->count(),
+            'unanswered_now' => Ticket::unfinished()->whereNull('first_responded_at')->count(),
+            'first_response_hours' => $answered->isEmpty()
+                ? null
+                : round((float) $answered->median(), 1),
+            'by_category' => Ticket::query()
+                ->whereBetween('created_at', [$from, $to])
+                ->selectRaw('category, count(*) as total')
+                ->groupBy('category')
+                ->orderByDesc('total')
+                ->pluck('total', 'category')
+                ->map(fn ($total, $category) => [
+                    'label' => Ticket::CATEGORIES[$category] ?? $category,
+                    'count' => (int) $total,
+                ])
+                ->values(),
+        ];
     }
 
     /**

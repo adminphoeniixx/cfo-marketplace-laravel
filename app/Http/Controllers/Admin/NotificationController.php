@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Notifications\DatabaseNotification;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -50,6 +51,27 @@ class NotificationController extends Controller
                 'all' => $user->notifications()->count(),
                 'unread' => $user->unreadNotifications()->count(),
             ],
+            /*
+            | The kinds this person actually has, counted.
+            |
+            | Read off their own pile rather than from a list of every
+            | notification class: somebody who has never been sent a payout
+            | alert has no use for a "payouts" tab, and a kind added next month
+            | appears here without anybody remembering to register it.
+            */
+            'kinds' => $user->notifications()
+                ->selectRaw("data->>'kind' as kind, count(*) as total")
+                ->groupBy('kind')
+                ->orderByDesc('total')
+                ->pluck('total', 'kind')
+                ->filter(fn ($total, $kind) => filled($kind))
+                ->map(fn ($total, $kind) => [
+                    'value' => (string) $kind,
+                    // "ticket-raised" is a slug; "Ticket raised" is a tab.
+                    'label' => Str::of((string) $kind)->replace('-', ' ')->ucfirst()->toString(),
+                    'count' => (int) $total,
+                ])
+                ->values(),
             'push' => [
                 'enabled' => (bool) config('webpush.enabled'),
                 'publicKey' => config('webpush.public_key'),

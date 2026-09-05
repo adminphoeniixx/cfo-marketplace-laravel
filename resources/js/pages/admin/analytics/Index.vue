@@ -73,6 +73,14 @@ const props = defineProps<{
         cancellations_count: number;
         cancellations_value: number;
     } | null;
+    support: {
+        opened: number;
+        resolved: number;
+        open_now: number;
+        unanswered_now: number;
+        first_response_hours: number | null;
+        by_category: { label: string; count: number }[];
+    } | null;
     exports: string[];
 }>();
 
@@ -562,6 +570,66 @@ const totalOf = (rows: Record<string, number>) =>
                     </dd>
                 </div>
             </dl>
+        </PCard>
+
+        <PCard
+            v-if="support"
+            title="Support"
+            subtitle="Tickets opened in this window"
+        >
+            <dl class="space-y-1.5 text-[13px]">
+                <div class="flex justify-between gap-3">
+                    <dt class="text-[#616161] dark:text-[#b5b5b5]">Opened</dt>
+                    <dd class="tabular-nums">{{ number(support.opened) }}</dd>
+                </div>
+                <div class="flex justify-between gap-3">
+                    <dt class="text-[#616161] dark:text-[#b5b5b5]">Resolved</dt>
+                    <dd class="tabular-nums">{{ number(support.resolved) }}</dd>
+                </div>
+                <div class="flex justify-between gap-3">
+                    <dt class="text-[#616161] dark:text-[#b5b5b5]">
+                        Typical first reply
+                    </dt>
+                    <dd class="tabular-nums">
+                        <!--
+                        | Median, not mean: one ticket answered a fortnight
+                        | late drags an average somewhere nobody recognises.
+                        -->
+                        {{
+                            support.first_response_hours === null
+                                ? '—'
+                                : `${support.first_response_hours}h`
+                        }}
+                    </dd>
+                </div>
+                <div
+                    class="flex justify-between gap-3 border-t border-[#e3e3e3] pt-1.5 font-semibold dark:border-[#3a3a3a]"
+                >
+                    <dt>Waiting now</dt>
+                    <dd class="tabular-nums">
+                        {{ number(support.open_now) }}
+                        <span
+                            v-if="support.unanswered_now"
+                            class="font-normal text-[#8a8a8a]"
+                        >
+                            · {{ number(support.unanswered_now) }} never answered
+                        </span>
+                    </dd>
+                </div>
+            </dl>
+
+            <ul v-if="support.by_category.length" class="mt-3 space-y-1.5 border-t border-[#e3e3e3] pt-3 dark:border-[#3a3a3a]">
+                <li
+                    v-for="row in support.by_category"
+                    :key="row.label"
+                    class="flex items-center justify-between gap-3 text-[13px]"
+                >
+                    <span class="min-w-0 truncate text-[#616161] dark:text-[#b5b5b5]">
+                        {{ row.label }}
+                    </span>
+                    <span class="tabular-nums">{{ number(row.count) }}</span>
+                </li>
+            </ul>
         </PCard>
 
         <PCard
