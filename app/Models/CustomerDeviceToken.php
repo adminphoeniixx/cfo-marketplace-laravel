@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Contracts\PushDevice;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * phone that signs out and back in as someone else moves the token across
  * instead of delivering one shopper's orders to another.
  */
-class CustomerDeviceToken extends Model
+class CustomerDeviceToken extends Model implements PushDevice
 {
     public const PLATFORMS = ['android', 'ios', 'web'];
 
@@ -48,5 +49,15 @@ class CustomerDeviceToken extends Model
                 'device_name' => $deviceName,
             ],
         );
+    }
+
+    public function pushToken(): string
+    {
+        return (string) $this->token;
+    }
+
+    public function markPushSent(): void
+    {
+        $this->forceFill(['last_sent_at' => now()])->save();
     }
 }

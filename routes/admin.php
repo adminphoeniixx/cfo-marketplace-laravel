@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\CustomerAddressController;
 use App\Http\Controllers\Admin\CustomerController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DeliveryPartnerController;
+use App\Http\Controllers\Admin\BroadcastController;
 use App\Http\Controllers\Admin\InvoiceController;
 use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\OrderController;
@@ -198,6 +199,21 @@ Route::middleware(['auth', 'verified', 'deny.vendor'])->prefix('admin')->name('a
         Route::get('tickets/{ticket}', [TicketController::class, 'show'])->name('tickets.show');
         Route::post('tickets/{ticket}/replies', [TicketController::class, 'reply'])->name('tickets.reply');
         Route::patch('tickets/{ticket}', [TicketController::class, 'update'])->name('tickets.update');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Broadcasts
+    |--------------------------------------------------------------------------
+    |
+    | The one screen that writes to shoppers unprompted. Gated on `customers`
+    | rather than `settings`: it is a message to people, not a configuration.
+    |
+    */
+
+    Route::middleware('role.can:customers')->group(function () {
+        Route::get('broadcasts', [BroadcastController::class, 'index'])->name('broadcasts.index');
+        Route::post('broadcasts', [BroadcastController::class, 'store'])->name('broadcasts.store');
     });
 
     /*

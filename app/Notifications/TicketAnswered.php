@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\Ticket;
+use App\Notifications\Channels\FcmChannel;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
@@ -11,8 +12,9 @@ use Illuminate\Notifications\Notification;
  *
  * Deliberately not an `AdminNotification`: that base class is addressed to
  * people with a role and a section, and a shopper has neither. This goes to
- * the app's own notification feed and to their inbox, because somebody who
- * wrote in on Monday is not necessarily holding the app open on Tuesday.
+ * the app's own notification feed, to their phone, and to their inbox, because
+ * somebody who wrote in on Monday is not necessarily holding the app open on
+ * Tuesday.
  */
 class TicketAnswered extends Notification
 {
@@ -23,7 +25,50 @@ class TicketAnswered extends Notification
      */
     public function via(object $notifiable): array
     {
-        return ['database', 'mail'];
+        return ['database', FcmChannel::class, 'mail'];
+    }
+
+    /**
+     * The Firebase message. Built here rather than inherited because this
+     * class predates `ShopperNotification` and answers to staff as well —
+     * `Notifier` sends the staff-facing `TicketReplied` alongside it.
+     *
+     * @return array<string, mixed>
+     */
+    public function toFcm(object $notifiable): array
+    {
+        $ttl = (int) config('firebase.ttl');
+        $data = $this->toArray($notifiable);
+
+        return [
+            'notification' => ['title' => $data['title'], 'body' => $data['body']],
+            'data' => [
+                'kind' => 'ticket',
+                'link' => $data['link'],
+                'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
+            ],
+            'android' => [
+                'priority' => 'high',
+                'ttl' => $ttl.'s',
+                'notification' => [
+                    'channel_id' => (string) config('firebase.android_channel'),
+                    'sound' => 'default',
+                    // Per ticket: two answers on one ticket replace each other,
+                    // two different tickets do not.
+                    'tag' => 'ticket-'.$this->ticket->number,
+                ],
+            ],
+            'apns' => [
+                'headers' => [
+                    'apns-priority' => '10',
+                    'apns-expiration' => (string) (time() + $ttl),
+                ],
+                'payload' => ['aps' => [
+                    'sound' => 'default',
+                    'thread-id' => 'ticket-'.$this->ticket->number,
+                ]],
+            ],
+        ];
     }
 
     /**

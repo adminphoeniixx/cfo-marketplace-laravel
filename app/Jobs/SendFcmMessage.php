@@ -2,9 +2,10 @@
 
 namespace App\Jobs;
 
-use App\Models\DeviceToken;
+use App\Contracts\PushDevice;
 use App\Services\Firebase\FcmClient;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
 
@@ -32,9 +33,14 @@ class SendFcmMessage implements ShouldQueue
     }
 
     /**
+     * @param  class-string<Model&PushDevice>  $deviceType  Which table the id
+     *                                                      belongs to. A seller
+     *                                                      and a shopper both
+     *                                                      have a device 7.
      * @param  array<string, mixed>  $message
      */
     public function __construct(
+        private readonly string $deviceType,
         private readonly int $deviceTokenId,
         private readonly array $message,
     ) {}
@@ -45,16 +51,16 @@ class SendFcmMessage implements ShouldQueue
             return;
         }
 
-        $device = DeviceToken::find($this->deviceTokenId);
+        $device = $this->deviceType::find($this->deviceTokenId);
 
-        if (! $device) {
+        if (! $device instanceof PushDevice) {
             return;
         }
 
-        $result = $client->send($device->token, $this->message);
+        $result = $client->send($device->pushToken(), $this->message);
 
         if ($result->success) {
-            $device->forceFill(['last_sent_at' => now()])->save();
+            $device->markPushSent();
 
             return;
         }
@@ -75,7 +81,7 @@ class SendFcmMessage implements ShouldQueue
         // Anything else is a configuration problem (a bad project, messaging
         // not switched on) — worth a line in the log, not a stuck queue.
         Log::warning('FCM delivery failed', [
-            'device_token_id' => $device->id,
+            'device' => $this->deviceType.'#'.$device->getKey(),
             'reason' => $result->describe(),
         ]);
     }

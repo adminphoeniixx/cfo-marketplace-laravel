@@ -15,6 +15,43 @@ step with both.
 
 ---
 
+## 2026-09-07 — push
+
+### Changed
+
+- **Push is delivered now, not just configured.** Registering a token on
+  `POST /push/device` used to store a row nothing ever read: the delivery
+  channel refused anything that was not a staff login, so a shopper could
+  switch push on and hear nothing for the life of an order. Tokens registered
+  before this release start working without re-registering.
+
+### Added
+
+- **Order progress reaches the phone.** `kind: "order"` — on the way, arriving
+  today, delivered, a delivery attempt that failed, a parcel coming back, plus
+  cancelled and refunded. Driven by the courier's own scans where a courier is
+  connected. Governed by the `order_updates` preference.
+- **Decisions reach the phone.** `kind: "request"` when a cancellation or return
+  is approved, declined, or the refund settles; `kind: "ticket"` when support
+  replies. **Neither is governed by a preference** — a shopper who muted order
+  updates has not asked to stop hearing whether we agreed to refund them.
+- **Deal broadcasts.** `kind: "deal"`, written by hand in the panel and governed
+  by `deals_price_drops`, which is **off by default**.
+
+**What an app must do:**
+
+- Route the tap with `data.link` — an in-app route beginning with `/`, never a
+  URL — and pick the icon from `data.kind`.
+- Create the Android channel named in `FIREBASE_ANDROID_CHANNEL` (`cfo_alerts`).
+  Android 8+ drops anything whose channel it does not know, and that looks
+  exactly like push being broken.
+- Keep reading `GET /notifications`. **Every push has a row behind it**, written
+  first — the push is the tap on the shoulder, the row is the record.
+- Expect alerts about one order to replace each other on the lock screen, and
+  alerts about different orders never to.
+
+---
+
 ## 2026-09-07 — invoices
 
 ### Added

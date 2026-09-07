@@ -592,8 +592,47 @@ field that says so beats a step that never fills.
 | GET | `/wallet` | Store credit: balance, currency, when it lapses, and every movement behind it. |
 | GET | `/notifications`, `/notifications/unread-count` | The list carries `unread_count` with it. |
 | POST | `/notifications/{id}/read`, `/notifications/read-all` | |
-| POST/DELETE | `/push/device` | FCM tokens, keyed by the token's hash. |
+| POST/DELETE | `/push/device` | FCM tokens, keyed by the token's hash. **Register one and push is delivered.** |
 | GET/POST/DELETE | `/auth/devices`, `/auth/devices/{token}` | Signed-in devices. |
+
+### Push, and what actually arrives
+
+Registering a token on `POST /push/device` now **delivers**. Until this release
+tokens were stored and never read, so an app could register, switch push on, and
+be met with silence for the life of an order.
+
+What is sent:
+
+| `kind` | When | Preference that governs it |
+|---|---|---|
+| `order` | The parcel moved: on the way, arriving today, delivered, a failed attempt, coming back. Also cancelled and refunded. | `order_updates` |
+| `request` | A cancellation or return was approved, declined, or the refund settled. | none — this is an answer the shopper is waiting on |
+| `ticket` | Support replied. | none |
+| `deal` | A broadcast written by the marketplace. | `deals_price_drops` |
+
+**What an app must do:**
+
+- Read `data.kind` to pick an icon, and `data.link` to route the tap. `link` is
+  an **in-app route** beginning with `/`, never a web address — the app owns its
+  own navigation.
+- Create the Android notification channel named in `FIREBASE_ANDROID_CHANNEL`
+  (`cfo_alerts` by default). Android 8+ silently drops anything whose channel it
+  does not know, and that failure looks exactly like "push is broken".
+- Not treat the push as the record. **Every push has a matching row in
+  `GET /notifications`**, written first. A phone that was off, uninstalled or
+  out of battery loses the alert and keeps the notification.
+
+`push_enabled` is the master switch; `order_updates` and `deals_price_drops`
+narrow it. Switching deals off suppresses the feed row as well as the push —
+muting marketing should not mean finding it waiting in the list later. Order
+updates only suppress the push: the row stays, because it is the order's
+history. Turning off order updates never silences a refund decision or a support
+reply; those are answers to something the shopper asked for.
+
+Rows about the same order replace each other on the lock screen. Rows about
+different orders never do.
+
+---
 
 The first address saved becomes the default; deleting the default promotes
 whatever is left; the last one cannot be deleted, because orders have to go
@@ -720,10 +759,10 @@ Said plainly, so nobody plans around a hole:
   as a way to pay.
 - **Saved payment methods are stored, not charged.** They are display and
   tokens; `POST /payments/create-intent` still opens a fresh intent.
-- **No push delivery to shoppers.** Tokens are stored and the feed works, but
-  nothing sends to them yet; the seller app's FCM path is not shared.
-- **Customers are not notified of seller-side status changes.** The order
-  timeline is truthful, but no notification fires when a seller ships.
+- **Push is transactional only.** Order progress, cancellation and return
+  decisions, support replies, plus deal broadcasts a human writes in the panel.
+  Nothing is generated — no abandoned-basket nudges, no "you might also like",
+  no back-in-stock alerts.
 - **Invoices are HTML, not PDF.** The tax invoices themselves are now one per
   seller, as they have to be; it is the rendering that is a print-ready page
   rather than a generated PDF.

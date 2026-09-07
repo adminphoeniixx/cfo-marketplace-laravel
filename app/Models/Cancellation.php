@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Observers\RequestObserver;
 use Database\Factories\CancellationFactory;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,6 +20,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $reviewed_at
  * @property Carbon|null $created_at
  */
+#[ObservedBy(RequestObserver::class)]
 class Cancellation extends Model
 {
     /** @use HasFactory<CancellationFactory> */

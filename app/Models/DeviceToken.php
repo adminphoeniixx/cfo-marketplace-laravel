@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Contracts\PushDevice;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
@@ -21,7 +22,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $device_name
  * @property Carbon|null $last_sent_at
  */
-class DeviceToken extends Model
+class DeviceToken extends Model implements PushDevice
 {
     protected $guarded = [];
 
@@ -64,5 +65,15 @@ class DeviceToken extends Model
                 'device_name' => $deviceName,
             ],
         );
+    }
+
+    public function pushToken(): string
+    {
+        return (string) $this->token;
+    }
+
+    public function markPushSent(): void
+    {
+        $this->forceFill(['last_sent_at' => now()])->save();
     }
 }

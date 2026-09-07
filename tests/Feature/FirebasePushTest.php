@@ -200,7 +200,9 @@ test('a delivered message stamps the device, a dead one deletes it', function ()
             ->push(['error' => ['details' => [['errorCode' => 'UNREGISTERED']]]], 404),
     ]);
 
-    $job = fn () => (new SendFcmMessage($device->id, ['notification' => ['title' => 'Hi']]))
+    // The job is told which table the id belongs to: a seller and a shopper
+    // can both hold device 7.
+    $job = fn () => (new SendFcmMessage(DeviceToken::class, $device->id, ['notification' => ['title' => 'Hi']]))
         ->handle(app(FcmClient::class));
 
     $job();

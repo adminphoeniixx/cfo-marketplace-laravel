@@ -107,6 +107,13 @@ const allGroups = computed<NavGroup[]>(() => [
                 section: 'refunds',
             },
             {
+                label: 'Broadcasts',
+                href: '/admin/broadcasts',
+                match: '/admin/broadcasts',
+                icon: 'notification',
+                section: 'customers',
+            },
+            {
                 label: 'Customers',
                 href: '/admin/customers',
                 match: '/admin/customers',

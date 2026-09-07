@@ -358,6 +358,14 @@ deliver to.
 them all back on and two devices agree. `email_marketing` is the profile's
 `accepts_marketing` under the name the screen uses.
 
+**And they now govern something.** Push is delivered rather than merely
+configured: the parcel moving, a cancellation or return decided, a support
+reply, and deal broadcasts written in the panel. `push_enabled` is the master
+switch; `order_updates` and `deals_price_drops` narrow it, and neither can
+silence a decision the shopper is waiting on. Every push has a matching row in
+`GET /notifications`, so a phone that was off loses the alert and not the
+notification.
+
 ### Seller onboarding — `GET /app-config`
 
 `seller_onboarding_url`, plus `store_name`, `currency`, `support_email`,
