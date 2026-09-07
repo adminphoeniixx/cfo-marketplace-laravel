@@ -674,10 +674,12 @@ Said plainly, so nobody plans around a hole:
 - **One gateway, Razorpay.** Cards, UPI and net banking all go through it, and
   with no credentials configured a non-COD order is still marked paid on
   placement. No other provider is wired up.
-- **SMS needs a provider.** The path is wired (`SMS_DRIVER=http` plus
-  `SMS_API_KEY`, `SMS_URL`, `SMS_TEMPLATE_ID`, `SMS_SENDER`), and until one is
-  configured codes are logged and returned as `debug_code` outside production.
-  Configure one before launch, or a shopper cannot sign in.
+- **SMS is built and sending; the credentials are the open question.** MSG91 is
+  wired and has delivered a real code end to end — set `MSG91_AUTHKEY` and the
+  driver flips to `http` on its own. Where no provider is configured the code is
+  logged instead and comes back as `debug_code` outside production, so an app
+  must not depend on `debug_code` being there. `sent` is `true` either way;
+  `delivered` says whether the provider actually took it.
 - **Store credit cannot be spent yet.** `GET /wallet` is truthful and a refund
   settled to store credit lands in it, but checkout does not offer the balance
   as a way to pay.
@@ -689,8 +691,10 @@ Said plainly, so nobody plans around a hole:
   timeline is truthful, but no notification fires when a seller ships.
 - **Invoices are HTML, not PDF**, and one document covers the whole order rather
   than one per seller.
-- **Courier milestones are the order's own timestamps**, not the carrier's
-  scans. Nothing polls Delhivery or Shiprocket; "Out for delivery" is therefore
-  only ever reached retrospectively.
+- **Courier milestones need a courier connected.** Where Delhivery or Shiprocket
+  is configured the carrier's own scans drive the timeline — pushed as they
+  happen, with a fifteen-minute sweep behind them. Where neither is, the
+  milestones fall back to the order's own timestamps and "Out for delivery" is
+  again only reachable in hindsight.
 - **Guest checkout does not exist.** A basket may be built signed out and
   merged on sign-in, but placing an order needs an account.
