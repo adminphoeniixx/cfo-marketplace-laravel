@@ -528,10 +528,16 @@ const submitNote = () =>
                                 | their GSTIN. Support has to be able to open
                                 | it, because a shopper asking "where is my
                                 | bill" is asking about this one.
+                                |
+                                | A line with no vendor gets no link, because it
+                                | has no supplier to raise one. That row is
+                                | grouped under "Store" and is a data problem
+                                | rather than a document — a dash says so
+                                | instead of offering a link that 404s.
                                 -->
                                 <td class="py-2 pl-4 text-right">
                                     <a
-                                        v-if="!isClosed"
+                                        v-if="!isClosed && row.vendor_id"
                                         :href="`/admin/orders/${order.id}/invoices/${row.vendor_id}`"
                                         target="_blank"
                                         rel="noopener"
