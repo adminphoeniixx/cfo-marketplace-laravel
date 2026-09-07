@@ -33,6 +33,12 @@ class WalletTransaction extends Model
     }
 
     /**
+     * What a movement is. `refund` and `adjustment` add; `spend` takes away
+     * and is the only one that may be negative.
+     */
+    public const KINDS = ['refund', 'adjustment', 'spend'];
+
+    /**
      * Credit that still counts: nothing that has lapsed.
      *
      * @param  Builder<$this>  $query
@@ -51,6 +57,23 @@ class WalletTransaction extends Model
         return round((float) static::query()
             ->where('customer_id', $customerId)
             ->live()
+            ->sum('amount'), 2);
+    }
+
+    /**
+     * The same number, read under a lock.
+     *
+     * Two checkouts running at once would both read the old balance and both
+     * spend it, and the ledger would go negative with nobody at fault. Callers
+     * must already be inside a transaction; `lockForUpdate` is what makes the
+     * second one wait for the first one's debit to land.
+     */
+    public static function lockedBalanceFor(int $customerId): float
+    {
+        return round((float) static::query()
+            ->where('customer_id', $customerId)
+            ->live()
+            ->lockForUpdate()
             ->sum('amount'), 2);
     }
 }

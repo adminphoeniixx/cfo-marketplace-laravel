@@ -15,6 +15,39 @@ step with both.
 
 ---
 
+## 2026-09-07 — store credit
+
+### Added
+
+- **`wallet` on `GET /checkout`.** `balance`, `applicable`, `covers_order`,
+  `remaining_to_pay`. **What an app must do:** offer the balance as a way to
+  pay, and show `applicable` rather than `balance` — a ₹5,000 balance against a
+  ₹900 basket spends ₹900.
+- **`use_wallet` on `POST /orders`** (boolean, default false). Credit is never
+  spent unless asked for. Where it covers the whole order the order is `paid` on
+  placement and no gateway opens; where it covers part, the rest is collected as
+  before.
+- **`totals.wallet_amount` on an order.** How much of it credit paid for. **What
+  an app must do:** show it, or the order screen implies a card charge that
+  never happened.
+- **`price_changed`, `previous_price` and `price` on each `added` entry of
+  `POST /orders/{number}/reorder`.** **What an app must do:** a price that moved
+  is not a refusal — the line is in the basket at today's price. Show "prices
+  have changed since your last order" rather than letting the shopper find it in
+  the total.
+
+### Changed
+
+- **A basket fully covered by credit is no longer refused over cash.** A seller
+  who does not take cash, and a pincode with no COD, both stop mattering when
+  nobody is collecting anything at the door. **What an app must do:** nothing;
+  fewer `422`s on `payment_method`.
+- **Refunds return credit to credit.** The share of an order paid from the
+  balance comes back to the balance whatever method the marketplace picks for
+  the rest. **What an app must do:** nothing — `GET /wallet` simply adds up.
+
+---
+
 ## 2026-09-07 — push
 
 ### Changed

@@ -1769,13 +1769,14 @@
                         },
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n  \"address_id\": 1,\n  \"payment_method\": \"upi\",\n  \"shipping_code\": \"standard\",\n  \"note\": \"\"\n}",
+                            "raw": "{\n    \"address_id\": 1,\n    \"payment_method\": \"upi\",\n    \"shipping_code\": \"standard\",\n    \"note\": \"\",\n    \"use_wallet\": false\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
                                 }
                             }
-                        }
+                        },
+                        "description": "`use_wallet` spends the shopper's store credit against this order. Credit covering the whole order settles it outright — `payment_status` comes back `paid` and no gateway opens. See `wallet` on GET /checkout for what it would cover."
                     }
                 },
                 {

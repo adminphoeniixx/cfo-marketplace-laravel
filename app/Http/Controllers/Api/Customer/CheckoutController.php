@@ -8,10 +8,13 @@ use App\Actions\Shipping\CheckServiceability;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Customer\AddressResource;
 use App\Http\Resources\Customer\OrderResource;
+use App\Models\Cart;
 use App\Models\CartItem;
 use App\Models\Coupon;
+use App\Models\Customer;
 use App\Models\PaymentMethod;
 use App\Models\Vendor;
+use App\Models\WalletTransaction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -96,10 +99,62 @@ class CheckoutController extends Controller
                 $this->storesRefusingCash($items),
                 $this->cashRefusedByCourier($delivery),
             ),
+            /*
+            | Store credit the shopper already has.
+            |
+            | `applicable` rather than the raw balance, because a ₹5,000
+            | balance against a ₹900 basket spends ₹900 — showing the shopper
+            | the larger number and then charging them differently is how a
+            | checkout loses trust. `covers_order` is what lets the app hide
+            | the payment methods entirely.
+            */
+            'wallet' => $this->walletBlock($this->customer($request), (float) $quote['totals']['grand_total']),
             'coupon' => $quote['coupon'],
             'totals' => $quote['totals'],
             'items' => $quote['lines'],
         ]);
+    }
+
+    /**
+     * What this basket comes to, quoted the same way the review screen quoted
+     * it.
+     *
+     * Run again here rather than trusted from the request: everything else in
+     * `store` re-derives its figures server-side for exactly this reason, and
+     * a total the app sent would be a total the app could choose.
+     */
+    private function quotedTotal(Request $request, Cart $cart): float
+    {
+        $items = $cart->activeItems()->with([
+            'product.images', 'product.taxClass.rates', 'variant',
+        ])->get();
+
+        $quote = $this->quote->handle(
+            $items,
+            $cart->coupon_code ? Coupon::usable()->where('code', $cart->coupon_code)->first() : null,
+            $this->selectedAddress($request, $cart, $this->addressesOf($request)),
+            $request->string('shipping_code')->toString() ?: null,
+        );
+
+        return round((float) $quote['totals']['grand_total'], 2);
+    }
+
+    /**
+     * The store-credit block on the checkout screen.
+     *
+     * @return array<string, mixed>
+     */
+    private function walletBlock(Customer $customer, float $grandTotal): array
+    {
+        $balance = WalletTransaction::balanceFor($customer->id);
+        $applicable = round(min($balance, $grandTotal), 2);
+
+        return [
+            'balance' => $balance,
+            'applicable' => $applicable,
+            'covers_order' => $balance > 0 && $applicable >= round($grandTotal, 2),
+            'remaining_to_pay' => round(max($grandTotal - $applicable, 0), 2),
+        ];
     }
 
     public function store(Request $request): JsonResponse
@@ -113,6 +168,9 @@ class CheckoutController extends Controller
                 ->where('is_active', true)],
             'shipping_code' => ['nullable', 'string', 'max:60'],
             'note' => ['nullable', 'string', 'max:1000'],
+            // Whether to spend the balance. Absent means no: money the shopper
+            // is owed is not something to spend on their behalf by default.
+            'use_wallet' => ['sometimes', 'boolean'],
         ]);
 
         $cart = $this->cartFor($request);
@@ -126,7 +184,17 @@ class CheckoutController extends Controller
         | place an order a seller has said they will not accept cash for, and
         | the first anybody hears of it is a courier at the door.
         */
-        if (PaymentMethod::isPayOnDelivery($method?->code)) {
+        /*
+        | Credit that covers the whole basket makes the cash question moot: no
+        | courier is collecting anything, so a seller who refuses cash and a
+        | pincode that refuses cash are both beside the point. Without this a
+        | shopper with enough credit is turned away over money nobody is
+        | going to be asked for.
+        */
+        $coveredByCredit = $request->boolean('use_wallet')
+            && WalletTransaction::balanceFor($customer->id) >= $this->quotedTotal($request, $cart);
+
+        if (! $coveredByCredit && PaymentMethod::isPayOnDelivery($method?->code)) {
             $refusing = $this->storesRefusingCash($cart->activeItems()->with('product.vendor:id,name,cod_available')->get());
 
             if ($refusing !== []) {

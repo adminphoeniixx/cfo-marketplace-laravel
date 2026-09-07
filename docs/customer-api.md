@@ -487,6 +487,47 @@ itself is a 404.
 - **The whole basket comes back**, plus `cart_count` for a client that only
   wants the badge, so the cart is right the moment the call returns.
 
+### Store credit at checkout
+
+`GET /checkout` carries a `wallet` block:
+
+```json
+{ "balance": 5000.0, "applicable": 900.0, "covers_order": true, "remaining_to_pay": 0.0 }
+```
+
+`applicable` is what this basket would actually spend, not the balance —
+showing the larger number and then charging differently is how a checkout loses
+trust. `covers_order` is what lets an app hide the payment methods entirely.
+
+`POST /orders` takes **`use_wallet`** (boolean, default false). Money the
+shopper is owed is not spent on their behalf unless they ask.
+
+- Credit is applied to the whole order — delivery and tax included — because it
+  is money the marketplace already owes, not a discount on the goods.
+- Credit covering the whole order **settles it outright**: `payment_status` is
+  `paid` on placement, whatever `payment_method` was sent for the remaining
+  zero, and no gateway is opened.
+- Where credit covers everything, a seller who refuses cash and a pincode that
+  refuses cash **no longer block the order** — nobody is collecting anything at
+  the door.
+- `totals.wallet_amount` on the order says how much of it credit paid for. An
+  app that omits it shows a card charge that never happened.
+- Lapsed credit cannot be spent, and two checkouts at once cannot spend the
+  same balance twice.
+
+**Refunds go back the way they came.** The part of an order paid with credit
+returns to the balance whatever method the marketplace picks for the rest — a
+card that was never charged cannot be refunded to. Two refunds on one order
+cannot return the credit twice.
+
+### Reorder and prices that moved
+
+Each entry in `added` now carries `price_changed`, `previous_price` and `price`.
+A price that moved is **not** a refusal: the line goes back in the basket at
+today's price and says so, so an app can put "prices have changed since your
+last order" above the basket rather than leaving the shopper to spot it in the
+total.
+
 ### Invoices
 
 Two endpoints, because a marketplace order has two different documents in it.
@@ -754,9 +795,6 @@ Said plainly, so nobody plans around a hole:
   logged instead and comes back as `debug_code` outside production, so an app
   must not depend on `debug_code` being there. `sent` is `true` either way;
   `delivered` says whether the provider actually took it.
-- **Store credit cannot be spent yet.** `GET /wallet` is truthful and a refund
-  settled to store credit lands in it, but checkout does not offer the balance
-  as a way to pay.
 - **Saved payment methods are stored, not charged.** They are display and
   tokens; `POST /payments/create-intent` still opens a fresh intent.
 - **Push is transactional only.** Order progress, cancellation and return

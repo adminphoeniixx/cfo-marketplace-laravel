@@ -455,8 +455,10 @@ Nothing below blocks the app; each is either a decision or a credential.
 
 **Deliberately not built**
 
-- **Store credit cannot be spent at checkout.** `GET /wallet` is truthful and
-  refunds land in it, but the balance is not offered as a way to pay.
+- ~~Store credit cannot be spent at checkout.~~ **Done.** `GET /checkout`
+  carries a `wallet` block and `POST /orders` takes `use_wallet`. Credit
+  covering the whole order settles it outright, and the credit share of a
+  refund returns to the balance whatever method is chosen for the rest.
 - **Saved payment methods are not charged.** They are display plus a gateway
   token; `POST /payments/create-intent` still opens a fresh intent each time.
 - **Invoices are HTML, not PDF.** The rendering is a print-ready page rather
@@ -469,8 +471,9 @@ Nothing below blocks the app; each is either a decision or a credential.
   commission invoice charges both; the payout arithmetic is unchanged from
   before it existed. Deliberate — changing what a seller is paid is not a
   documentation change — but the two will not reconcile until it is decided.
-- **`price_changed` is never a skip reason on reorder.** A price that moved does
-  not stop the line going back in the basket; it is added at today's price.
+- **`price_changed` is a notice on reorder, not a skip.** A price that moved
+  does not stop the line going back in the basket; it is added at today's price
+  and each `added` entry carries `price_changed`, `previous_price` and `price`.
 - **Guest checkout does not exist.** A basket can be built signed out and merged
   on sign-in, but placing an order needs an account.
 - **Delhivery pickup is one marketplace warehouse**, not one per seller.

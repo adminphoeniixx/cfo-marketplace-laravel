@@ -53,6 +53,7 @@ type Order = {
     tax_total: string;
     shipping_total: string;
     grand_total: string;
+    wallet_amount: string;
     refunded_total: string;
     commission_total: string;
     payment_method: string | null;
@@ -437,6 +438,24 @@ const submitNote = () =>
                             <dt>Total</dt>
                             <dd class="tabular-nums">
                                 {{ currency(order.grand_total) }}
+                            </dd>
+                        </div>
+                        <!--
+                        | Store credit the shopper spent on this order.
+                        |
+                        | Shown because it changes what a refund may do: this
+                        | part never touched a card, so it goes back to the
+                        | balance whatever method is chosen for the rest.
+                        -->
+                        <div
+                            v-if="Number(order.wallet_amount) > 0"
+                            class="flex justify-between gap-8"
+                        >
+                            <dt class="text-[#616161] dark:text-[#b5b5b5]">
+                                Paid with store credit
+                            </dt>
+                            <dd class="tabular-nums">
+                                −{{ currency(order.wallet_amount) }}
                             </dd>
                         </div>
                         <div

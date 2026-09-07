@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\Customer\OrderItemResource;
 use App\Http\Resources\Customer\OrderResource;
 use App\Models\Cart;
+use App\Models\CartItem;
 use App\Models\DeliveryPartner;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -440,6 +441,20 @@ class OrderController extends Controller
 
         $short = $granted < $wanted;
 
+        /*
+        | What it costs today against what it cost then.
+        |
+        | Deliberately **not** a refusal. A price that moved by a rupee must
+        | not stop somebody reordering their weekly shop, and an app that
+        | discovers the change only in the basket total has to explain it
+        | after the fact. So the line goes in at today's price and says so,
+        | and the app can put "prices have changed since your last order" above
+        | the basket rather than leaving the shopper to spot it.
+        */
+        $then = round((float) $item->unit_price, 2);
+        $now = round((float) $this->currentPrice($item, $line), 2);
+        $moved = $then > 0 && abs($now - $then) >= 0.01;
+
         return [
             'cart_item_id' => $line->id,
             'product_id' => $item->product_id,
@@ -450,6 +465,22 @@ class OrderController extends Controller
             'quantity' => $granted,
             'status' => $short ? 'partial' : 'added',
             'warning' => $short ? "Only {$granted} of {$wanted} could be added." : null,
+            'price_changed' => $moved,
+            'previous_price' => $then,
+            'price' => $now,
         ];
+    }
+
+    /**
+     * What this line costs now — the variant's own price where it has one,
+     * the product's otherwise.
+     */
+    protected function currentPrice(OrderItem $item, CartItem $line): float
+    {
+        $variant = $item->product_variant_id
+            ? $item->product?->variants->firstWhere('id', $item->product_variant_id)
+            : null;
+
+        return (float) ($variant->price ?? $item->product->price ?? $item->unit_price);
     }
 }

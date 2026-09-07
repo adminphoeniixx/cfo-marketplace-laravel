@@ -11,6 +11,7 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Vendor;
+use App\Models\WalletTransaction;
 use App\Notifications\LowStockReached;
 use App\Notifications\OrderPlaced;
 use App\Services\Eta;
@@ -109,8 +110,37 @@ class PlaceOrder
         | behaviour and treats anything but cash on delivery as captured, which
         | is what lets the demo and the test suite run without credentials.
         */
-        $awaitingPayment = ! $payOnDelivery && Razorpay::enabled();
-        $paid = ! $payOnDelivery && ! $awaitingPayment;
+        /*
+        | Store credit, spent before anything else is asked for.
+        |
+        | Read under a lock inside the surrounding transaction: two checkouts
+        | racing would otherwise both see the old balance and both spend it,
+        | and the ledger would go negative with nobody at fault.
+        |
+        | Credit is applied to the whole of the order it can cover — delivery
+        | and tax included — because it is money the marketplace already owes
+        | this shopper, not a discount on the goods.
+        */
+        $grandTotal = round((float) $quote['totals']['grand_total'], 2);
+        $wallet = 0.0;
+
+        if (! empty($data['use_wallet'])) {
+            $wallet = min(WalletTransaction::lockedBalanceFor($customer->id), $grandTotal);
+            $wallet = max(round($wallet, 2), 0);
+        }
+
+        $remaining = round($grandTotal - $wallet, 2);
+
+        /*
+        | Credit covering the whole order settles it outright: there is nothing
+        | left for a gateway to collect and nothing for a courier to take at
+        | the door, so the order is paid the moment it is placed — whichever
+        | method the shopper picked for the part that turned out to be zero.
+        */
+        $settledByCredit = $remaining <= 0 && $wallet > 0;
+
+        $awaitingPayment = ! $settledByCredit && ! $payOnDelivery && Razorpay::enabled();
+        $paid = $settledByCredit || (! $payOnDelivery && ! $awaitingPayment);
 
         $addressPayload = $this->addressPayload($address, $customer);
         // The window the shopper was promised, frozen at the moment they
@@ -191,7 +221,28 @@ class PlaceOrder
             'shipping_total' => $quote['totals']['shipping_total'],
             'commission_total' => round($commissionTotal, 2),
             'grand_total' => $quote['totals']['grand_total'],
+            'wallet_amount' => $wallet,
         ]);
+
+        if ($wallet > 0) {
+            // Negative, because the ledger is a ledger: the balance is the sum
+            // of its movements and nothing recomputes it from a stored figure.
+            WalletTransaction::create([
+                'customer_id' => $customer->id,
+                'amount' => -$wallet,
+                'kind' => 'spend',
+                'description' => "Paid towards {$order->number}",
+                'order_id' => $order->id,
+            ]);
+
+            $order->recordEvent(
+                'payment',
+                'Store credit applied',
+                '₹'.number_format($wallet, 2).' of store credit was used'
+                    .($remaining > 0 ? ', leaving ₹'.number_format($remaining, 2).' to pay.' : ', settling the order.'),
+                ['wallet_amount' => $wallet, 'remaining' => max($remaining, 0)],
+            );
+        }
 
         $order->recordEvent(
             'status',

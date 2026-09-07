@@ -61,6 +61,11 @@ class OrderResource extends JsonResource
                 'tax_total' => (float) $this->tax_total,
                 'shipping_total' => (float) $this->shipping_total,
                 'grand_total' => (float) $this->grand_total,
+                // How much of the total the shopper paid out of their own
+                // balance. Zero on almost every order; on the ones where it is
+                // not, an app that omits it shows a card charge that never
+                // happened.
+                'wallet_amount' => (float) $this->wallet_amount,
                 'refunded_total' => (float) $this->refunded_total,
             ],
             'items' => OrderItemResource::collection($items),

@@ -252,20 +252,52 @@ class RefundController extends Controller
             ]);
 
             /*
-            | A refund to store credit has to land somewhere the shopper can
-            | see it. Without this the panel said "refunded", the wallet said
-            | zero, and the difference was a support ticket.
+            | Money goes back the way it came.
+            |
+            | Two separate reasons credit is written here. The first is the
+            | admin choosing `store_credit` as the method — that has always
+            | worked. The second is newer and is not the admin's choice at all:
+            | where the shopper paid part of the order out of their own
+            | balance, that part cannot be refunded to a card that never
+            | charged it. It returns to the balance whatever method is picked
+            | for the rest, and refusing to do so would quietly convert the
+            | shopper's credit into the marketplace's money.
+            |
+            | Capped by what this order actually took from the wallet, less
+            | anything an earlier partial refund already gave back, so two
+            | refunds on one order cannot return the credit twice.
             */
-            if ($refund->method === 'store_credit' && $order->customer_id) {
-                WalletTransaction::create([
-                    'customer_id' => $order->customer_id,
-                    'amount' => (float) $refund->total_amount,
-                    'kind' => 'refund',
-                    'description' => "Refund for {$order->number}",
-                    'order_id' => $order->id,
-                    'refund_id' => $refund->id,
-                    'expires_at' => now()->addYear(),
-                ]);
+            if ($order->customer_id) {
+                $alreadyReturned = (float) WalletTransaction::query()
+                    ->where('order_id', $order->id)
+                    ->where('kind', 'refund')
+                    ->sum('amount');
+
+                $owedToCredit = round(min(
+                    (float) $refund->total_amount,
+                    max((float) $order->wallet_amount - $alreadyReturned, 0),
+                ), 2);
+
+                // The admin's own choice covers whatever is left over.
+                $byChoice = $refund->method === 'store_credit'
+                    ? round((float) $refund->total_amount - $owedToCredit, 2)
+                    : 0.0;
+
+                $toCredit = round($owedToCredit + $byChoice, 2);
+
+                if ($toCredit > 0) {
+                    WalletTransaction::create([
+                        'customer_id' => $order->customer_id,
+                        'amount' => $toCredit,
+                        'kind' => 'refund',
+                        'description' => $owedToCredit > 0 && $byChoice <= 0
+                            ? "Store credit returned for {$order->number}"
+                            : "Refund for {$order->number}",
+                        'order_id' => $order->id,
+                        'refund_id' => $refund->id,
+                        'expires_at' => now()->addYear(),
+                    ]);
+                }
             }
 
             $order->recordEvent(
