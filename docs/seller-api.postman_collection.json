@@ -2407,6 +2407,44 @@
                     ]
                 },
                 {
+                    "name": "Print the label",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/seller/orders/{{order_id}}/label",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "seller",
+                                "orders",
+                                "{{order_id}}",
+                                "label"
+                            ]
+                        },
+                        "description": "A URL to the courier's own PDF, fetched once and remembered on the order. Add `?refresh=1` for a link the courier has since expired.\n\nA 409 is information, not a failure: either the parcel is booked but not manifested yet, or there is no booking to print. `message` says which."
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test(\"answered, printable or not\", () => pm.expect(pm.response.code).to.be.oneOf([200, 409]));"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
                     "name": "Add a note",
                     "request": {
                         "method": "POST",

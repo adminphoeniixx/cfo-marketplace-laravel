@@ -73,6 +73,7 @@ another shopper's order, address, request or cart line is a **404**, never a
 | GET | `/sellers/{vendor}` | A storefront and its listings. Approved stores only. |
 | GET | `/products/filters` | The filter sheet, counted against the catalogue this search actually leaves. |
 | GET | `/reference` | Payment methods, couriers, cancellation/refund reasons, refund methods, return window. |
+| GET | `/serviceability?pincode=` | Whether anybody delivers there, and whether cash is one of the ways. |
 | GET | `/app-config` | Store name, currency, support contacts, the "sell with us" link, and which legal pages exist. |
 | GET | `/support/config` | Chat, phone, hours and the answered questions. |
 | GET | `/legal`, `/legal/{slug}` | `terms`, `privacy`, `returns`, `licenses`, `grievance-officer`. |
@@ -264,13 +265,38 @@ standard delivery (3–7 days) is the fallback, so an order can always be taken.
 ### Ways to pay, and when cash is not one
 
 Each method carries `is_available` and, where it is false, an
-`unavailable_reason`. Today that has one cause: **a seller in the basket who
-does not handle cash**. Grey the option out and show the reason — an option
-that vanishes reads as a bug, one with a sentence beside it reads as an answer.
+`unavailable_reason`. Two things can cause it: **a seller in the basket who does
+not handle cash**, and **a pincode the courier will not collect cash from** —
+plenty of Indian pincodes take prepaid and not COD. The seller's refusal is
+named first, because it is the one a shopper can act on by shopping elsewhere.
+
+Grey the option out and show the reason — an option that vanishes reads as a
+bug, one with a sentence beside it reads as an answer.
 
 The screen is not the rule: `POST /orders` refuses a pay-on-delivery method for
-such a basket with a `422` on `payment_method`, so an older build cannot place
-an order a seller will not accept cash for.
+either case with a `422` on `payment_method`, so an older build cannot place an
+order that would fail at the courier days later.
+
+### Whether it can get there at all
+
+`GET /checkout` carries a `delivery` block for the chosen address:
+
+```json
+{ "serviceable": true, "cod_available": false, "checked": true, "carrier": "Delhivery" }
+```
+
+`GET /serviceability?pincode=600090` asks the same question **without an
+account**, which is what a product page needs — a shopper checks a pincode long
+before there is a basket. It answers `serviceable`, `cod_available`,
+`prepaid_available`, `checked`, `carrier` and a ready-made `message`.
+
+**`checked` is the field that matters.** False means no courier could be asked,
+not that the answer was no; everything else reads `true` so the checkout stays
+open, and `message` is `null`. Show nothing in that case — a promise nobody
+verified is worse than silence. Only act on `serviceable: false` when `checked`
+is `true`.
+
+Answers are cached for twelve hours, so asking on every product view is fine.
 
 ### Ways to pay
 
@@ -415,10 +441,19 @@ Everything the courier screen draws, so it no longer needs this call *and*
   one tap and should not have to walk an object that is `null` until somebody
   collects the parcel.
 
-- `done` is only ever true of something that actually happened. The courier does
-  not report its own scans to this marketplace, so **"Out for delivery" is shown
-  as reached only once the parcel arrived** — the milestone is honest about the
-  fact rather than inventing a time.
+- `done` is only ever true of something that actually happened, and **"Out for
+  delivery" now reaches `done` on the morning it happens** — the courier reports
+  its own scans, so the step no longer has to wait for the parcel to arrive to
+  be filled in. Its `at` stays `null`: the scan says the state, not the minute.
+- **A delivery that was tried and failed says so.** The `out_for_delivery` row's
+  description becomes "Delivery was attempted and could not be completed". A
+  shopper who thinks a parcel is still on its way does not answer the phone to
+  the courier.
+- **A parcel coming back replaces "Delivered" rather than sitting above it.**
+  Where the courier has started a return, the last row is `returning` — "On its
+  way back to the seller", or "Returned to the seller" once it lands — and there
+  is no `delivered` row at all. A hollow "Delivered" underneath would read as
+  "still coming".
 - `current` marks the step the parcel is sitting on; `progress_step` is how many
   are done, which is how many segments of the bar to fill.
 - A cancelled order stops at "Order cancelled" instead of pretending the rest is

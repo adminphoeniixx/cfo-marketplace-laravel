@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Seller;
 
 use App\Actions\CreateManualOrder;
 use App\Actions\Shipping\BookShipment;
+use App\Actions\Shipping\FetchLabel;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Seller\OrderResource;
 use App\Models\Customer;
@@ -216,6 +217,36 @@ class OrderController extends Controller
         app(BookShipment::class)->handle($model->fresh(['items']));
 
         return new OrderResource($this->findOwnedOrder($request, $order));
+    }
+
+    /**
+     * The shipping label for this order's parcel.
+     *
+     * A URL rather than a PDF: the courier hosts it, and an app that gets a
+     * link can open it in a viewer, hand it to a Bluetooth label printer, or
+     * share it — none of which it could do with bytes down this pipe.
+     *
+     * Deliberately not an error when there is nothing to print. A parcel
+     * booked ninety seconds ago genuinely has no label yet, and an app that
+     * shows "not ready yet, try again" is telling the truth where one showing
+     * a failure is not.
+     */
+    public function label(Request $request, int $order, FetchLabel $labels): JsonResponse
+    {
+        $model = $this->findOwnedOrder($request, $order);
+
+        $url = $labels->handle($model, $request->boolean('refresh'));
+
+        return response()->json([
+            'url' => $url,
+            'carrier' => $model->carrier,
+            'tracking_number' => $model->tracking_number,
+            'message' => $url === null
+                ? ($model->tracking_number
+                    ? 'The courier has no label for this parcel yet. Try again in a minute.'
+                    : 'This order has no booking to print a label for.')
+                : null,
+        ], $url === null ? 409 : 200);
     }
 
     /**

@@ -36,7 +36,10 @@ const props = defineProps<{
         string,
         {
             label: string;
-            fields: Record<string, { label: string; secret: boolean; help: string }>;
+            fields: Record<
+                string,
+                { label: string; secret: boolean; help: string }
+            >;
         }
     >;
     scheduler: {
@@ -112,7 +115,9 @@ const partnerForm = useForm<{
 
 /** The fields the chosen courier asks for, or none for a link-only partner. */
 const driverFields = computed(() =>
-    partnerForm.driver ? (props.courierDrivers[partnerForm.driver]?.fields ?? {}) : {},
+    partnerForm.driver
+        ? (props.courierDrivers[partnerForm.driver]?.fields ?? {})
+        : {},
 );
 
 /** Already stored, so the input can say so instead of showing the secret. */
@@ -122,6 +127,14 @@ const alreadySet = (key: string) =>
 const testPartner = (partner: DeliveryPartner) =>
     router.post(
         `/admin/settings/delivery-partners/${partner.id}/test`,
+        {},
+        { preserveScroll: true },
+    );
+
+/** Ask this courier to collect whatever is booked and still on the table. */
+const pickupPartner = (partner: DeliveryPartner) =>
+    router.post(
+        `/admin/settings/delivery-partners/${partner.id}/pickup`,
         {},
         { preserveScroll: true },
     );
@@ -215,7 +228,8 @@ const destroyPartner = (partner: DeliveryPartner) =>
                 :class="scheduler.healthy ? 'bg-emerald-500' : 'bg-amber-500'"
             />
             <span>
-                <strong>Background jobs</strong> — last ran {{ schedulerAge() }}.
+                <strong>Background jobs</strong> — last ran
+                {{ schedulerAge() }}.
                 <template v-if="!scheduler.healthy">
                     Courier tracking and anything else on a schedule is not
                     running. Check that the web container is up and that
@@ -381,10 +395,19 @@ const destroyPartner = (partner: DeliveryPartner) =>
                             class="flex flex-wrap items-center gap-3 py-2.5 first:pt-0 last:pb-0"
                         >
                             <div class="min-w-0 flex-1">
+                                <!--
+                                | Wraps rather than overflows. A courier whose
+                                | name and status badge are wider than the
+                                | column used to run underneath the buttons,
+                                | which put "Untested" — the one word on this
+                                | row worth reading — behind "Edit".
+                                -->
                                 <p
-                                    class="flex items-center gap-2 text-[13px] font-medium text-[#303030] dark:text-[#e3e3e3]"
+                                    class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-medium text-[#303030] dark:text-[#e3e3e3]"
                                 >
-                                    {{ partner.name }}
+                                    <span class="min-w-0 truncate">{{
+                                        partner.name
+                                    }}</span>
                                     <PBadge
                                         v-if="!partner.is_active"
                                         tone="neutral"
@@ -398,7 +421,10 @@ const destroyPartner = (partner: DeliveryPartner) =>
                                     | booking and delivers nothing looks.
                                     -->
                                     <PBadge
-                                        v-if="partner.driver && partner.connected_at"
+                                        v-if="
+                                            partner.driver &&
+                                            partner.connected_at
+                                        "
                                         tone="success"
                                         >Connected</PBadge
                                     >
@@ -427,7 +453,8 @@ const destroyPartner = (partner: DeliveryPartner) =>
                                     {{ partner.connection_error }}
                                 </p>
                             </div>
-                            <div class="flex gap-1.5">
+                            <!-- Never squeezed: the actions are fixed width. -->
+                            <div class="flex shrink-0 gap-1.5">
                                 <PButton
                                     size="slim"
                                     @click="openPartner(partner)"
@@ -438,6 +465,18 @@ const destroyPartner = (partner: DeliveryPartner) =>
                                     size="slim"
                                     @click="testPartner(partner)"
                                     >Test</PButton
+                                >
+                                <!--
+                                | The morning run books a van every day; this
+                                | is the afternoon somebody packs twenty more
+                                | and does not want them sitting until
+                                | tomorrow.
+                                -->
+                                <PButton
+                                    v-if="partner.driver"
+                                    size="slim"
+                                    @click="pickupPartner(partner)"
+                                    >Pickup</PButton
                                 >
                                 <PButton
                                     size="slim"
@@ -538,14 +577,19 @@ const destroyPartner = (partner: DeliveryPartner) =>
                 help-text="Connected couriers book the waybill themselves and report their own scans."
             />
 
-            <div v-if="partnerForm.driver" class="space-y-3 rounded-lg bg-[#f7f7f7] p-3 dark:bg-[#282828]">
+            <div
+                v-if="partnerForm.driver"
+                class="space-y-3 rounded-lg bg-[#f7f7f7] p-3 dark:bg-[#282828]"
+            >
                 <PTextField
                     v-for="(field, key) in driverFields"
                     :key="key"
                     v-model="partnerForm.credentials[key]"
                     :label="field.label"
                     :type="field.secret ? 'password' : 'text'"
-                    :placeholder="alreadySet(key) ? '•••••••• (leave blank to keep)' : ''"
+                    :placeholder="
+                        alreadySet(key) ? '•••••••• (leave blank to keep)' : ''
+                    "
                     :help-text="field.help"
                 />
                 <p class="text-xs text-[#8a8a8a]">

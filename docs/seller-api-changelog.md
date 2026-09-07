@@ -15,6 +15,44 @@ with both.
 
 ---
 
+## 2026-09-07
+
+### Added
+
+- **The label, as a URL.** `GET /orders/{id}/label` answers
+  `200 {"url": …, "carrier": …, "tracking_number": …}` with a link to the
+  courier's own PDF. **What an app must do:** put a "Print label" action on a
+  fulfilled order. Treat `409` as information rather than failure — it means
+  the parcel is not manifested yet (`message` says to try again) or there is no
+  booking to print. `?refresh=1` re-asks for a link the courier has expired.
+- **`shipment_status` on every order.** The courier's own account of the box,
+  which is *not* `status`. One of `booked`, `in_transit`, `out_for_delivery`,
+  `delivered`, `undelivered`, `returning`, `returned`, `cancelled`, `lost` —
+  see the reference for the table. **What an app must do:** show `undelivered`
+  and `returning` prominently; they are the two states where waiting achieves
+  nothing. Both also raise a notification.
+- **`delivery_attempts`, `pickup_scheduled_at`, `returned_at`.** How many times
+  delivery was tried and failed, when a van was booked, and when a parcel got
+  back to the seller. All nullable / zero until they apply.
+
+### Changed
+
+- **Parcels are followed by push as well as by polling.** Couriers now push
+  updates to the marketplace as they happen; the fifteen-minute sweep stays for
+  anything a push misses. **What an app must do:** nothing — the same fields
+  move, just sooner.
+- **A van is booked every morning** for parcels a connected courier has
+  manifested and not collected. **What an app must do:** nothing. A seller no
+  longer has to arrange a collection themselves; `pickup_scheduled_at` says
+  when one was asked for.
+- **Cancelling an order now cancels the booking.** Where the marketplace booked
+  the waybill, cancelling the order — or approving a cancellation covering the
+  whole of it — calls it off with the courier too. The waybill stays on the
+  order for reconciliation, with `shipment_status: "cancelled"`. A courier that
+  refuses leaves a `shipment` event saying so.
+
+---
+
 ## 2026-09-05
 
 ### Added

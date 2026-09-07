@@ -197,16 +197,52 @@ class OrderController extends Controller
             'done' => $model->shipped_at !== null,
         ];
 
+        /*
+        | Out for delivery, which the courier now actually reports.
+        |
+        | This used to be drawn as reached only once the parcel had arrived —
+        | the marketplace had no way of knowing sooner. The sync and the
+        | webhooks changed that, and a shopper watching the screen on the
+        | morning it comes is the whole reason either exists.
+        */
+        $outForDelivery = in_array(
+            $model->shipment_status,
+            ['out_for_delivery', 'delivered', 'undelivered'],
+            true,
+        );
+
         $steps[] = [
             'key' => 'out_for_delivery',
             'title' => 'Out for delivery',
-            'subtitle' => 'Assigned to a rider near you',
+            'subtitle' => $model->delivery_attempts > 0
+                // Said plainly, because a shopper who thinks a parcel is still
+                // coming does not answer the phone to the courier.
+                ? 'Delivery was attempted and could not be completed'
+                : 'Assigned to a rider near you',
             'location' => $to,
-            // The courier does not report this to the marketplace yet, so it is
-            // shown as reached only once the parcel actually arrived.
             'at' => null,
-            'done' => $model->delivered_at !== null,
+            'done' => $outForDelivery || $model->delivered_at !== null,
         ];
+
+        /*
+        | And the one ending nobody wants to find out about from a refund line.
+        |
+        | Drawn instead of "Delivered", not beside it: a parcel on its way back
+        | to the seller is not going to arrive, and a hollow "Delivered" step
+        | under it would read as "still coming".
+        */
+        if (in_array($model->shipment_status, ['returning', 'returned'], true)) {
+            $steps[] = [
+                'key' => 'returning',
+                'title' => $model->returned_at ? 'Returned to the seller' : 'On its way back to the seller',
+                'subtitle' => 'Anything already paid is refunded to the original method',
+                'location' => $vendor?->city,
+                'at' => $model->returned_at?->toIso8601String(),
+                'done' => $model->returned_at !== null,
+            ];
+
+            return $this->markCurrent($steps);
+        }
 
         $steps[] = [
             'key' => 'delivered',

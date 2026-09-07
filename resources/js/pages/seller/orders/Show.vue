@@ -228,6 +228,21 @@ const showTimeline = ref(true);
                         >
                             Mark as packed
                         </PButton>
+                        <!--
+                        | The label, which is the thing that goes on the box.
+                        | A plain link because the server redirects to the
+                        | courier's own PDF — putting a viewer around it would
+                        | add a click between a packing table and a printer.
+                        -->
+                        <a
+                            v-if="order.tracking_number"
+                            :href="`/seller/orders/${order.id}/label`"
+                            target="_blank"
+                            rel="noopener"
+                            class="text-[13px] font-medium text-[#005bd3] hover:underline dark:text-[#8ac1ff]"
+                        >
+                            Print label
+                        </a>
                         <a
                             v-if="trackingUrl"
                             :href="trackingUrl"

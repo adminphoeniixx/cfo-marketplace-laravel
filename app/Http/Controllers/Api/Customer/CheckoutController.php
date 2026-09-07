@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Customer;
 
 use App\Actions\Customer\PlaceOrder;
 use App\Actions\Customer\QuoteBasket;
+use App\Actions\Shipping\CheckServiceability;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Customer\AddressResource;
 use App\Http\Resources\Customer\OrderResource;
@@ -29,7 +30,11 @@ class CheckoutController extends Controller
 {
     use ScopesToCustomer;
 
-    public function __construct(protected QuoteBasket $quote, protected PlaceOrder $placeOrder) {}
+    public function __construct(
+        protected QuoteBasket $quote,
+        protected PlaceOrder $placeOrder,
+        protected CheckServiceability $serviceability,
+    ) {}
 
     public function options(Request $request): JsonResponse
     {
@@ -60,6 +65,16 @@ class CheckoutController extends Controller
             $request->string('shipping_code')->toString() ?: null,
         );
 
+        /*
+        | What the couriers say about where this is going.
+        |
+        | Asked here rather than at `store` because the point is to answer
+        | before the shopper has committed: a pincode nobody serves, or one
+        | that takes prepaid but not cash, is a thing to find out on the review
+        | screen and not from a failed booking two days later.
+        */
+        $delivery = $this->serviceability->handle((string) ($address?->postcode ?? ''));
+
         return response()->json([
             'addresses' => AddressResource::collection($addresses),
             'selected_address_id' => $address?->id,
@@ -68,7 +83,19 @@ class CheckoutController extends Controller
             'selected_address' => $address ? new AddressResource($address) : null,
             'shipping_options' => $quote['shipping_options'],
             'selected_shipping_code' => $quote['shipping_code'],
-            'payment_methods' => self::paymentMethods($this->storesRefusingCash($items)),
+            'delivery' => [
+                'serviceable' => $delivery['serviceable'],
+                'cod_available' => $delivery['cod'],
+                // False means no courier could be asked, not that the answer
+                // was no — the app shows nothing rather than a promise nobody
+                // made.
+                'checked' => $delivery['checked'],
+                'carrier' => $delivery['carrier'],
+            ],
+            'payment_methods' => self::paymentMethods(
+                $this->storesRefusingCash($items),
+                $this->cashRefusedByCourier($delivery),
+            ),
             'coupon' => $quote['coupon'],
             'totals' => $quote['totals'],
             'items' => $quote['lines'],
@@ -109,6 +136,30 @@ class CheckoutController extends Controller
                         : 'Some sellers in this basket do not take cash on delivery. Choose another way to pay.',
                 ]);
             }
+
+            /*
+            | And the courier's refusal, which is a different no.
+            |
+            | Plenty of Indian pincodes are delivered to prepaid and not COD.
+            | Taking the order anyway means a booking refused days later on an
+            | order the shopper believes is coming — so it is refused here,
+            | where they can still choose another way to pay.
+            |
+            | Only ever on a *checked* answer: a courier that could not be
+            | reached must not close the checkout.
+            */
+            $address = $customer->addresses()->find($data['address_id']);
+            $delivery = $this->serviceability->handle((string) ($address?->postcode ?? ''));
+
+            if ($reason = $this->cashRefusedByCourier($delivery)) {
+                throw ValidationException::withMessages([
+                    // The pincode nobody serves gets no "choose another way":
+                    // there is no way to pay that makes a parcel reach it.
+                    'payment_method' => $delivery['serviceable']
+                        ? $reason.' Choose another way to pay.'
+                        : $reason,
+                ]);
+            }
         }
 
         // Orders record the label the shopper saw, not the code — that is what
@@ -132,18 +183,21 @@ class CheckoutController extends Controller
      * to know whether to open a gateway.
      *
      * @param  list<string>  $refusingCash  Stores in this basket that will not
-     *                                        handle cash, by name.
+     *                                      handle cash, by name.
+     * @param  string|null  $courierRefusesCash  Why the courier will not
+     *                                           collect cash here, if it
+     *                                           will not.
      * @return array<int, array<string, mixed>>
      */
-    public static function paymentMethods(array $refusingCash = []): array
+    public static function paymentMethods(array $refusingCash = [], ?string $courierRefusesCash = null): array
     {
         return PaymentMethod::active()->orderBy('position')->get()
-            ->map(function (PaymentMethod $method) use ($refusingCash) {
+            ->map(function (PaymentMethod $method) use ($refusingCash, $courierRefusesCash) {
                 $isCash = PaymentMethod::isPayOnDelivery($method->code);
                 // Greyed out rather than missing: an option that vanishes
                 // reads as a bug, where one with a reason beside it reads as
                 // an answer.
-                $blocked = $isCash && $refusingCash !== [];
+                $blocked = $isCash && ($refusingCash !== [] || $courierRefusesCash !== null);
 
                 return [
                     'code' => $method->code,
@@ -152,14 +206,39 @@ class CheckoutController extends Controller
                     'icon' => $method->glyph(),
                     'is_pay_on_delivery' => $isCash,
                     'is_available' => ! $blocked,
-                    'unavailable_reason' => $blocked
-                        ? (count($refusingCash) === 1
-                            ? $refusingCash[0].' does not take cash on delivery'
-                            : 'Some sellers in this basket do not take cash on delivery')
-                        : null,
+                    'unavailable_reason' => match (true) {
+                        ! $blocked => null,
+                        // The seller's refusal is named first: it is the one
+                        // the shopper can do something about, by shopping
+                        // elsewhere.
+                        count($refusingCash) === 1 => $refusingCash[0].' does not take cash on delivery',
+                        $refusingCash !== [] => 'Some sellers in this basket do not take cash on delivery',
+                        default => $courierRefusesCash,
+                    },
                 ];
             })
             ->all();
+    }
+
+    /**
+     * Why the courier will not collect cash at this address, if it will not.
+     *
+     * Null covers both "it will" and "nobody could be asked" on purpose: an
+     * unanswered question must read exactly like a yes everywhere downstream,
+     * because refusing a sale on a courier's bad morning is the more expensive
+     * mistake.
+     *
+     * @param  array{serviceable: bool, cod: bool, checked: bool, carrier: string|null}  $delivery
+     */
+    protected function cashRefusedByCourier(array $delivery): ?string
+    {
+        if (! $delivery['checked'] || $delivery['cod']) {
+            return null;
+        }
+
+        return $delivery['serviceable']
+            ? 'Cash on delivery is not available for this pincode.'
+            : 'No courier delivers to this pincode yet.';
     }
 
     /**

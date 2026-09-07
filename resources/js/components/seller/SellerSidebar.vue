@@ -25,6 +25,9 @@ const props = withDefaults(
 const page = usePage();
 
 const icons: Record<string, string> = {
+    // A support conversation: a speech bubble with a line of writing in it.
+    tickets:
+        'M3 4a2 2 0 012-2h10a2 2 0 012 2v7a2 2 0 01-2 2H8l-4 3.5V13a2 2 0 01-1-1.7V4zm3 2v1.5h8V6H6zm0 3.5V11h5V9.5H6',
     products:
         'M10 1.8l7 3.5v9.4l-7 3.5-7-3.5V5.3l7-3.5zm0 2.2L5.3 6.3 10 8.6l4.7-2.3L10 4zM4.5 7.8v6.1l4.8 2.4v-6.1L4.5 7.8zm6.7 8.5l4.8-2.4V7.8l-4.8 2.4v6.1z',
     orders: 'M4 3h12a1 1 0 011 1v3H3V4a1 1 0 011-1zm-1 6h14v7a1 1 0 01-1 1H4a1 1 0 01-1-1V9zm4 2v2h6v-2H7z',
@@ -65,7 +68,7 @@ const allGroups = computed<NavGroup[]>(() => [
                 label: 'Tickets',
                 href: '/seller/tickets',
                 match: '/seller/tickets',
-                icon: 'notifications',
+                icon: 'tickets',
                 section: 'tickets',
             },
         ],

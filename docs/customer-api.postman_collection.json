@@ -1314,6 +1314,36 @@
                             ]
                         }
                     }
+                },
+                {
+                    "name": "serviceability",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/serviceability?pincode=600090",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "serviceability"
+                            ],
+                            "query": [
+                                {
+                                    "key": "pincode",
+                                    "value": "600090",
+                                    "description": "Six digits. `checked: false` means no courier could be asked — not that the answer was no."
+                                }
+                            ]
+                        }
+                    }
                 }
             ]
         },

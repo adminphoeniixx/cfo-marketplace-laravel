@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Actions\CreateManualOrder;
+use App\Actions\Shipping\CancelShipment;
+use App\Actions\Shipping\FetchLabel;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\DeliveryPartner;
@@ -20,6 +22,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\RedirectResponse as BaseRedirect;
 
 class OrderController extends Controller
 {
@@ -218,6 +221,20 @@ class OrderController extends Controller
 
         $order->update(['status' => $data['status'], ...$timestamps]);
 
+        /*
+        | Tell the courier too.
+        |
+        | Cancelling here used to cancel the order and nothing else: the
+        | waybill stayed live, the van still came, and on a cash-on-delivery
+        | parcel somebody could still be asked for money at a door. It is
+        | never fatal — a courier refusing must not undo a cancellation the
+        | shopper has already been told about — and it writes its own line on
+        | the timeline either way.
+        */
+        if ($data['status'] === 'cancelled' && $from !== 'cancelled') {
+            app(CancelShipment::class)->handle($order->fresh());
+        }
+
         $order->recordEvent(
             'status',
             "Status changed from {$from} to {$data['status']}",
@@ -232,6 +249,26 @@ class OrderController extends Controller
         }
 
         return back()->with('success', "Order marked as {$data['status']}.");
+    }
+
+    /**
+     * Print the label, by sending staff straight to the courier's own PDF.
+     *
+     * The same document the seller prints, reachable from the marketplace's
+     * own order screen — because a support call about a parcel is answered by
+     * looking at what is actually on the box.
+     */
+    public function label(Request $request, Order $order, FetchLabel $labels): BaseRedirect
+    {
+        $url = $labels->handle($order, $request->boolean('refresh'));
+
+        if ($url === null) {
+            return back()->with('error', $order->tracking_number
+                ? 'The courier has no label for this parcel yet. Try again in a minute.'
+                : 'This order has no booking to print a label for.');
+        }
+
+        return redirect()->away($url);
     }
 
     public function updatePayment(Request $request, Order $order): RedirectResponse

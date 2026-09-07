@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\CourierWebhookController;
 use App\Http\Controllers\Api\Customer\AddressController as CustomerAddressController;
 use App\Http\Controllers\Api\Customer\AuthController as CustomerAuthController;
 use App\Http\Controllers\Api\Customer\CartController;
@@ -14,6 +15,7 @@ use App\Http\Controllers\Api\Customer\ProfileController as CustomerProfileContro
 use App\Http\Controllers\Api\Customer\ReferenceController;
 use App\Http\Controllers\Api\Customer\RequestController;
 use App\Http\Controllers\Api\Customer\ReviewController;
+use App\Http\Controllers\Api\Customer\ServiceabilityController;
 use App\Http\Controllers\Api\Customer\TicketController;
 use App\Http\Controllers\Api\Customer\WalletController;
 use App\Http\Controllers\Api\Customer\WishlistController;
@@ -33,6 +35,28 @@ use App\Http\Controllers\Api\Seller\TeamController;
 use App\Http\Controllers\Api\Seller\TicketController as SellerTicketController;
 use App\Http\Controllers\Api\Seller\UploadController;
 use Illuminate\Support\Facades\Route;
+
+/*
+|--------------------------------------------------------------------------
+| Courier webhooks
+|--------------------------------------------------------------------------
+|
+| The couriers telling us where a parcel got to, rather than being asked every
+| fifteen minutes by `shipments:sync`. Public by necessity — a courier carries
+| no token of ours — and believed only because of a shared secret set in each
+| provider's panel and checked in the controller.
+|
+| Throttled, because these are the only unauthenticated endpoints that write to
+| orders, and a courier having a bad day can push the same parcel repeatedly.
+| Both are safe to replay: `ApplyTracking` writes nothing the second time.
+|
+*/
+
+Route::prefix('webhooks/couriers')->name('api.webhooks.couriers.')
+    ->middleware('throttle:120,1')->group(function () {
+        Route::post('shiprocket', [CourierWebhookController::class, 'shiprocket'])->name('shiprocket');
+        Route::post('delhivery', [CourierWebhookController::class, 'delhivery'])->name('delhivery');
+    });
 
 /*
 |--------------------------------------------------------------------------
@@ -204,6 +228,7 @@ Route::prefix('seller')->name('api.seller.')->group(function () {
                 Route::get('orders/{order}', [OrderController::class, 'show'])->name('orders.show');
                 Route::post('orders/{order}/fulfill', [OrderController::class, 'fulfill'])->name('orders.fulfill');
                 Route::post('orders/{order}/notes', [OrderController::class, 'addNote'])->name('orders.notes');
+                Route::get('orders/{order}/label', [OrderController::class, 'label'])->name('orders.label');
             });
 
             Route::middleware('seller.section:cancellations')->group(function () {
@@ -265,6 +290,15 @@ Route::prefix('customer')->name('api.customer.')->group(function () {
     Route::get('products/{product}/reviews', [ReviewController::class, 'index'])->name('products.reviews');
     Route::get('sellers/{vendor}', [CustomerCatalogController::class, 'seller'])->name('sellers.show');
     Route::get('reference', ReferenceController::class)->name('reference');
+
+    /*
+    | "Do you deliver to my pincode?" — asked on a product page, before there
+    | is a basket or an account to hang the question off. Open for that
+    | reason, and throttled because it is the one public endpoint that reaches
+    | a third party.
+    */
+    Route::get('serviceability', ServiceabilityController::class)
+        ->middleware('throttle:60,1')->name('serviceability');
 
     /*
     | Words rather than shopping, and all of it open: a shopper who has been

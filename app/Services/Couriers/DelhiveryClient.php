@@ -45,6 +45,18 @@ class DelhiveryClient implements CourierClient
     ];
 
     /**
+     * Their two-letter code for which *journey* a parcel is on, which the
+     * status alone does not say.
+     *
+     * This is the whole reason returns were invisible: a parcel coming back to
+     * the seller reports `Status: "In Transit"` and then `Status: "Delivered"`,
+     * exactly like one going out. Only `StatusType` distinguishes them, and
+     * "Delivered" under `RT` means delivered *back to the seller* — the one
+     * status this marketplace must never show a shopper as good news.
+     */
+    private const RETURN_TYPE = 'RT';
+
+    /**
      * @param  string  $token  Delhivery's API token.
      * @param  string  $pickupName  A warehouse registered in their panel — a
      *                              name they do not know refuses every booking.
@@ -220,10 +232,15 @@ class DelhiveryClient implements CourierClient
 
         $status = (array) ($shipment['Status'] ?? []);
         $raw = (string) ($status['Status'] ?? '');
+        $type = (string) ($status['StatusType'] ?? '');
 
         return [
-            'status' => self::STATUS_MAP[$raw] ?? 'in_transit',
-            'raw_status' => $raw,
+            'status' => $this->normalise($raw, $type),
+            // The journey is kept in the raw status where it applies, because
+            // "Delivered" on a return and "Delivered" on a sale are the same
+            // word for opposite outcomes and a timeline showing either one
+            // should say which.
+            'raw_status' => $type === self::RETURN_TYPE ? 'RTO '.$raw : $raw,
             'location' => is_string($status['StatusLocation'] ?? null) ? $status['StatusLocation'] : null,
             'updated_at' => is_string($status['StatusDateTime'] ?? null) ? $status['StatusDateTime'] : null,
             // `array_values` because Delhivery's scan list is keyed by
@@ -236,6 +253,21 @@ class DelhiveryClient implements CourierClient
                 'at' => $scan['ScanDetail']['ScanDateTime'] ?? null,
             ], (array) ($shipment['Scans'] ?? []))),
         ];
+    }
+
+    /**
+     * Delhivery's word for where a parcel is, in this marketplace's — with the
+     * journey taken into account, because it changes the answer.
+     */
+    private function normalise(string $raw, string $type): string
+    {
+        if ($type === self::RETURN_TYPE) {
+            // Back with the seller, and finished. Everything else on a return
+            // journey is still on its way there.
+            return $raw === 'Delivered' ? 'returned' : 'returning';
+        }
+
+        return self::STATUS_MAP[$raw] ?? 'in_transit';
     }
 
     /**
@@ -260,20 +292,75 @@ class DelhiveryClient implements CourierClient
     }
 
     /**
-     * The label, as a URL the browser can open with the token attached by us
-     * rather than by the caller.
+     * The packing slip, as a URL somebody can open and print.
+     *
+     * Delhivery hosts the PDF and hands back a link to it, so the token is
+     * spent here rather than handed to a browser.
      */
-    public function packingSlip(string $waybill): ?string
+    public function label(string $waybill): ?string
     {
         try {
             $response = $this->request()->get('/api/p/packing_slip', ['wbns' => $waybill, 'pdf' => 'true']);
-        } catch (ConnectionException) {
+        } catch (ConnectionException $e) {
+            Log::warning('Delhivery unreachable while fetching a label.', [
+                'waybill' => $waybill, 'error' => $e->getMessage(),
+            ]);
+
             return null;
         }
 
         $url = $response->json('packages.0.pdf_download_link');
 
-        return is_string($url) ? $url : null;
+        return is_string($url) && $url !== '' ? $url : null;
+    }
+
+    /**
+     * Ask for a van.
+     *
+     * Delhivery books a pickup against a *warehouse and a package count*, not
+     * against waybills — so the list is counted rather than sent. Their window
+     * is a time of day, and one that has already passed is refused, so an
+     * afternoon slot is the default a morning run can still use.
+     *
+     * @param  list<string>  $waybills
+     * @return array{scheduled: bool, reference: string|null, message: string|null}|null
+     */
+    public function schedulePickup(array $waybills, ?string $date = null): ?array
+    {
+        try {
+            $response = $this->request()->post('/fm/request/new/', [
+                'pickup_location' => $this->pickupName,
+                'pickup_date' => $date ?? now()->format('Y-m-d'),
+                'pickup_time' => '14:00:00',
+                // At least one, or Delhivery reads it as a warehouse survey
+                // rather than a collection.
+                'expected_package_count' => max(count($waybills), 1),
+            ]);
+        } catch (ConnectionException $e) {
+            Log::warning('Delhivery unreachable while scheduling a pickup.', ['error' => $e->getMessage()]);
+
+            return null;
+        }
+
+        $reference = $response->json('pickup_id');
+
+        if ($response->failed() || $reference === null) {
+            return [
+                'scheduled' => false,
+                'reference' => null,
+                // Their refusals are prose, and worth passing on verbatim:
+                // "pickup already exists for this slot" is not an error to fix.
+                'message' => (string) ($response->json('error')
+                    ?? $response->json('message')
+                    ?? mb_substr($response->body(), 0, 200)),
+            ];
+        }
+
+        return [
+            'scheduled' => true,
+            'reference' => (string) $reference,
+            'message' => null,
+        ];
     }
 
     private function request(): PendingRequest

@@ -15,6 +15,38 @@ step with both.
 
 ---
 
+## 2026-09-07
+
+### Added
+
+- **`GET /serviceability?pincode=`.** Open, no token: whether anybody delivers
+  to a pincode and whether cash is one of the ways, with a ready-made `message`.
+  **What an app must do:** put a pincode check on the product page. Act on
+  `serviceable: false` **only** when `checked` is `true` — `checked: false`
+  means no courier could be asked, everything else reads `true` so nothing
+  closes, and `message` is `null`. Cached twelve hours, so asking often is fine.
+- **`delivery` on `GET /checkout`.** The same answer for the chosen address:
+  `serviceable`, `cod_available`, `checked`, `carrier`.
+
+### Changed
+
+- **Cash can now be refused by the pincode as well as by the seller.** A
+  payment method's `unavailable_reason` may now read "Cash on delivery is not
+  available for this pincode." **What an app must do:** nothing new — keep
+  greying the option out and showing the reason. `POST /orders` refuses the same
+  case with a `422` on `payment_method`, as it already did for a seller who
+  will not take cash.
+- **Tracking tells the truth sooner and about more.** On
+  `GET /orders/{number}/track`: "Out for delivery" now reaches `done` on the
+  morning it happens rather than only once the parcel arrived; a failed delivery
+  attempt says so in that row's description; and a parcel the courier has
+  started returning ends the timeline with a `returning` row — "On its way back
+  to the seller", then "Returned to the seller" — **instead of** a `delivered`
+  row. **What an app must do:** handle a timeline whose last key is `returning`
+  and do not assume `delivered` is always present.
+
+---
+
 ## 2026-09-05
 
 ### Added

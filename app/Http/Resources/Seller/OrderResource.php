@@ -58,6 +58,15 @@ class OrderResource extends JsonResource
             // Built from the courier's own URL template, so the app can offer
             // a "track this" link without knowing anything about couriers.
             'tracking_url' => DeliveryPartner::trackingUrlFrom($this->carrier, $this->tracking_number),
+            /*
+            | The courier's own account of the parcel, which is not the
+            | order's status and does not move with it. A seller needs this
+            | one: `returning` and `undelivered` are the two states where
+            | waiting achieves nothing and somebody has to act.
+            */
+            'shipment_status' => $this->shipment_status,
+            'delivery_attempts' => (int) $this->delivery_attempts,
+            'pickup_scheduled_at' => $this->pickup_scheduled_at?->toIso8601String(),
             'customer' => [
                 // Enough to pack and deliver, and no more: no email, no
                 // customer id, nothing that identifies them off this order.
@@ -98,6 +107,7 @@ class OrderResource extends JsonResource
             ],
             'placed_at' => $this->placed_at?->toIso8601String(),
             'shipped_at' => $this->shipped_at?->toIso8601String(),
+            'returned_at' => $this->returned_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
         ];
     }

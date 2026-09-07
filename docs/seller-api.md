@@ -323,6 +323,7 @@ malformed, unlike a `422`.
 | GET | `/orders/customers` | `?search=`. People who have already bought from this store. |
 | POST | `/orders/{id}/fulfill` | `items[].id`, `items[].quantity`, optional `tracking_number`, `carrier`. |
 | POST | `/orders/{id}/notes` | `note`. Lands on the order timeline the admin panel shows. |
+| GET | `/orders/{id}/label` | The shipping label as a URL. `?refresh=1` asks the courier again. |
 
 `carrier` is the courier's **name**, and it has to come from
 `GET /delivery-partners` — the marketplace matches on that name to build the
@@ -352,10 +353,51 @@ read `tracking_number` back from the response.
 - A courier that is only a name and a tracking link books nothing, and that is
   not a failure — `GET /delivery-partners` is still the picker to show.
 
-Once booked, `shipments:sync` follows the parcel every fifteen minutes: each
-courier scan becomes a timeline event, and `shipped_at` / `delivered_at` come
-from the courier rather than from a seller pressing a button. A cash-on-delivery
-order is marked paid when the courier records the delivery.
+Once booked, the parcel is followed two ways: the courier pushes updates as they
+happen, and `shipments:sync` sweeps every fifteen minutes for anything a push
+missed. Each scan becomes a timeline event, and `shipped_at` / `delivered_at`
+come from the courier rather than from a seller pressing a button. A
+cash-on-delivery order is marked paid when the courier records the delivery.
+
+A van is booked once each morning for every parcel a connected courier has
+manifested and not yet collected, so a seller who fulfils an order does not have
+to arrange a collection themselves.
+
+### The parcel's own state
+
+`shipment_status` is the **courier's** account of the box, and it is not
+`status` — which stays the marketplace's account of the sale. The two can
+disagree, and that is the point: a parcel can be `returning` while the order is
+still a sale nobody has refunded.
+
+| `shipment_status` | What it means |
+|---|---|
+| `booked` | Manifested with the courier, not collected yet. |
+| `in_transit` | Moving. |
+| `out_for_delivery` | With a rider today. |
+| `delivered` | Handed over. |
+| `undelivered` | Tried and failed. **Call the shopper** — waiting does not help. |
+| `returning` | Coming back to the seller. |
+| `returned` | Back with the seller. `returned_at` is set and `fulfillment_status` drops to `unfulfilled`. |
+| `cancelled` | The booking was called off. The waybill stays on the order for reconciliation. |
+| `lost` | The courier cannot find it. Raise a claim. |
+
+Alongside it: `delivery_attempts` (how many times delivery has been tried and
+failed) and `pickup_scheduled_at` (when a van was booked, null until one is).
+Both `undelivered` and `returning` also raise a notification, so an app that
+reads the bell does not have to poll for them.
+
+### Printing the label
+
+`GET /orders/{id}/label` answers `200 {"url": "…"}` with a link to the courier's
+own PDF — open it in a viewer, hand it to a label printer, or share it. The URL
+is fetched once and remembered on the order, so reprinting is free; pass
+`?refresh=1` for a link the courier has since expired.
+
+A `409` is not an error to show as one. It means either the parcel is booked but
+not manifested yet — normal for the first minute, and `message` says to try
+again — or there is no booking to print, in which case there is nothing to
+show but the manual waybill field.
 
 That is why the "to pack" list is **`?needs_packing=1`**, not
 `?fulfillment_status=unfulfilled`. `needs_packing` asks whether any of *your*

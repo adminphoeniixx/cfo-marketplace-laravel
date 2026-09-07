@@ -355,6 +355,9 @@ function shopperCalls(array $f): array
         'api.customer.home' => ['GET', route('api.customer.home'), []],
         'api.customer.categories' => ['GET', route('api.customer.categories'), []],
         'api.customer.reference' => ['GET', route('api.customer.reference'), []],
+        // No courier is connected in this fixture, so nobody can be asked and
+        // the answer is an open one — see `CheckServiceability`.
+        'api.customer.serviceability' => ['GET', route('api.customer.serviceability', ['pincode' => '110001']), []],
         'api.customer.products' => ['GET', route('api.customer.products', ['sort' => 'newest']), []],
         'api.customer.products.suggestions' => ['GET', route('api.customer.products.suggestions', ['q' => 'wool']), []],
         'api.customer.products.filters' => ['GET', route('api.customer.products.filters'), []],

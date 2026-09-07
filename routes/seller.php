@@ -108,6 +108,8 @@ Route::middleware(['auth', 'verified', 'seller.panel'])
             Route::get('orders/{order}', [OrderController::class, 'show'])->name('orders.show');
             Route::post('orders/{order}/fulfill', [OrderController::class, 'fulfill'])->name('orders.fulfill');
             Route::post('orders/{order}/notes', [OrderController::class, 'addNote'])->name('orders.notes');
+            // A redirect to the courier's own PDF — see the controller.
+            Route::get('orders/{order}/label', [OrderController::class, 'label'])->name('orders.label');
         });
 
         /*

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Seller;
 
 use App\Actions\Shipping\BookShipment;
+use App\Actions\Shipping\FetchLabel;
 use App\Http\Controllers\Api\Seller\ScopesToStore;
 use App\Http\Controllers\Controller;
 use App\Models\DeliveryPartner;
@@ -13,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\RedirectResponse as BaseRedirect;
 
 /**
  * The seller panel's order screens — the web twin of the seller API's
@@ -192,6 +194,31 @@ class OrderController extends Controller
         app(BookShipment::class)->handle($model->fresh(['items']));
 
         return back()->with('success', 'Fulfilment updated.');
+    }
+
+    /**
+     * Print the label, by sending the seller straight to the courier's own PDF.
+     *
+     * A redirect rather than a page: the thing the seller wants is a document
+     * in a print dialog, and putting a viewer around it would only add a click
+     * between a packing table and a printer.
+     *
+     * The URL is fetched with the marketplace's credentials and remembered on
+     * the order, so a reprint is free.
+     */
+    public function label(Request $request, int $order, FetchLabel $labels): BaseRedirect
+    {
+        $model = $this->findOwnedOrder($request, $order);
+
+        $url = $labels->handle($model, $request->boolean('refresh'));
+
+        if ($url === null) {
+            return back()->with('error', $model->tracking_number
+                ? 'The courier has no label for this parcel yet. Try again in a minute.'
+                : 'This order has no booking to print a label for.');
+        }
+
+        return redirect()->away($url);
     }
 
     public function addNote(Request $request, int $order): RedirectResponse

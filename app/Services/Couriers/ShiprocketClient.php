@@ -38,8 +38,16 @@ class ShiprocketClient implements CourierClient
         'IN TRANSIT' => 'in_transit',
         'OUT FOR DELIVERY' => 'out_for_delivery',
         'DELIVERED' => 'delivered',
+        // A delivery that was tried and failed. Distinct from "in transit" on
+        // purpose: it is the one state where waiting longer does not help and
+        // somebody has to call the shopper.
+        'UNDELIVERED' => 'undelivered',
+        'NDR' => 'undelivered',
         'RTO INITIATED' => 'returning',
-        'RTO DELIVERED' => 'returning',
+        'RTO ACKNOWLEDGED' => 'returning',
+        'RTO IN TRANSIT' => 'returning',
+        // Back with the seller, and finished — not still coming back.
+        'RTO DELIVERED' => 'returned',
         'CANCELED' => 'cancelled',
         'CANCELLED' => 'cancelled',
         'LOST' => 'lost',
@@ -219,6 +227,156 @@ class ShiprocketClient implements CourierClient
                 'at' => $scan['date'] ?? null,
             ], (array) ($data['shipment_track_activities'] ?? []))),
         ];
+    }
+
+    /**
+     * The label, as a URL somebody can open and print.
+     *
+     * Two calls, and the first one is not optional: Shiprocket generates
+     * labels against a *shipment*, and a waybill is the only identifier this
+     * marketplace kept. Tracking is what turns one into the other.
+     */
+    public function label(string $waybill): ?string
+    {
+        $shipmentId = $this->shipmentIdFor($waybill);
+
+        if ($shipmentId === null) {
+            return null;
+        }
+
+        try {
+            $response = $this->request()->post(self::BASE.'/courier/generate/label', [
+                'shipment_id' => [$shipmentId],
+            ]);
+        } catch (ConnectionException|RuntimeException $e) {
+            Log::warning('Shiprocket unreachable while generating a label.', [
+                'waybill' => $waybill, 'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+
+        $url = $response->json('label_url');
+
+        if ($response->failed() || ! is_string($url) || $url === '') {
+            Log::warning('Shiprocket would not generate a label.', [
+                'waybill' => $waybill,
+                'why' => $response->json('message') ?? mb_substr($response->body(), 0, 200),
+            ]);
+
+            return null;
+        }
+
+        return $url;
+    }
+
+    /**
+     * Ask for a van.
+     *
+     * Shiprocket schedules against shipments rather than a warehouse, so every
+     * waybill has to be resolved first. A parcel it has never heard of is
+     * skipped rather than failing the run — one bad waybill must not keep a
+     * day's collection from being booked.
+     *
+     * @param  list<string>  $waybills
+     * @return array{scheduled: bool, reference: string|null, message: string|null}|null
+     */
+    public function schedulePickup(array $waybills, ?string $date = null): ?array
+    {
+        $shipments = array_values(array_filter(array_map(
+            fn (string $waybill) => $this->shipmentIdFor($waybill),
+            $waybills,
+        )));
+
+        if ($shipments === []) {
+            return ['scheduled' => false, 'reference' => null, 'message' => 'Shiprocket knows none of these waybills.'];
+        }
+
+        $payload = ['shipment_id' => $shipments];
+
+        // Their field is optional and, when sent, must be a date they consider
+        // bookable — so it is only sent when a caller actually chose one.
+        if ($date !== null) {
+            $payload['pickup_date'] = [$date];
+        }
+
+        try {
+            $response = $this->request()->post(self::BASE.'/courier/generate/pickup', $payload);
+        } catch (ConnectionException|RuntimeException $e) {
+            Log::warning('Shiprocket unreachable while scheduling a pickup.', ['error' => $e->getMessage()]);
+
+            return null;
+        }
+
+        // A pickup already booked for the day comes back as a failure with a
+        // perfectly good explanation, which is not the same as nothing having
+        // been arranged.
+        if ($response->failed()) {
+            return [
+                'scheduled' => false,
+                'reference' => null,
+                'message' => (string) ($response->json('message') ?? mb_substr($response->body(), 0, 200)),
+            ];
+        }
+
+        return [
+            'scheduled' => true,
+            'reference' => is_scalar($token = $response->json('response.pickup_token_number')) ? (string) $token : null,
+            'message' => is_string($when = $response->json('response.pickup_scheduled_date')) ? $when : null,
+        ];
+    }
+
+    /**
+     * Call a booking off by waybill.
+     *
+     * Their AWB endpoint rather than the order one, because a waybill is what
+     * an order here records — and because cancelling the *shipment* leaves the
+     * order on their side to be re-shipped, which is what somebody who cancels
+     * a booking almost always wants.
+     */
+    public function cancel(string $waybill): bool
+    {
+        try {
+            $response = $this->request()->post(self::BASE.'/orders/cancel/shipment/awbs', [
+                'awbs' => [$waybill],
+            ]);
+        } catch (ConnectionException|RuntimeException $e) {
+            Log::warning('Shiprocket unreachable while cancelling.', [
+                'waybill' => $waybill, 'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+
+        return $response->successful();
+    }
+
+    /**
+     * The shipment a waybill belongs to, which is what their label and pickup
+     * endpoints are addressed by.
+     */
+    protected function shipmentIdFor(string $waybill): ?int
+    {
+        $request = $this->requestOrNull();
+
+        if ($request === null) {
+            return null;
+        }
+
+        try {
+            $response = $request->get(self::BASE.'/courier/track/awb/'.rawurlencode($waybill));
+        } catch (ConnectionException) {
+            return null;
+        }
+
+        if ($response->failed()) {
+            return null;
+        }
+
+        $id = $response->json('tracking_data.shipment_track.0.shipment_id')
+            ?? $response->json('tracking_data.shipment_track.0.id');
+
+        return is_numeric($id) ? (int) $id : null;
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Actions\Shipping\SchedulePickup;
 use App\Http\Controllers\Controller;
 use App\Models\DeliveryPartner;
 use App\Models\Order;
@@ -88,6 +89,41 @@ class DeliveryPartnerController extends Controller
             $ok
                 ? "\"{$partner->name}\" answered. Bookings will go through it."
                 : "\"{$partner->name}\" refused these credentials. Nothing was shipped."
+        );
+    }
+
+    /**
+     * Ask this courier to come and collect what is waiting for it.
+     *
+     * `shipments:pickup` does this every morning; this is the button for the
+     * afternoon somebody packs twenty more parcels and does not want them
+     * sitting until tomorrow. Same action, same one-request-per-courier shape,
+     * so pressing it twice books one collection and reports the second refusal
+     * from the courier rather than inventing one.
+     */
+    public function pickup(Request $request, DeliveryPartner $partner, SchedulePickup $schedule): RedirectResponse
+    {
+        $orders = Order::query()
+            ->whereRaw('lower(carrier) = ?', [mb_strtolower($partner->name)])
+            ->whereNotNull('tracking_number')
+            ->whereNull('pickup_scheduled_at')
+            ->where(fn ($query) => $query->whereNull('shipment_status')->orWhere('shipment_status', 'booked'))
+            ->whereNull('shipped_at')
+            ->whereNotIn('status', ['cancelled', 'refunded'])
+            ->get();
+
+        if ($orders->isEmpty()) {
+            return back()->with('error', "Nothing is waiting for \"{$partner->name}\".");
+        }
+
+        $result = $schedule->handle($partner->name, $orders, $request->input('date'));
+
+        return back()->with(
+            $result['scheduled'] ? 'success' : 'error',
+            $result['scheduled']
+                ? "\"{$partner->name}\" is collecting {$result['orders']} parcel(s)."
+                    .($result['reference'] ? " Reference {$result['reference']}." : '')
+                : "\"{$partner->name}\" would not book a collection: ".($result['message'] ?: 'no reason given.')
         );
     }
 

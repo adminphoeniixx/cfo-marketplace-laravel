@@ -288,6 +288,10 @@ function storeCalls(array $f): array
         'api.seller.orders.notes' => ['POST', route('api.seller.orders.notes', $f['order']->id), [
             'note' => 'Packed and handed over.',
         ], 201],
+        // 409 rather than 200: this fixture's order was never booked with a
+        // courier, so there is genuinely no label to print — which is the
+        // answer the endpoint is meant to give rather than an error.
+        'api.seller.orders.label' => ['GET', route('api.seller.orders.label', $f['order']->id), [], 409],
 
         // Money out.
         'api.seller.payouts.index' => ['GET', route('api.seller.payouts.index'), []],

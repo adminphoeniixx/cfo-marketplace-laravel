@@ -53,6 +53,9 @@ const icons: Record<string, string> = {
         'M3 4h14a1 1 0 011 1v3H2V5a1 1 0 011-1zm-1 6h16v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zm2.5 2v1.5h4V12h-4z',
     team: 'M7 9a3 3 0 100-6 3 3 0 000 6zm7 0a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM1 16.5C1 13.9 3.7 12 7 12s6 1.9 6 4.5V18H1v-1.5zm13.2 1.5v-1.5c0-1.5-.6-2.8-1.6-3.8 2.9.2 5.4 1.9 5.4 4.3V18h-3.8z',
     roles: 'M10 1.5l6.5 2.8v4.4c0 4-2.8 7.6-6.5 8.8-3.7-1.2-6.5-4.8-6.5-8.8V4.3L10 1.5zm-.9 10.9l4.6-4.6-1.3-1.3-3.3 3.3-1.5-1.5-1.3 1.3 2.8 2.8z',
+    // A support conversation: a speech bubble with a line of writing in it.
+    tickets:
+        'M3 4a2 2 0 012-2h10a2 2 0 012 2v7a2 2 0 01-2 2H8l-4 3.5V13a2 2 0 01-1-1.7V4zm3 2v1.5h8V6H6zm0 3.5V11h5V9.5H6',
 };
 
 const { sections, isAdmin } = useSections();
@@ -119,7 +122,7 @@ const allGroups = computed<NavGroup[]>(() => [
                 label: 'Tickets',
                 href: '/admin/tickets',
                 match: '/admin/tickets',
-                icon: 'notifications',
+                icon: 'tickets',
                 section: 'tickets',
             },
         ],

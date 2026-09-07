@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Actions\Shipping\CancelShipment;
 use App\Http\Controllers\Controller;
 use App\Models\Cancellation;
 use App\Models\Order;
@@ -194,6 +195,23 @@ class CancellationController extends Controller
 
             $order->recordEvent('cancellation', "Cancellation {$cancellation->number} approved", $data['review_note'] ?? null);
         });
+
+        /*
+        | A wholly cancelled order has to be called off with the courier too,
+        | or the van still comes for a parcel nobody is sending — and on a
+        | cash-on-delivery order somebody could still be asked for money at a
+        | door. A part-cancellation is left alone: the rest of the basket is
+        | still going out on that same waybill.
+        |
+        | Outside the transaction, and never fatal: a courier refusing must not
+        | undo a cancellation the shopper has already been told about. It
+        | leaves its own line on the timeline when it cannot.
+        */
+        $order = $cancellation->order->fresh('items');
+
+        if ($order->status === 'cancelled') {
+            app(CancelShipment::class)->handle($order);
+        }
 
         // The seller has a Requests screen and no other way to learn what was
         // decided; whoever made the call is left out of their own news.

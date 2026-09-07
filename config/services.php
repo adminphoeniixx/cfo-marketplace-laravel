@@ -78,6 +78,13 @@ return [
         'seller_name' => env('DELHIVERY_SELLER_NAME'),
         'connect_timeout' => (int) env('DELHIVERY_CONNECT_TIMEOUT', 5),
         'timeout' => (int) env('DELHIVERY_TIMEOUT', 30),
+        /*
+        | The secret in the push URL registered with Delhivery, which is the
+        | whole authority on a webhook nobody signs. Unset refuses every push
+        | rather than accepting every push, so an unconfigured marketplace
+        | falls back to the fifteen-minute sync instead of to an open endpoint.
+        */
+        'webhook_token' => env('DELHIVERY_WEBHOOK_TOKEN'),
     ],
 
     /*
@@ -93,6 +100,9 @@ return [
         'pickup_location' => env('SHIPROCKET_PICKUP_LOCATION'),
         // Their serviceability check needs a pickup pincode to answer at all.
         'pickup_postcode' => env('SHIPROCKET_PICKUP_POSTCODE'),
+        // Sent back as `x-api-key` on every push. Set on the same screen in
+        // their panel as the callback URL; unset refuses every push.
+        'webhook_token' => env('SHIPROCKET_WEBHOOK_TOKEN'),
     ],
 
     /*

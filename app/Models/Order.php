@@ -18,6 +18,10 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $shipped_at
  * @property Carbon|null $delivered_at
  * @property Carbon|null $cancelled_at
+ * @property Carbon|null $returned_at
+ * @property Carbon|null $pickup_scheduled_at
+ * @property string|null $shipment_status
+ * @property int $delivery_attempts
  * @property Carbon|null $eta_min_at
  * @property Carbon|null $eta_max_at
  */
@@ -51,6 +55,8 @@ class Order extends Model
             'shipped_at' => 'datetime',
             'delivered_at' => 'datetime',
             'cancelled_at' => 'datetime',
+            'returned_at' => 'datetime',
+            'pickup_scheduled_at' => 'datetime',
             'eta_min_at' => 'date',
             'eta_max_at' => 'date',
         ];

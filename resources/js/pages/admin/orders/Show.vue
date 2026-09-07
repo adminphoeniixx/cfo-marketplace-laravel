@@ -60,6 +60,10 @@ type Order = {
     shipping_method: string | null;
     tracking_number: string | null;
     carrier: string | null;
+    /** The courier's own account of the parcel, which is not the order's status. */
+    shipment_status: string | null;
+    delivery_attempts: number;
+    returned_at: string | null;
     coupon_code: string | null;
     billing_address: Address;
     shipping_address: Address;
@@ -160,6 +164,46 @@ const isClosed = computed(() =>
     ['cancelled', 'refunded'].includes(props.order.status),
 );
 const vendorRows = computed(() => Object.entries(props.vendorBreakdown));
+
+/*
+| The parcel's own state, in words and in a colour.
+|
+| Deliberately separate from the order's status badges at the top: those are
+| the marketplace's account of a sale, this is the courier's account of a box,
+| and the whole point of showing it is that the two can disagree.
+*/
+const parcelLabels: Record<string, string> = {
+    booked: 'Booked, awaiting pickup',
+    in_transit: 'In transit',
+    out_for_delivery: 'Out for delivery',
+    delivered: 'Delivered',
+    undelivered: 'Delivery attempt failed',
+    returning: 'Coming back',
+    returned: 'Back with the seller',
+    cancelled: 'Booking cancelled',
+    lost: 'Lost by the courier',
+};
+
+const parcelLabel = computed(
+    () =>
+        parcelLabels[props.order.shipment_status ?? ''] ??
+        props.order.shipment_status,
+);
+
+const parcelTone = computed(() => {
+    switch (props.order.shipment_status) {
+        case 'delivered':
+            return 'success';
+        case 'lost':
+            return 'critical';
+        case 'undelivered':
+        case 'returning':
+        case 'returned':
+            return 'warning';
+        default:
+            return 'info';
+    }
+});
 
 const eventIconTone = (type: string) =>
     ({
@@ -775,6 +819,55 @@ const submitNote = () =>
                             <template v-else>
                                 {{ order.tracking_number ?? '—' }}
                             </template>
+                        </dd>
+                    </div>
+                    <!--
+                    | The courier's account of the parcel, which is a different
+                    | question from the order's status and moves at a different
+                    | pace: a parcel can be coming back while the sale is still
+                    | very much a sale nobody has refunded.
+                    -->
+                    <div
+                        v-if="order.shipment_status"
+                        class="flex justify-between gap-3"
+                    >
+                        <dt class="text-[#616161] dark:text-[#b5b5b5]">
+                            Parcel
+                        </dt>
+                        <dd class="text-right">
+                            <PBadge :tone="parcelTone">{{
+                                parcelLabel
+                            }}</PBadge>
+                        </dd>
+                    </div>
+                    <div
+                        v-if="order.delivery_attempts > 0"
+                        class="flex justify-between gap-3"
+                    >
+                        <dt class="text-[#616161] dark:text-[#b5b5b5]">
+                            Delivery attempts
+                        </dt>
+                        <dd class="text-right">
+                            {{ order.delivery_attempts }}
+                        </dd>
+                    </div>
+                    <div
+                        v-if="order.tracking_number"
+                        class="flex justify-between gap-3"
+                    >
+                        <dt class="text-[#616161] dark:text-[#b5b5b5]">
+                            Label
+                        </dt>
+                        <dd class="text-right">
+                            <!-- Redirects to the courier's own PDF. -->
+                            <a
+                                :href="`/admin/orders/${order.id}/label`"
+                                target="_blank"
+                                rel="noopener"
+                                class="font-medium text-[#005bd3] hover:underline dark:text-[#8ac1ff]"
+                            >
+                                Print
+                            </a>
                         </dd>
                     </div>
                     <div

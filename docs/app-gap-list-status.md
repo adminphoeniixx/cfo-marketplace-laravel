@@ -287,11 +287,18 @@ Everything asked for, in the shape asked for:
 combine with a position. `milestones[]` and `steps[]` are unchanged beside it;
 they describe the same steps, use whichever fits.
 
-**The parcel now reports itself.** Where the marketplace has Delhivery
-credentials, fulfilling an order books the waybill and a background job follows
-it every fifteen minutes: courier scans become timeline events, and
-`shipped_at` / `delivered_at` come from the courier rather than a seller
-pressing a button. "Out for delivery" is no longer only reachable in hindsight.
+**The parcel now reports itself.** Where a courier is connected — Delhivery or
+Shiprocket — fulfilling an order books the waybill, the courier pushes each
+update as it happens, and a fifteen-minute sweep catches anything a push missed.
+Courier scans become timeline events, and `shipped_at` / `delivered_at` come
+from the courier rather than a seller pressing a button. "Out for delivery" now
+reaches `done` on the morning it happens rather than only in hindsight.
+
+**And it reports the endings that are not "delivered".** A delivery tried and
+failed says so in the `out_for_delivery` row's description; a parcel the courier
+has started returning ends the timeline with a `returning` row — "On its way
+back to the seller", then "Returned to the seller" — **instead of** a `delivered`
+row. An app must not assume `delivered` is always the last key.
 
 ### Cancellation / return detail
 

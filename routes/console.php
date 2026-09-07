@@ -26,3 +26,19 @@ Schedule::command('shipments:sync')
     ->everyFifteenMinutes()
     ->withoutOverlapping()
     ->runInBackground();
+
+/*
+| A van, once a morning.
+|
+| Booking a waybill is not a pickup: both providers will manifest a parcel,
+| print a label and then wait to be asked separately to come and get it. Ten
+| o'clock is late enough that this morning's packing is in it and early enough
+| that the collection still happens today.
+|
+| One request per courier, not per parcel — that is the shape both APIs want,
+| and it is what they charge for.
+*/
+Schedule::command('shipments:pickup')
+    ->dailyAt('10:00')
+    ->withoutOverlapping()
+    ->runInBackground();

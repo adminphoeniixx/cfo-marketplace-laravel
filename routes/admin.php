@@ -102,6 +102,8 @@ Route::middleware(['auth', 'verified', 'deny.vendor'])->prefix('admin')->name('a
         Route::patch('orders/{order}/payment', [OrderController::class, 'updatePayment'])->name('orders.payment');
         Route::post('orders/{order}/fulfill', [OrderController::class, 'fulfill'])->name('orders.fulfill');
         Route::post('orders/{order}/notes', [OrderController::class, 'addNote'])->name('orders.notes');
+        // A redirect to the courier's own PDF — see the controller.
+        Route::get('orders/{order}/label', [OrderController::class, 'label'])->name('orders.label');
     });
 
     /*
@@ -252,6 +254,9 @@ Route::middleware(['auth', 'verified', 'deny.vendor'])->prefix('admin')->name('a
         // Ships nothing; only asks the courier whether the keys are real.
         Route::post('settings/delivery-partners/{partner}/test', [DeliveryPartnerController::class, 'test'])
             ->name('delivery-partners.test');
+        // Asks for a van now, rather than waiting for the morning's run.
+        Route::post('settings/delivery-partners/{partner}/pickup', [DeliveryPartnerController::class, 'pickup'])
+            ->name('delivery-partners.pickup');
         Route::delete('settings/delivery-partners/{partner}', [DeliveryPartnerController::class, 'destroy'])
             ->name('delivery-partners.destroy');
     });
