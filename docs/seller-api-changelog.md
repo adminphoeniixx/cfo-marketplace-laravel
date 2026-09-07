@@ -15,6 +15,39 @@ with both.
 
 ---
 
+## 2026-09-07 — invoices
+
+### Added
+
+- **`GET /orders/{id}/invoice` — the invoice you raise.** You sold the goods, so
+  you are the supplier: your name, your GSTIN, your own series, addressed to the
+  shopper. On a basket shared with another seller it holds **only your lines**.
+  **What an app must do:** put "Invoice" beside "Print label" on a packed order.
+  A `409` means nothing has been supplied yet, not that something failed.
+- **`GET /payouts/{id}/commission-invoice` — the invoice raised against you.**
+  The marketplace's fee for that period with GST charged on it, which is the
+  document that lets that GST be claimed back. **What an app must do:** offer it
+  on every payout. `409` means the period earned no commission, or the
+  marketplace has not recorded its own GSTIN yet.
+- Both answer `{ number, type, issued_at, taxable_value, tax_total, total, url,
+  expires_at, content_type }`. `type` is `tax` for yours, `commission` for
+  theirs; the `url` is signed rather than token-authenticated and lasts seven
+  days.
+
+### Notes
+
+- Numbers are consecutive **per store** and restart each Indian financial year,
+  so two sellers both hold number 1 in the same year.
+- Tax splits into CGST + SGST within a state and IGST across one, decided by
+  your state against the shipping address. Where either is missing the document
+  says the treatment is unknown rather than guessing at it.
+- An issued invoice never changes. Names, addresses and registration numbers are
+  copied in when the number is claimed, so moving premises does not rewrite a
+  document already sent.
+- **Not on it yet:** an HSN or SAC code per line — products do not carry one.
+
+---
+
 ## 2026-09-07
 
 ### Added

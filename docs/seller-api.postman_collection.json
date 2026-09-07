@@ -1535,6 +1535,44 @@
                             }
                         }
                     ]
+                },
+                {
+                    "name": "Commission invoice for a payout",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/seller/payouts/{{payout_id}}/commission-invoice",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "seller",
+                                "payouts",
+                                "{{payout_id}}",
+                                "commission-invoice"
+                            ]
+                        },
+                        "description": "The invoice pointing the other way: the marketplace's fee for that period, with GST charged on the fee. This is what lets an accountant claim that GST back.\n\nA 409 means the period earned no commission, or the marketplace has not recorded its own GSTIN yet."
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test(\"answered, invoiced or not\", () => pm.expect(pm.response.code).to.be.oneOf([200, 409]));"
+                                ]
+                            }
+                        }
+                    ]
                 }
             ]
         },
@@ -2439,6 +2477,44 @@
                                 "type": "text/javascript",
                                 "exec": [
                                     "pm.test(\"answered, printable or not\", () => pm.expect(pm.response.code).to.be.oneOf([200, 409]));"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "This store's tax invoice",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/seller/orders/{{order_id}}/invoice",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "seller",
+                                "orders",
+                                "{{order_id}}",
+                                "invoice"
+                            ]
+                        },
+                        "description": "The invoice this store raised for the order: your name, your GSTIN, your own consecutive series, addressed to the shopper. On a shared basket it holds only your lines.\n\nA 409 means nothing has been supplied yet — the order is still awaiting payment, or was cancelled."
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test(\"answered, invoiced or not\", () => pm.expect(pm.response.code).to.be.oneOf([200, 409]));"
                                 ]
                             }
                         }

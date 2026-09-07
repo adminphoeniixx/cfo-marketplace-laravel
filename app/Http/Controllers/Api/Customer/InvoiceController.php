@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\Api\Customer;
 
+use App\Actions\Invoicing\IssueTaxInvoice;
 use App\Http\Controllers\Controller;
+use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\Setting;
 use App\Models\Vendor;
@@ -30,7 +32,55 @@ class InvoiceController extends Controller
     use ScopesToCustomer;
 
     /**
-     * A link to this order's invoice, good for seven days.
+     * The tax invoices for this order — one per seller.
+     *
+     * The marketplace sells nothing: each seller supplies their own goods, so
+     * each raises their own invoice on their own GSTIN. A basket across two
+     * stores therefore answers with two documents, and an app must render a
+     * list rather than assume a single one.
+     *
+     * The combined `invoice` beside this stays what it was: a summary of the
+     * whole order, useful to a shopper reconciling one payment, and not a tax
+     * document. This endpoint is the tax document.
+     */
+    public function taxInvoices(Request $request, string $order): JsonResponse
+    {
+        $model = $this->findOwnedOrder($request, $order);
+        $model->loadMissing('items');
+
+        $expires = now()->addDays(7);
+
+        $invoices = app(IssueTaxInvoice::class)->forOrder($model)
+            ->map(fn (Invoice $invoice) => [
+                'number' => $invoice->number,
+                'seller' => $invoice->snapshot['supplier']['name'] ?? null,
+                'seller_gstin' => $invoice->snapshot['supplier']['gstin'] ?? null,
+                'issued_at' => $invoice->issued_at->toIso8601String(),
+                'total' => (float) $invoice->grand_total,
+                'url' => URL::temporarySignedRoute(
+                    'api.invoices.document',
+                    $expires,
+                    ['invoice' => $invoice->id],
+                ),
+                'content_type' => 'text/html',
+            ])
+            ->all();
+
+        return response()->json([
+            'data' => $invoices,
+            'meta' => [
+                'order_number' => $model->number,
+                'expires_at' => $expires->toIso8601String(),
+                // Empty is a real answer, not a failure: an order still
+                // awaiting payment has not been supplied yet, so nobody has
+                // raised an invoice for it.
+                'count' => count($invoices),
+            ],
+        ]);
+    }
+
+    /**
+     * A link to this order's combined summary, good for seven days.
      */
     public function link(Request $request, string $order): JsonResponse
     {

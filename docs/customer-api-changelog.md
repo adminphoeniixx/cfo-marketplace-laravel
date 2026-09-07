@@ -15,6 +15,30 @@ step with both.
 
 ---
 
+## 2026-09-07 — invoices
+
+### Added
+
+- **`GET /orders/{number}/invoices` — the tax invoices, one per seller.** The
+  marketplace supplies nothing: each seller sells their own goods, so each
+  raises their own invoice under their own GSTIN and their own consecutive
+  series. **What an app must do:** render a **list**. A basket across two stores
+  answers with two documents, and an empty `data` is a real answer — an order
+  still awaiting payment, or cancelled, has had no invoice raised against it.
+  Each entry carries `number`, `seller`, `seller_gstin`, `issued_at`, `total`
+  and a signed seven-day `url`.
+
+### Changed
+
+- **`GET /orders/{number}/invoice` is now described as the order summary.**
+  Nothing about it moved — same shape, same URL, same signed link on
+  `invoice_url`. It is simply not the tax document, and calling it "the
+  invoice" was steering apps into printing the wrong page for an accountant.
+  **What an app must do:** keep it where it is for "view my order", and point
+  anything labelled *invoice* or *bill* at `/invoices` instead.
+
+---
+
 ## 2026-09-07
 
 ### Added

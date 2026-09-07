@@ -19,11 +19,13 @@ use App\Http\Controllers\Api\Customer\ServiceabilityController;
 use App\Http\Controllers\Api\Customer\TicketController;
 use App\Http\Controllers\Api\Customer\WalletController;
 use App\Http\Controllers\Api\Customer\WishlistController;
+use App\Http\Controllers\Api\InvoiceDocumentController;
 use App\Http\Controllers\Api\Seller\AnalyticsController;
 use App\Http\Controllers\Api\Seller\AuthController;
 use App\Http\Controllers\Api\Seller\CancellationController;
 use App\Http\Controllers\Api\Seller\CatalogController;
 use App\Http\Controllers\Api\Seller\DashboardController;
+use App\Http\Controllers\Api\Seller\InvoiceController as SellerInvoiceController;
 use App\Http\Controllers\Api\Seller\NotificationController;
 use App\Http\Controllers\Api\Seller\OrderController;
 use App\Http\Controllers\Api\Seller\PayoutController;
@@ -57,6 +59,22 @@ Route::prefix('webhooks/couriers')->name('api.webhooks.couriers.')
         Route::post('shiprocket', [CourierWebhookController::class, 'shiprocket'])->name('shiprocket');
         Route::post('delhivery', [CourierWebhookController::class, 'delhivery'])->name('delhivery');
     });
+
+/*
+|--------------------------------------------------------------------------
+| Invoices
+|--------------------------------------------------------------------------
+|
+| One route for every issued invoice, whoever it belongs to. Reached by
+| signature rather than by token: a document has to survive being opened in a
+| browser or handed to a download manager, and neither carries a bearer token.
+| The signature is the authority, and it is only ever minted by a controller
+| that has already decided the caller owns the thing.
+|
+*/
+
+Route::get('invoices/{invoice}', InvoiceDocumentController::class)
+    ->middleware('signed')->whereNumber('invoice')->name('api.invoices.document');
 
 /*
 |--------------------------------------------------------------------------
@@ -229,6 +247,9 @@ Route::prefix('seller')->name('api.seller.')->group(function () {
                 Route::post('orders/{order}/fulfill', [OrderController::class, 'fulfill'])->name('orders.fulfill');
                 Route::post('orders/{order}/notes', [OrderController::class, 'addNote'])->name('orders.notes');
                 Route::get('orders/{order}/label', [OrderController::class, 'label'])->name('orders.label');
+                // The store's own tax invoice for the order — their supply,
+                // their GSTIN, addressed to the shopper.
+                Route::get('orders/{order}/invoice', [SellerInvoiceController::class, 'order'])->name('orders.invoice');
             });
 
             Route::middleware('seller.section:cancellations')->group(function () {
@@ -248,6 +269,10 @@ Route::prefix('seller')->name('api.seller.')->group(function () {
                 Route::get('payouts', [PayoutController::class, 'index'])->name('payouts.index');
                 Route::get('payouts/earnings', [PayoutController::class, 'earnings'])->name('payouts.earnings');
                 Route::get('payouts/{payout}', [PayoutController::class, 'show'])->name('payouts.show');
+                // The invoice pointing the other way: the marketplace's fee
+                // for the period, with the GST the store can claim back.
+                Route::get('payouts/{payout}/commission-invoice', [SellerInvoiceController::class, 'commission'])
+                    ->name('payouts.commission-invoice');
             });
         });
     });
@@ -422,6 +447,9 @@ Route::prefix('customer')->name('api.customer.')->group(function () {
         Route::get('orders/{order}', [CustomerOrderController::class, 'show'])->name('orders.show');
         Route::get('orders/{order}/track', [CustomerOrderController::class, 'track'])->name('orders.track');
         Route::get('orders/{order}/invoice', [InvoiceController::class, 'link'])->name('orders.invoice');
+        // One document per seller, because one seller is one supply. The
+        // `invoice` above stays the whole-order summary it always was.
+        Route::get('orders/{order}/invoices', [InvoiceController::class, 'taxInvoices'])->name('orders.invoices');
         Route::post('orders/{order}/reorder', [CustomerOrderController::class, 'reorder'])->name('orders.reorder');
         Route::post('orders/{order}/cancellations', [RequestController::class, 'storeCancellation'])->name('orders.cancellations');
         Route::post('orders/{order}/returns', [RequestController::class, 'storeRefund'])->name('orders.returns');

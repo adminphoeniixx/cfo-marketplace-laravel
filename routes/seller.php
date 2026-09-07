@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\Seller\UploadController;
 use App\Http\Controllers\Seller\AnalyticsController;
+use App\Http\Controllers\Seller\InvoiceController;
 use App\Http\Controllers\Seller\ManualOrderController;
 use App\Http\Controllers\Seller\NotificationController;
 use App\Http\Controllers\Seller\OrderController;
@@ -110,6 +111,8 @@ Route::middleware(['auth', 'verified', 'seller.panel'])
             Route::post('orders/{order}/notes', [OrderController::class, 'addNote'])->name('orders.notes');
             // A redirect to the courier's own PDF — see the controller.
             Route::get('orders/{order}/label', [OrderController::class, 'label'])->name('orders.label');
+            // This store's tax invoice for the order, as a page that prints.
+            Route::get('orders/{order}/invoice', [InvoiceController::class, 'order'])->name('orders.invoice');
         });
 
         /*

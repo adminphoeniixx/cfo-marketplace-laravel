@@ -39,6 +39,24 @@ class SettingController extends Controller
         'auto_approve_cancellations' => '0',
         'low_stock_threshold' => '5',
         'address' => '',
+        /*
+        | The marketplace's own identity on a commission invoice. `store_name`
+        | is the brand and belongs on a screen; a tax invoice needs the name a
+        | company is registered under, which is often not the same string.
+        | Blank until somebody types the real thing in — none of this may be
+        | invented, and an invoice refuses to issue without the GSTIN.
+        */
+        'legal_name' => '',
+        'gst_number' => '',
+        // The marketplace's own state, which decides whether commission is
+        // taxed as CGST+SGST or as IGST for a seller in another state.
+        'gst_state' => '',
+        // GST on a marketplace commission is 18% at the time of writing. It is
+        // a setting rather than a constant because rates move and an invoice
+        // issued last year must keep the rate it was issued under.
+        'commission_gst_rate' => '18',
+        'invoice_prefix' => 'INV',
+        'commission_invoice_prefix' => 'COM',
     ];
 
     public function index(): Response
@@ -119,6 +137,18 @@ class SettingController extends Controller
             'auto_approve_cancellations' => ['boolean'],
             'low_stock_threshold' => ['required', 'integer', 'min:0'],
             'address' => ['nullable', 'string', 'max:500'],
+            'legal_name' => ['nullable', 'string', 'max:180'],
+            // Fifteen characters, and the shape is worth checking: a typo here
+            // is reprinted on every commission invoice until somebody notices.
+            'gst_number' => ['nullable', 'string', 'size:15', 'regex:/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]{3}$/'],
+            'gst_state' => ['nullable', 'string', 'max:60'],
+            // `sometimes` because these arrived after the form did: a caller
+            // sending the older payload should save what it sent rather than
+            // be refused for omitting a field it has never heard of. Present,
+            // they still have to be real.
+            'commission_gst_rate' => ['sometimes', 'required', 'numeric', 'min:0', 'max:100'],
+            'invoice_prefix' => ['sometimes', 'required', 'string', 'max:8'],
+            'commission_invoice_prefix' => ['sometimes', 'required', 'string', 'max:8'],
         ]);
 
         foreach ($data as $key => $value) {

@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\CustomerAddressController;
 use App\Http\Controllers\Admin\CustomerController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DeliveryPartnerController;
+use App\Http\Controllers\Admin\InvoiceController;
 use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\OrderController;
 use App\Http\Controllers\Admin\PaymentMethodController;
@@ -104,6 +105,10 @@ Route::middleware(['auth', 'verified', 'deny.vendor'])->prefix('admin')->name('a
         Route::post('orders/{order}/notes', [OrderController::class, 'addNote'])->name('orders.notes');
         // A redirect to the courier's own PDF — see the controller.
         Route::get('orders/{order}/label', [OrderController::class, 'label'])->name('orders.label');
+        // A seller's own invoice for their part of the order. Support answers
+        // for both sides of a marketplace, so it has to be able to open this.
+        Route::get('orders/{order}/invoices/{vendor}', [InvoiceController::class, 'order'])
+            ->whereNumber('vendor')->name('orders.invoice');
     });
 
     /*
@@ -151,6 +156,7 @@ Route::middleware(['auth', 'verified', 'deny.vendor'])->prefix('admin')->name('a
         Route::get('payouts', [PayoutController::class, 'index'])->name('payouts.index');
         Route::post('payouts', [PayoutController::class, 'store'])->name('payouts.store');
         Route::patch('payouts/{payout}/status', [PayoutController::class, 'updateStatus'])->name('payouts.status');
+        Route::get('payouts/{payout}/invoice', [InvoiceController::class, 'commission'])->name('payouts.invoice');
         Route::delete('payouts/{payout}', [PayoutController::class, 'destroy'])->name('payouts.destroy');
     });
 

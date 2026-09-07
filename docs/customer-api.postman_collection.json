@@ -2190,6 +2190,44 @@
                     }
                 },
                 {
+                    "name": "Tax invoices (one per seller)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/orders/{{order_number}}/invoices",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "orders",
+                                "{{order_number}}",
+                                "invoices"
+                            ]
+                        },
+                        "description": "One document per seller, because the marketplace sells nothing: each seller supplies their own goods under their own GSTIN.\n\n`data` may be empty — an order still awaiting payment, or cancelled, has had no invoice raised against it. Render a list, never assume a single document."
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test(\"status is 200\", () => pm.expect(pm.response.code).to.be.oneOf([200]));"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
                     "name": "invoices.show",
                     "request": {
                         "method": "GET",

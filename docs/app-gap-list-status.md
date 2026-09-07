@@ -268,6 +268,13 @@ badge, and the skip reasons are the codes asked for.
 
 See list 1 item 8. ✅
 
+**And the tax invoice is now the seller's, not the marketplace's.** `GET
+/orders/{number}/invoices` answers with one document per seller — their name,
+their GSTIN, their own consecutive series — because the marketplace does not
+supply the goods and cannot invoice for them. `invoice`, singular, stays what
+it was: a summary of the whole order. An app must render a list and must not
+assume a single document.
+
 ### Track order
 
 Everything asked for, in the shape asked for:
@@ -444,8 +451,16 @@ Nothing below blocks the app; each is either a decision or a credential.
   refunds land in it, but the balance is not offered as a way to pay.
 - **Saved payment methods are not charged.** They are display plus a gateway
   token; `POST /payments/create-intent` still opens a fresh intent each time.
-- **Invoices are HTML, not PDF**, and one document covers the whole order rather
-  than one per seller.
+- **Invoices are HTML, not PDF.** The rendering is a print-ready page rather
+  than a generated document; the split itself is done — `GET
+  /orders/{number}/invoices` answers with one tax invoice per seller, and the
+  marketplace raises its own commission invoice against each payout.
+- **No HSN or SAC code on an invoice line.** Products do not carry one and it
+  cannot be invented; it has to be recorded against the product first.
+- **Payout `net_amount` deducts the commission but not the GST on it.** The
+  commission invoice charges both; the payout arithmetic is unchanged from
+  before it existed. Deliberate — changing what a seller is paid is not a
+  documentation change — but the two will not reconcile until it is decided.
 - **`price_changed` is never a skip reason on reorder.** A price that moved does
   not stop the line going back in the basket; it is added at today's price.
 - **Guest checkout does not exist.** A basket can be built signed out and merged

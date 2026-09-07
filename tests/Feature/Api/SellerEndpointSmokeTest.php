@@ -292,10 +292,12 @@ function storeCalls(array $f): array
         // courier, so there is genuinely no label to print — which is the
         // answer the endpoint is meant to give rather than an error.
         'api.seller.orders.label' => ['GET', route('api.seller.orders.label', $f['order']->id), [], 409],
+        'api.seller.orders.invoice' => ['GET', route('api.seller.orders.invoice', $f['order']->id), []],
 
         // Money out.
         'api.seller.payouts.index' => ['GET', route('api.seller.payouts.index'), []],
         'api.seller.payouts.show' => ['GET', route('api.seller.payouts.show', $f['payout']->id), []],
+        'api.seller.payouts.commission-invoice' => ['GET', route('api.seller.payouts.commission-invoice', $f['payout']->id), [], 409],
         'api.seller.payouts.earnings' => ['GET', route('api.seller.payouts.earnings'), []],
 
         // Cancellations and returns, from this side of the counter.

@@ -195,6 +195,9 @@ class OrderController extends Controller
             'vendorBreakdown' => $order->items
                 ->groupBy(fn (OrderItem $item) => $item->vendor->name ?? 'Store')
                 ->map(fn ($items) => [
+                    // The id as well as the totals, so the row can link to
+                    // that seller's own invoice for their part of the order.
+                    'vendor_id' => $items->first()->vendor_id,
                     'items' => $items->count(),
                     'total' => round((float) $items->sum('total'), 2),
                     'commission' => round((float) $items->sum('commission_amount'), 2),

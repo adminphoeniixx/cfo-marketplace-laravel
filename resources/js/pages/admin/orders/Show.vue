@@ -117,7 +117,13 @@ const props = defineProps<{
     trackingUrl: string | null;
     vendorBreakdown: Record<
         string,
-        { items: number; total: number; commission: number; earning: number }
+        {
+            vendor_id: number;
+            items: number;
+            total: number;
+            commission: number;
+            earning: number;
+        }
     >;
 }>();
 
@@ -484,8 +490,11 @@ const submitNote = () =>
                                 <th class="px-4 py-2 text-right font-semibold">
                                     Commission
                                 </th>
-                                <th class="py-2 pl-4 text-right font-semibold">
+                                <th class="px-4 py-2 text-right font-semibold">
                                     Vendor earns
+                                </th>
+                                <th class="py-2 pl-4 text-right font-semibold">
+                                    Invoice
                                 </th>
                             </tr>
                         </thead>
@@ -508,9 +517,33 @@ const submitNote = () =>
                                     {{ currency(row.commission) }}
                                 </td>
                                 <td
-                                    class="py-2 pl-4 text-right font-semibold tabular-nums"
+                                    class="px-4 py-2 text-right font-semibold tabular-nums"
                                 >
                                     {{ currency(row.earning) }}
+                                </td>
+                                <!--
+                                | The seller's own tax invoice, not the
+                                | marketplace's: the seller supplied these
+                                | goods, so the document carries their name and
+                                | their GSTIN. Support has to be able to open
+                                | it, because a shopper asking "where is my
+                                | bill" is asking about this one.
+                                -->
+                                <td class="py-2 pl-4 text-right">
+                                    <a
+                                        v-if="!isClosed"
+                                        :href="`/admin/orders/${order.id}/invoices/${row.vendor_id}`"
+                                        target="_blank"
+                                        rel="noopener"
+                                        class="font-medium text-[#005bd3] hover:underline dark:text-[#8ac1ff]"
+                                    >
+                                        View
+                                    </a>
+                                    <span
+                                        v-else
+                                        class="text-[#8a8a8a] dark:text-[#8a8a8a]"
+                                        >—</span
+                                    >
                                 </td>
                             </tr>
                         </tbody>

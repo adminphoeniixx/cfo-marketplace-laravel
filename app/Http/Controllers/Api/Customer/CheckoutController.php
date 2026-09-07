@@ -73,7 +73,7 @@ class CheckoutController extends Controller
         | that takes prepaid but not cash, is a thing to find out on the review
         | screen and not from a failed booking two days later.
         */
-        $delivery = $this->serviceability->handle((string) ($address?->postcode ?? ''));
+        $delivery = $this->serviceability->handle((string) ($address->postcode ?? ''));
 
         return response()->json([
             'addresses' => AddressResource::collection($addresses),
@@ -148,8 +148,8 @@ class CheckoutController extends Controller
             | Only ever on a *checked* answer: a courier that could not be
             | reached must not close the checkout.
             */
-            $address = $customer->addresses()->find($data['address_id']);
-            $delivery = $this->serviceability->handle((string) ($address?->postcode ?? ''));
+            $address = $customer->addresses()->find((int) $data['address_id']);
+            $delivery = $this->serviceability->handle((string) ($address->postcode ?? ''));
 
             if ($reason = $this->cashRefusedByCourier($delivery)) {
                 throw ValidationException::withMessages([

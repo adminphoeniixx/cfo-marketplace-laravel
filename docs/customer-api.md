@@ -383,7 +383,8 @@ multiplication twice.
 | GET | `/orders?filter=` | `all`, `open`, `delivered`, `cancelled`. |
 | GET | `/orders/{number}` | `1043` or `#1043` — both spellings work. |
 | GET | `/orders/{number}/track` | The whole tracking screen in one call. |
-| GET | `/orders/{number}/invoice` | A signed, seven-day link to the invoice. |
+| GET | `/orders/{number}/invoice` | A signed, seven-day link to the order summary. |
+| GET | `/orders/{number}/invoices` | The tax invoices, one per seller. May be empty. |
 | POST | `/orders/{number}/reorder` | Puts the lines back in the basket and hands the basket back. |
 
 An order carries `status_label` ("Being packed", "On the way"), its `sellers`,
@@ -488,16 +489,50 @@ itself is a 404.
 
 ### Invoices
 
-`GET /orders/{number}/invoice` returns `{ url, expires_at, content_type }`. The
-URL is **signed rather than token-authenticated**, so it opens in a browser, a
-download manager or an email client — none of which carries the app's bearer
-token — and it expires after seven days.
+Two endpoints, because a marketplace order has two different documents in it.
 
-The document is **HTML, not PDF**: this marketplace has no PDF library, and a
+**`GET /orders/{number}/invoices` — the tax invoices.** One per seller, because
+the marketplace sells nothing: each seller supplies their own goods, so each
+raises their own invoice under their own GSTIN and their own consecutive series.
+A basket across two stores answers with **two** documents.
+
+```json
+{
+  "data": [
+    {
+      "number": "INV/2026-27/V12/00004",
+      "seller": "Silk House",
+      "seller_gstin": "33AABCU9603R1ZM",
+      "issued_at": "2026-09-07T10:12:00+00:00",
+      "total": 1230.0,
+      "url": "https://…/api/invoices/41?expires=…&signature=…",
+      "content_type": "text/html"
+    }
+  ],
+  "meta": { "order_number": "#882549", "expires_at": "…", "count": 1 }
+}
+```
+
+`data` may be **empty**, and that is an answer rather than a failure: an order
+still waiting for payment, or cancelled before it was ever supplied, has had no
+invoice raised against it. Render a list, not a single document — assuming one
+is the mistake this endpoint exists to prevent.
+
+A number, once issued, never changes, and neither do the names and addresses on
+the document: they are copied in when it is raised, so a seller who moves
+premises next March does not rewrite last April's paper.
+
+**`GET /orders/{number}/invoice` — the order summary.** Unchanged: one page
+covering the whole order, useful to a shopper reconciling a single payment.
+It is *not* a tax document, and it is not the thing to print for an accountant.
+
+Both hand back URLs that are **signed rather than token-authenticated**, so they
+open in a browser, a download manager or an email client — none of which carries
+the app's bearer token — and both expire after seven days.
+
+The documents are **HTML, not PDF**: this marketplace has no PDF library, and a
 print-ready page renders to PDF in one keystroke everywhere the app runs.
-`content_type` says so rather than leaving anyone to guess. One page covers the
-whole order, with a block per seller, because a shared basket has two sets of
-tax registration numbers on it.
+`content_type` says so rather than leaving anyone to guess.
 
 ---
 
@@ -689,8 +724,12 @@ Said plainly, so nobody plans around a hole:
   nothing sends to them yet; the seller app's FCM path is not shared.
 - **Customers are not notified of seller-side status changes.** The order
   timeline is truthful, but no notification fires when a seller ships.
-- **Invoices are HTML, not PDF**, and one document covers the whole order rather
-  than one per seller.
+- **Invoices are HTML, not PDF.** The tax invoices themselves are now one per
+  seller, as they have to be; it is the rendering that is a print-ready page
+  rather than a generated PDF.
+- **No HSN or SAC code on an invoice line.** Products do not carry one, and it
+  cannot be invented — a seller who needs it on their invoice has to have it
+  recorded against the product first.
 - **Courier milestones need a courier connected.** Where Delhivery or Shiprocket
   is configured the carrier's own scans drive the timeline — pushed as they
   happen, with a fifteen-minute sweep behind them. Where neither is, the

@@ -85,6 +85,13 @@ const form = useForm({
         props.settings.auto_approve_cancellations === '1',
     low_stock_threshold: props.settings.low_stock_threshold ?? '5',
     address: props.settings.address ?? '',
+    legal_name: props.settings.legal_name ?? '',
+    gst_number: props.settings.gst_number ?? '',
+    gst_state: props.settings.gst_state ?? '',
+    commission_gst_rate: props.settings.commission_gst_rate ?? '18',
+    invoice_prefix: props.settings.invoice_prefix ?? 'INV',
+    commission_invoice_prefix:
+        props.settings.commission_invoice_prefix ?? 'COM',
 });
 
 const submit = () => form.put('/admin/settings', { preserveScroll: true });
@@ -302,6 +309,68 @@ const destroyPartner = (partner: DeliveryPartner) =>
                                 :error="form.errors.address"
                             />
                         </div>
+                    </div>
+                </PCard>
+
+                <!--
+                | Who the marketplace is on its own invoice.
+                |
+                | The commission invoice is the one document the marketplace
+                | issues in its own name — every other invoice on the platform
+                | belongs to a seller. That makes this the registered company,
+                | not the brand: the two are often different strings and only
+                | one of them may appear on a tax invoice. Until the GSTIN is
+                | filled in, commission invoices are not raised at all.
+                -->
+                <PCard
+                    title="Invoicing"
+                    subtitle="The marketplace's own identity on the commission invoices it raises against sellers"
+                >
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        <PTextField
+                            v-model="form.legal_name"
+                            label="Registered company name"
+                            placeholder="As on the GST certificate"
+                            :error="form.errors.legal_name"
+                        />
+                        <PTextField
+                            v-model="form.gst_number"
+                            label="Marketplace GSTIN"
+                            placeholder="15 characters"
+                            :error="form.errors.gst_number"
+                        />
+                        <PTextField
+                            v-model="form.gst_state"
+                            label="State of registration"
+                            placeholder="Decides CGST + SGST or IGST"
+                            :error="form.errors.gst_state"
+                        />
+                        <PTextField
+                            v-model="form.commission_gst_rate"
+                            label="GST on commission (%)"
+                            required
+                            :error="form.errors.commission_gst_rate"
+                        />
+                        <PTextField
+                            v-model="form.invoice_prefix"
+                            label="Seller invoice prefix"
+                            required
+                            :error="form.errors.invoice_prefix"
+                        />
+                        <PTextField
+                            v-model="form.commission_invoice_prefix"
+                            label="Commission invoice prefix"
+                            required
+                            :error="form.errors.commission_invoice_prefix"
+                        />
+                        <p
+                            class="text-xs text-[#616161] sm:col-span-2 dark:text-[#b5b5b5]"
+                        >
+                            Leave the GSTIN empty and no commission invoice is
+                            raised — payouts still settle, they just carry no
+                            paper. An invoice already issued keeps the details
+                            it was issued with.
+                        </p>
                     </div>
                 </PCard>
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Actions\Invoicing\IssueCommissionInvoice;
 use App\Http\Controllers\Controller;
 use App\Models\Vendor;
 use App\Models\VendorPayout;
@@ -85,6 +86,13 @@ class PayoutController extends Controller
             'method' => $vendor->payout_method,
             'note' => $data['note'] ?? null,
         ]);
+
+        // The fee invoice is raised with the payout, not looked for later: the
+        // period is settled the moment the payout is, and a commission invoice
+        // dated whenever somebody happened to click is worth nothing to an
+        // accountant. Silent where the marketplace has not been given its own
+        // GSTIN yet — the payout is still correct, it just has no paper.
+        app(IssueCommissionInvoice::class)->handle($payout);
 
         Notifier::send(new PayoutRecorded($payout), $request->user());
 

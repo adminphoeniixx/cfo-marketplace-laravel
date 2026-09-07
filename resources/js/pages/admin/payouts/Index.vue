@@ -248,6 +248,22 @@ const remove = (payout: Payout) =>
                 </td>
                 <td class="px-4 py-2.5 text-right">
                     <div class="flex items-center justify-end gap-1">
+                        <!--
+                        | The commission invoice: the marketplace billing the
+                        | seller for the fee, with GST on it. Raised with the
+                        | payout, so it is here rather than behind a build
+                        | step — and absent where the marketplace has not been
+                        | given its own GSTIN yet, which is when it 404s.
+                        -->
+                        <a
+                            v-if="Number(payout.commission_amount) > 0"
+                            :href="`/admin/payouts/${payout.id}/invoice`"
+                            target="_blank"
+                            rel="noopener"
+                            class="px-1 text-[13px] font-medium text-[#005bd3] hover:underline dark:text-[#8ac1ff]"
+                        >
+                            Invoice
+                        </a>
                         <PButton
                             v-if="payout.status !== 'paid'"
                             size="slim"

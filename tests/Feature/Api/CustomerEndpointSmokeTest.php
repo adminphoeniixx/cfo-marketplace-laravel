@@ -415,6 +415,7 @@ function shopperCalls(array $f): array
         'api.customer.orders.show' => ['GET', route('api.customer.orders.show', pathNumber($f['delivered'])), []],
         'api.customer.orders.track' => ['GET', route('api.customer.orders.track', pathNumber($f['delivered'])), []],
         'api.customer.orders.invoice' => ['GET', route('api.customer.orders.invoice', pathNumber($f['delivered'])), []],
+        'api.customer.orders.invoices' => ['GET', route('api.customer.orders.invoices', pathNumber($f['delivered'])), []],
         'api.customer.invoices.show' => ['GET', URL::temporarySignedRoute(
             'api.customer.invoices.show', now()->addDay(), ['order' => $f['delivered']->id],
         ), []],

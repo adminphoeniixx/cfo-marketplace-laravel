@@ -243,6 +243,24 @@ const showTimeline = ref(true);
                         >
                             Print label
                         </a>
+                        <!--
+                        | The store's own tax invoice for this order. The
+                        | marketplace did not sell these goods, this store did,
+                        | so the document carries this store's name and GSTIN —
+                        | and on a basket shared with another seller it holds
+                        | only this store's lines.
+                        -->
+                        <a
+                            v-if="
+                                !['pending', 'cancelled'].includes(order.status)
+                            "
+                            :href="`/seller/orders/${order.id}/invoice`"
+                            target="_blank"
+                            rel="noopener"
+                            class="text-[13px] font-medium text-[#005bd3] hover:underline dark:text-[#8ac1ff]"
+                        >
+                            Print invoice
+                        </a>
                         <a
                             v-if="trackingUrl"
                             :href="trackingUrl"

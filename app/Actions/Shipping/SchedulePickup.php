@@ -41,7 +41,7 @@ class SchedulePickup
             return ['scheduled' => false, 'reference' => null, 'message' => "No client is connected for {$carrier}.", 'orders' => 0];
         }
 
-        $waybills = $orders->pluck('tracking_number')->map(fn ($w) => (string) $w)->values()->all();
+        $waybills = array_values($orders->pluck('tracking_number')->map(fn ($w) => (string) $w)->all());
         $result = $courier->schedulePickup($waybills, $date);
 
         if ($result === null) {

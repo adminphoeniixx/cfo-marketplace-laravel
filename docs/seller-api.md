@@ -214,6 +214,7 @@ channel or Android 8+ drops them silently.
 | GET | `/payouts` | `?status=` |
 | GET | `/payouts/{id}` | |
 | GET | `/payouts/earnings` | Lifetime gross/commission/earning, plus paid, in-progress and unsettled. |
+| GET | `/payouts/{id}/commission-invoice` | The marketplace's fee invoice for that period. `409` if none. |
 | GET | `/analytics/sales` | `?days=30` (1–365). One point per day for the chart. |
 | GET | `/analytics/report` | `?preset=7\|30\|90\|365`, or `?from=&to=`. The full report screen in one call. |
 | GET | `/analytics/export/{report}` | `products\|categories\|customers\|orders`, same filters. Streams CSV. |
@@ -324,6 +325,7 @@ malformed, unlike a `422`.
 | POST | `/orders/{id}/fulfill` | `items[].id`, `items[].quantity`, optional `tracking_number`, `carrier`. |
 | POST | `/orders/{id}/notes` | `note`. Lands on the order timeline the admin panel shows. |
 | GET | `/orders/{id}/label` | The shipping label as a URL. `?refresh=1` asks the courier again. |
+| GET | `/orders/{id}/invoice` | Your own tax invoice for the order, as a URL. `409` if none yet. |
 
 `carrier` is the courier's **name**, and it has to come from
 `GET /delivery-partners` — the marketplace matches on that name to build the
@@ -398,6 +400,60 @@ A `409` is not an error to show as one. It means either the parcel is booked but
 not manifested yet — normal for the first minute, and `message` says to try
 again — or there is no booking to print, in which case there is nothing to
 show but the manual waybill field.
+
+### The two invoices
+
+A marketplace has two supplies in it, and a store is on the opposite side of
+each.
+
+**`GET /orders/{id}/invoice` — the one you raise.** You sold the goods, so you
+are the supplier: the document carries your name, your GSTIN and your own
+consecutive series, addressed to the shopper. On a basket shared with another
+seller it holds **only your lines** — their half is their invoice, not yours.
+
+**`GET /payouts/{id}/commission-invoice` — the one raised against you.** The
+marketplace's fee for that period, with GST charged on the fee. This is the
+document your accountant needs to claim that GST back; without it the
+commission quietly costs more than the rate you agreed to.
+
+Both answer:
+
+```json
+{
+  "data": {
+    "number": "INV/2026-27/V12/00004",
+    "type": "tax",
+    "issued_at": "2026-09-07T10:12:00+00:00",
+    "taxable_value": 1000.0,
+    "tax_total": 180.0,
+    "total": 1230.0,
+    "url": "https://…/api/invoices/41?expires=…&signature=…",
+    "expires_at": "…",
+    "content_type": "text/html"
+  }
+}
+```
+
+`type` is `tax` for your own and `commission` for the marketplace's. The URL is
+signed rather than token-authenticated, so it opens anywhere, and it lasts seven
+days.
+
+A `409` here is information, not failure. On an order it means nothing has been
+supplied yet — still awaiting payment, or cancelled. On a payout it means the
+period earned no commission, or the marketplace has not recorded its own GSTIN
+yet, in which case no fee invoice can be raised at all.
+
+Numbers restart each Indian financial year (April to March) and are consecutive
+**per store**: two sellers both hold number 1 in the same year, because you keep
+separate books. Tax splits into CGST + SGST where your state matches the
+shipping address, and into IGST where it does not; where either state is missing
+the document says the treatment is unknown rather than guessing.
+
+Nothing on an issued invoice changes afterwards. The names, addresses and
+registration numbers are copied in when the number is claimed, so moving
+premises does not rewrite a document already sent.
+
+**Not on it yet:** an HSN or SAC code per line. Products do not carry one.
 
 That is why the "to pack" list is **`?needs_packing=1`**, not
 `?fulfillment_status=unfulfilled`. `needs_packing` asks whether any of *your*
