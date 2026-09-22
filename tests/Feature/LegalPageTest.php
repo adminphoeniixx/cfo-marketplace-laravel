@@ -234,3 +234,22 @@ test('a policy with no gstin says nothing about one', function () {
     expect((string) LegalPage::where('slug', 'privacy')->value('body'))
         ->not->toContain('GSTIN');
 });
+
+test('a policy with no officer named still publishes without a bracket in it', function () {
+    // The name is the one thing that may not be invented, and a bracket on a
+    // public page is worse than naming the post: a complaint still arrives.
+    Setting::put('legal_name', 'Example Trading Private Limited');
+    Setting::put('address', '12 Example Road, Noida 201301');
+    Setting::put('store_email', 'help@example.test');
+    Setting::put('store_phone', '+91 98100 00000');
+    putenv('GRIEVANCE_OFFICER_NAME');
+
+    $this->seed(LegalContentSeeder::class);
+
+    $body = (string) LegalPage::where('slug', 'privacy')->value('body');
+
+    expect($body)->toContain('**The Grievance Officer**')
+        ->and($body)->not->toMatch('/\[[^\]]+\]/');
+
+    $this->get('/legal/privacy')->assertOk();
+});

@@ -53,6 +53,13 @@ class LegalContentSeeder extends Seeder
 
         $this->command->info('Privacy policy written and published: /legal/privacy');
 
+        if (! trim((string) Env::get('GRIEVANCE_OFFICER_NAME'))) {
+            $this->command->newLine();
+            $this->command->warn('No grievance officer named — the page says "The Grievance Officer".');
+            $this->command->line('The IT Rules want a person. Re-run with GRIEVANCE_OFFICER_NAME and');
+            $this->command->line('LEGAL_SEED_OVERWRITE=1 once you have one, or type it in the panel.');
+        }
+
         preg_match_all('/\[[^\]]+\]/', $body, $found);
 
         if ($found[0] !== []) {
@@ -104,9 +111,18 @@ class LegalContentSeeder extends Seeder
         $email = $this->detail('store_email', 'LEGAL_SUPPORT_EMAIL', '[support email address]');
         $phone = $this->detail('store_phone', 'LEGAL_SUPPORT_PHONE', '[support phone number]');
 
-        // Nobody's name is in the settings table, and a grievance officer may
-        // not be invented — the rules put a real person behind the address.
-        $officer = (string) (Env::get('GRIEVANCE_OFFICER_NAME') ?: '[Grievance officer name]');
+        /*
+        | Nobody's name is in the settings table, and a grievance officer may
+        | not be invented — the rules put a real person behind the address.
+        | Without one the line names the post instead: a complaint still
+        | reaches somebody, which is the point of the section, and a published
+        | page carries no bracket for a shopper to find. The seeder says so on
+        | the way out, because the post is not what the rules asked for.
+        */
+        $officer = trim((string) Env::get('GRIEVANCE_OFFICER_NAME'));
+        $officerLine = $officer !== ''
+            ? "- **{$officer}**, Grievance Officer"
+            : '- **The Grievance Officer**';
 
         // A GSTIN is proof the publisher is a real registered company, which
         // is worth saying to an app store reviewer. Omitted rather than
@@ -228,7 +244,7 @@ class LegalContentSeeder extends Seeder
         Media Ethics Code) Rules, 2021 and the Digital Personal Data Protection Act,
         2023, complaints about your data can be sent to:
 
-        - **{$officer}**, Grievance Officer
+        {$officerLine}
         - {$entity}, {$address}
         - Email: {$email}
         - Phone: {$phone}

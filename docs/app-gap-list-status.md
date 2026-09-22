@@ -452,8 +452,19 @@ Nothing below blocks the app; each is either a decision or a credential.
   those may be invented. They 404 until published, and `GET /legal` will not
   list them, so the app needs no change when they go live.
   A full privacy policy draft now ships in `LegalContentSeeder`, built from the
-  store settings; run it with `LEGAL_ENTITY_NAME` and `GRIEVANCE_OFFICER_NAME`
-  set and it publishes with nothing left in brackets.
+  company details in Settings → Store — `legal_name`, `address`, `gst_number`,
+  `store_email`, `store_phone` — with `LEGAL_ENTITY_NAME`, `LEGAL_SUPPORT_EMAIL`
+  and the rest as environment fallbacks for a marketplace that has not been
+  through the panel yet. It publishes with nothing left in brackets; a setting
+  still on its shipped `marketplace.test` default counts as unset, so a fake
+  support address cannot reach a public page.
+
+  The one field it will not fill is the grievance officer's name, which the IT
+  Rules want to be a real person and which may not be invented. Supply it with
+  `GRIEVANCE_OFFICER_NAME`; without it the section names the post — "The
+  Grievance Officer" — with the company's email and phone under it, which
+  publishes cleanly and is still short of what the rules ask for. The seeder
+  says so every time it runs without a name.
 
 **Operational**
 
