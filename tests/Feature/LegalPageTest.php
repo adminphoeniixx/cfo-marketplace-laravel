@@ -188,3 +188,49 @@ test('the seeder never overwrites a policy somebody wrote', function () {
 
     expect(LegalPage::where('slug', 'privacy')->value('body'))->toBe('Our own words.');
 });
+
+test('the panel\'s own company fields write the policy', function () {
+    // Nothing in the environment at all: a marketplace that has filled in
+    // Settings → Store has already said who it is, and saying it twice is how
+    // an invoice and a policy end up naming two different companies.
+    Setting::put('legal_name', 'Example Trading Private Limited');
+    Setting::put('address', '12 Example Road, Noida 201301');
+    Setting::put('gst_number', '09AAOCC1589P1ZP');
+    Setting::put('store_email', 'help@example.test');
+    Setting::put('store_phone', '+91 98100 00000');
+    putenv('GRIEVANCE_OFFICER_NAME=A Named Person');
+
+    $this->seed(LegalContentSeeder::class);
+
+    $body = (string) LegalPage::where('slug', 'privacy')->value('body');
+
+    expect($body)->toContain('Example Trading Private Limited')
+        ->and($body)->toContain('GSTIN 09AAOCC1589P1ZP')
+        ->and($body)->toContain('help@example.test')
+        ->and($body)->not->toMatch('/\[[^\]]+\]/');
+
+    putenv('GRIEVANCE_OFFICER_NAME');
+});
+
+test('the address the box shipped with never reaches a published policy', function () {
+    // `store_email` has a default, and a default is not an address anybody
+    // answers. Better a visible placeholder than an invitation to write to
+    // nobody.
+    Setting::put('store_email', 'support@marketplace.test');
+
+    $this->seed(LegalContentSeeder::class);
+
+    expect((string) LegalPage::where('slug', 'privacy')->value('body'))
+        ->toContain('[support email address]')
+        ->and((string) LegalPage::where('slug', 'privacy')->value('body'))
+        ->not->toContain('marketplace.test');
+});
+
+test('a policy with no gstin says nothing about one', function () {
+    Setting::put('gst_number', '');
+
+    $this->seed(LegalContentSeeder::class);
+
+    expect((string) LegalPage::where('slug', 'privacy')->value('body'))
+        ->not->toContain('GSTIN');
+});

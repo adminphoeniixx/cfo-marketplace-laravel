@@ -68,16 +68,52 @@ class LegalContentSeeder extends Seeder
     }
 
     /**
+     * One company detail, read from the panel first and the environment next.
+     *
+     * A setting still sitting at the value the box shipped with — anything on
+     * `marketplace.test` — is nobody's address. Treating it as unset is what
+     * keeps a fake support address off a published policy.
+     */
+    private function detail(string $setting, string $env, string $fallback): string
+    {
+        foreach ([Setting::cached($setting), Env::get($env)] as $value) {
+            $value = trim((string) $value);
+
+            if ($value !== '' && ! str_contains($value, 'marketplace.test')) {
+                return $value;
+            }
+        }
+
+        return $fallback;
+    }
+
+    /**
      * The policy itself, in the Markdown the panel's textarea takes.
      */
     private function privacyBody(): string
     {
         $store = (string) Setting::cached('store_name', config('app.name'));
-        $entity = (string) (Env::get('LEGAL_ENTITY_NAME') ?: '[Registered company name]');
+
+        // The panel's own fields come first. An admin who has typed the
+        // registered name into Settings → Store has said it more recently than
+        // any environment variable, and those same fields already sign the
+        // commission invoices — the policy and the invoice naming two
+        // different companies would be worse than either being late.
+        $entity = $this->detail('legal_name', 'LEGAL_ENTITY_NAME', '[Registered company name]');
+        $address = $this->detail('address', 'LEGAL_ENTITY_ADDRESS', '[registered address]');
+        $email = $this->detail('store_email', 'LEGAL_SUPPORT_EMAIL', '[support email address]');
+        $phone = $this->detail('store_phone', 'LEGAL_SUPPORT_PHONE', '[support phone number]');
+
+        // Nobody's name is in the settings table, and a grievance officer may
+        // not be invented — the rules put a real person behind the address.
         $officer = (string) (Env::get('GRIEVANCE_OFFICER_NAME') ?: '[Grievance officer name]');
-        $email = (string) (Setting::cached('store_email') ?: '[support email address]');
-        $phone = (string) (Setting::cached('store_phone') ?: '[support phone number]');
-        $address = (string) (Setting::cached('address') ?: '[registered address]');
+
+        // A GSTIN is proof the publisher is a real registered company, which
+        // is worth saying to an app store reviewer. Omitted rather than
+        // bracketed: a policy is complete without it.
+        $gstin = $this->detail('gst_number', 'LEGAL_ENTITY_GSTIN', '');
+        $registration = $gstin !== '' ? " It is registered in India under GSTIN {$gstin}." : '';
+
         $date = now()->format('j F Y');
 
         return <<<MD
@@ -87,7 +123,7 @@ class LegalContentSeeder extends Seeder
         us to do with it.
 
         It applies to the {$store} shopping app, this website and the seller panel. It is
-        published by **{$entity}**, {$address}.
+        published by **{$entity}**, {$address}.{$registration}
 
         ## What we collect
 
