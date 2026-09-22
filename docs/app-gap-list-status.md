@@ -340,6 +340,18 @@ screen under a legal title — so drive the list from `GET /legal` (or
 `app-config.legal_pages`) rather than hardcoding five rows. `returns` and
 `licenses` are live now; see "Still needed" below for the other three.
 
+The same rows are also served in a browser at **`GET /legal/{slug}`** on the
+web host — `/privacy` redirects there — for the app store listings, which want
+a URL anyone can open without the app. The bodies are not written the same way
+(`returns` and `licenses` are HTML, the privacy draft is Markdown), so both are
+rendered and then put through a tag whitelist: prose and tables survive,
+scripts, embeds, forms, images, inline handlers and `javascript:` links do not.
+Headings come back with ids, and the page shows its own contents beside a long
+policy. Published pages are linked from the landing page footer; an unwritten
+or unpublished one 404s on this side too. The app has no reason to
+open these, but the URL is a fine thing to put behind "Privacy policy" if a
+WebView is ever easier than a fetch.
+
 ### Account deletion — `DELETE /me`
 
 Revokes every token and registered device, releases the email and phone so the
@@ -439,6 +451,9 @@ Nothing below blocks the app; each is either a decision or a credential.
   need a registered company name, an address and a named officer, and none of
   those may be invented. They 404 until published, and `GET /legal` will not
   list them, so the app needs no change when they go live.
+  A full privacy policy draft now ships in `LegalContentSeeder`, built from the
+  store settings; run it with `LEGAL_ENTITY_NAME` and `GRIEVANCE_OFFICER_NAME`
+  set and it publishes with nothing left in brackets.
 
 **Operational**
 

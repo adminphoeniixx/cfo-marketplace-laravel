@@ -4,6 +4,10 @@ import { computed } from 'vue';
 import AppLogo from '@/components/admin/AppLogo.vue';
 import { dashboard, login } from '@/routes';
 
+defineProps<{
+    legal: { slug: string; title: string }[];
+}>();
+
 const page = usePage();
 const user = computed(
     () => (page.props.auth as { user?: { name: string } } | undefined)?.user,
@@ -488,9 +492,18 @@ const statusRows = [
                     <AppLogo :size="24" />
                     <span class="text-[13px] font-semibold">CFO Admin</span>
                 </div>
-                <p class="text-xs text-[#8a8a8a]">
-                    Built with Laravel, Inertia and Vue.
-                </p>
+                <div
+                    class="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-[#8a8a8a]"
+                >
+                    <a
+                        v-for="item in legal"
+                        :key="item.slug"
+                        :href="`/legal/${item.slug}`"
+                        class="hover:text-[#303030] hover:underline dark:hover:text-[#e3e3e3]"
+                        >{{ item.title }}</a
+                    >
+                    <span>Built with Laravel, Inertia and Vue.</span>
+                </div>
             </div>
         </footer>
     </div>

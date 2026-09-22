@@ -20,6 +20,10 @@ createInertiaApp({
             // other while the panel behind `SellerLayout` is still closed.
             case name.startsWith('sell/'):
                 return null;
+            // Terms and privacy, read by people with no account at all —
+            // including an app store reviewer who has not installed anything.
+            case name.startsWith('legal/'):
+                return null;
             case name.startsWith('admin/'):
                 return AdminLayout;
             case name.startsWith('seller/'):
