@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AccountDeletionController;
 use App\Http\Controllers\LegalPageController;
 use App\Models\LegalPage;
 use Illuminate\Support\Facades\Route;
@@ -21,6 +22,15 @@ Route::get('legal/{page}', [LegalPageController::class, 'show'])->name('legal.sh
 
 // The address people type, and the one handed to the app stores.
 Route::permanentRedirect('privacy', '/legal/privacy');
+
+/*
+| How to close an account, for somebody who no longer has the app to close it
+| from. Play Console asks for this page by URL and checks it can be reached
+| without signing in, which is the whole point: the person asking has usually
+| uninstalled already.
+*/
+Route::get('account/delete', [AccountDeletionController::class, 'show'])->name('account.delete');
+Route::permanentRedirect('delete-account', '/account/delete');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     // Sellers get their own panel; everyone else is marketplace staff.

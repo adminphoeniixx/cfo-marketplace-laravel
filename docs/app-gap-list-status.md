@@ -362,6 +362,20 @@ are a seller's sales history as much as the shopper's. Returns
 An order still in flight is a `422` on `account`: there is nobody left to
 deliver to.
 
+The same thing in words lives at **`GET /account/delete`** on the web host
+(`/delete-account` redirects there), because Play Console asks every app that
+takes a sign-up for a page that says how to close the account and what happens
+to the data — reachable by somebody who has already uninstalled, which is who
+usually wants it. It gives the in-app route, a prefilled mail draft for anyone
+without the app, what goes at once, what is kept and why, and the two things
+that stop a closure: an order still on its way, and store credit that cannot
+follow you to a new account.
+
+Those words are in the page rather than in `legal_pages` on purpose. They
+describe what `ProfileController@destroy` does, so they have to move when it
+moves; an admin editing a textarea would drift and the page would start
+promising deletions that never happen.
+
 ### Notification settings
 
 `GET` / `PUT /notification-preferences` with exactly the five fields asked for:

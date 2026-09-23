@@ -24,6 +24,10 @@ createInertiaApp({
             // including an app store reviewer who has not installed anything.
             case name.startsWith('legal/'):
                 return null;
+            // How to delete an account, read by somebody who has already
+            // uninstalled the app — so it cannot sit behind one.
+            case name.startsWith('account/'):
+                return null;
             case name.startsWith('admin/'):
                 return AdminLayout;
             case name.startsWith('seller/'):

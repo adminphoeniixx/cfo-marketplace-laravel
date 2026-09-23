@@ -502,6 +502,13 @@ const statusRows = [
                         class="hover:text-[#303030] hover:underline dark:hover:text-[#e3e3e3]"
                         >{{ item.title }}</a
                     >
+                    <!-- Play Console wants this reachable from the site, not
+                         only from the listing. -->
+                    <a
+                        href="/account/delete"
+                        class="hover:text-[#303030] hover:underline dark:hover:text-[#e3e3e3]"
+                        >Delete your account</a
+                    >
                     <span>Built with Laravel, Inertia and Vue.</span>
                 </div>
             </div>
