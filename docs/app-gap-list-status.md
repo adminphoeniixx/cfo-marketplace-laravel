@@ -493,6 +493,25 @@ Nothing below blocks the app; each is either a decision or a credential.
   workers already running, moving notifications onto the queue would be the
   better fix when somebody has an afternoon.
 
+**Review accounts**
+
+- **`DemoCustomerSeeder`** and **`DemoSellerSeeder`** each make one login an
+  app store reviewer can use, because both stores ask for working credentials
+  and the front door of the shopper app is an SMS code that will not reach
+  somebody in another country. Pass `DEMO_CUSTOMER_EMAIL` /
+  `DEMO_CUSTOMER_PASSWORD` (or the `DEMO_SELLER_*` pair, plus
+  `DEMO_SELLER_STORE`); without a password one is generated and printed once,
+  and running either again with a password set resets that account rather than
+  making a second one.
+- Neither is in `DatabaseSeeder`, so nothing runs them by accident. Between
+  them they write one customer row, one vendor row and one user row — no
+  orders, no catalogue. The seller's store is created **approved**, which
+  `RegisterStore` deliberately never does: a demo account must not arrive in
+  the staff's approval queue pretending to be an application.
+- The shopper signs in at `POST /api/customer/auth/login`, the seller at
+  `POST /api/seller/login` and at `/seller` in a browser. Both are email and
+  password — the SMS door stays shut until a provider is wired up.
+
 **Deliberately not built**
 
 - ~~Store credit cannot be spent at checkout.~~ **Done.** `GET /checkout`
