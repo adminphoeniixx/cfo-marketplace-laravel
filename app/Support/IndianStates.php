@@ -10,6 +10,13 @@ namespace App\Support;
  * states and no way to reach the other thirty. The names are the spellings
  * shipping zones and tax invoices match on, which is why a free-typed
  * "tamil nadu" is folded onto "Tamil Nadu" rather than stored as typed.
+ *
+ * Cities come from `resources/data/indian-cities.json`: the Census 2011 town
+ * list (via github.com/nshntarora/Indian-Cities-JSON), cleaned of its
+ * spelling damage, renamed where the rename has stuck (Gurugram, Prayagraj)
+ * and topped up where it had nothing — Sikkim, Ladakh, Lakshadweep. It is a
+ * list to pick from, not a rule: a village is a real address too, so `city`
+ * stays free text and the app must let a shopper type one that is missing.
  */
 class IndianStates
 {
@@ -71,6 +78,20 @@ class IndianStates
         }
 
         return null;
+    }
+
+    /**
+     * The towns of one state, alphabetically. Empty for a name that is not
+     * a state — pass it through `canonical()` first.
+     *
+     * @return list<string>
+     */
+    public static function cities(string $state): array
+    {
+        static $cities = null;
+        $cities ??= json_decode((string) file_get_contents(resource_path('data/indian-cities.json')), true);
+
+        return $cities[$state] ?? [];
     }
 
     private static function key(string $value): string

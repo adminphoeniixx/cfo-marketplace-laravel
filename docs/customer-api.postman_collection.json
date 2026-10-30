@@ -1255,6 +1255,60 @@
                     }
                 },
                 {
+                    "name": "states",
+                    "request": {
+                        "description": "Every Indian state and union territory, alphabetical: `{ name, is_union_territory }`. The address form's first picker.",
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/states",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "states"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "cities",
+                    "request": {
+                        "description": "The towns of one state, alphabetical. `state` is a name from `/states`, any case; `422` on `state` otherwise. The list is for picking from — `city` stays free text when saving an address, so offer a way to type one that is missing.",
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/cities?state=Tamil Nadu",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customer",
+                                "cities"
+                            ],
+                            "query": [
+                                {
+                                    "key": "state",
+                                    "value": "Tamil Nadu"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
                     "name": "reviews.store",
                     "request": {
                         "method": "POST",

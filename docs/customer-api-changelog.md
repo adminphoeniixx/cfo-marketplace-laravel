@@ -19,6 +19,14 @@ step with both.
 
 ### Added
 
+- **`GET /states` and `GET /cities?state=`.** The address form's two pickers,
+  open without a token. `/states` is the same list as `/reference`'s
+  `states`; `/cities` returns a state's towns (about 1,250 across India) and
+  echoes `state` as the list spells it. **What an app must do:** fill the city
+  picker from `/cities` once a state is chosen, and keep a "type your city"
+  option — the list is the census town list, not every village, and `city` is
+  still accepted as free text.
+
 - **`states` on `GET /reference`.** All 28 states and 8 union territories,
   alphabetical: `[{ "name": "Andaman and Nicobar Islands", "is_union_territory": true }, …]`.
   **What an app must do:** build the address form's state picker from this

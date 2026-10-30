@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\Customer\CatalogController as CustomerCatalogContro
 use App\Http\Controllers\Api\Customer\CheckoutController;
 use App\Http\Controllers\Api\Customer\ContentController;
 use App\Http\Controllers\Api\Customer\InvoiceController;
+use App\Http\Controllers\Api\Customer\LocationController;
 use App\Http\Controllers\Api\Customer\NotificationController as CustomerNotificationController;
 use App\Http\Controllers\Api\Customer\OrderController as CustomerOrderController;
 use App\Http\Controllers\Api\Customer\PaymentController;
@@ -315,6 +316,10 @@ Route::prefix('customer')->name('api.customer.')->group(function () {
     Route::get('products/{product}/reviews', [ReviewController::class, 'index'])->name('products.reviews');
     Route::get('sellers/{vendor}', [CustomerCatalogController::class, 'seller'])->name('sellers.show');
     Route::get('reference', ReferenceController::class)->name('reference');
+    // The address form's pickers. `city` is still free text when saving —
+    // the list is for picking from, and a village is a real address too.
+    Route::get('states', [LocationController::class, 'states'])->name('states');
+    Route::get('cities', [LocationController::class, 'cities'])->name('cities');
 
     /*
     | "Do you deliver to my pincode?" — asked on a product page, before there

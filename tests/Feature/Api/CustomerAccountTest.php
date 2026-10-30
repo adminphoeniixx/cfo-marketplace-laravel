@@ -3,6 +3,7 @@
 use App\Models\Customer;
 use App\Models\Order;
 use App\Models\ProductReview;
+use App\Support\IndianStates;
 use Illuminate\Notifications\Notification;
 
 beforeEach(function () {
@@ -277,4 +278,29 @@ test('an address takes a state from the list, in any case', function () {
         'first_name' => 'Priya', 'address_line1' => '1 Main St', 'city' => 'Austin',
         'state' => 'Texas', 'country' => 'US',
     ])->assertCreated();
+});
+
+test('the address pickers list states, then the cities in one', function () {
+    $this->getJson(route('api.customer.states'))
+        ->assertOk()
+        ->assertJsonCount(36, 'data')
+        ->assertJsonPath('data.0.name', 'Andaman and Nicobar Islands');
+
+    // Any case, echoed back as the list spells it.
+    $cities = $this->getJson(route('api.customer.cities', ['state' => 'haryana']))
+        ->assertOk()
+        ->assertJsonPath('state', 'Haryana')
+        ->json('data');
+
+    expect($cities)->toContain('Gurugram')->not->toContain('Gurgaon');
+
+    // Every state has somewhere to pick.
+    foreach (IndianStates::names() as $state) {
+        expect(IndianStates::cities($state))->not->toBeEmpty();
+    }
+
+    $this->getJson(route('api.customer.cities', ['state' => 'Narnia']))
+        ->assertStatus(422)->assertJsonValidationErrors('state');
+    $this->getJson(route('api.customer.cities'))
+        ->assertStatus(422)->assertJsonValidationErrors('state');
 });
