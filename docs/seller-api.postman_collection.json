@@ -1826,10 +1826,10 @@
                                 "products"
                             ]
                         },
-                        "description": "Upload images first via **Uploads**, then send the returned `path` here — never the file.",
+                        "description": "Upload images first via **Uploads**, then send the returned `path` here — never the file.\n\n`cost_price` is what you are paid per unit. `price` is the marketplace's to set: it comes back as `0`, and `status: \"active\"` comes back `pending` until the marketplace prices and publishes it.",
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n  \"name\": \"QA Kanchipuram silk saree\",\n  \"type\": \"simple\",\n  \"price\": 4999,\n  \"compare_at_price\": 6499,\n  \"status\": \"active\",\n  \"track_inventory\": true,\n  \"stock_quantity\": 12,\n  \"low_stock_threshold\": 3,\n  \"short_description\": \"Pure zari, hand woven.\",\n  \"tags\": [\n    \"saree\",\n    \"silk\"\n  ],\n  \"images\": [\n    {\n      \"path\": \"cfo/products/1/example.jpg\",\n      \"alt\": \"Front\"\n    }\n  ]\n}",
+                            "raw": "{\n  \"name\": \"QA Kanchipuram silk saree\",\n  \"type\": \"simple\",\n  \"cost_price\": 3100,\n  \"status\": \"active\",\n  \"track_inventory\": true,\n  \"stock_quantity\": 12,\n  \"low_stock_threshold\": 3,\n  \"short_description\": \"Pure zari, hand woven.\",\n  \"tags\": [\n    \"saree\",\n    \"silk\"\n  ],\n  \"images\": [\n    {\n      \"path\": \"cfo/products/1/example.jpg\",\n      \"alt\": \"Front\"\n    }\n  ]\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -1881,10 +1881,10 @@
                                 "products"
                             ]
                         },
-                        "description": "The parent's stock is recomputed as the sum of its variants. Attribute ids come from **Catalog → Attributes**.",
+                        "description": "The parent's stock is recomputed as the sum of its variants. Attribute ids come from **Catalog → Attributes**.\n\nEach variant carries its own `cost_price`; the parent needs none. A new variant reads `price: 0` until the marketplace prices it.",
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n  \"name\": \"QA Cotton kurta\",\n  \"type\": \"variable\",\n  \"price\": 1999,\n  \"status\": \"active\",\n  \"stock_quantity\": 0,\n  \"attribute_ids\": [\n    1\n  ],\n  \"variants\": [\n    {\n      \"name\": \"Small\",\n      \"price\": 1999,\n      \"stock_quantity\": 4,\n      \"values\": [\n        {\n          \"attribute_id\": 1,\n          \"attribute_value_id\": 1\n        }\n      ]\n    },\n    {\n      \"name\": \"Large\",\n      \"price\": 2099,\n      \"stock_quantity\": 6,\n      \"values\": [\n        {\n          \"attribute_id\": 1,\n          \"attribute_value_id\": 2\n        }\n      ]\n    }\n  ]\n}",
+                            "raw": "{\n  \"name\": \"QA Cotton kurta\",\n  \"type\": \"variable\",\n  \"status\": \"active\",\n  \"stock_quantity\": 0,\n  \"attribute_ids\": [\n    1\n  ],\n  \"variants\": [\n    {\n      \"name\": \"Small\",\n      \"cost_price\": 1200,\n      \"stock_quantity\": 4,\n      \"values\": [\n        {\n          \"attribute_id\": 1,\n          \"attribute_value_id\": 1\n        }\n      ]\n    },\n    {\n      \"name\": \"Large\",\n      \"cost_price\": 1300,\n      \"stock_quantity\": 6,\n      \"values\": [\n        {\n          \"attribute_id\": 1,\n          \"attribute_value_id\": 2\n        }\n      ]\n    }\n  ]\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -1967,10 +1967,10 @@
                                 "{{product_id}}"
                             ]
                         },
-                        "description": "**Full replace.** Anything you leave out is cleared, images included. Always send the complete object.",
+                        "description": "**Full replace.** Anything you leave out is cleared, images included. Always send the complete object.\n\nA live product stays live unless the cost moves — a new `cost_price`, a new variant cost, or a new variant sends it back to `pending` until the marketplace re-prices it.",
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n  \"name\": \"QA Kanchipuram silk saree (updated)\",\n  \"type\": \"simple\",\n  \"price\": 5299,\n  \"status\": \"active\",\n  \"track_inventory\": true,\n  \"stock_quantity\": 8,\n  \"images\": [\n    {\n      \"path\": \"cfo/products/1/example.jpg\",\n      \"alt\": \"Front\"\n    }\n  ]\n}",
+                            "raw": "{\n  \"name\": \"QA Kanchipuram silk saree (updated)\",\n  \"type\": \"simple\",\n  \"cost_price\": 3300,\n  \"status\": \"active\",\n  \"track_inventory\": true,\n  \"stock_quantity\": 8,\n  \"images\": [\n    {\n      \"path\": \"cfo/products/1/example.jpg\",\n      \"alt\": \"Front\"\n    }\n  ]\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -2018,7 +2018,7 @@
                                 "status"
                             ]
                         },
-                        "description": "`draft`, `active` or `archived`.",
+                        "description": "`draft`, `pending`, `active` or `archived`. `active` on a product that is not already live answers `pending` — only the marketplace puts a product on sale.",
                         "body": {
                             "mode": "raw",
                             "raw": "{\n  \"status\": \"draft\"\n}",
@@ -2119,7 +2119,7 @@
                                 "bulk"
                             ]
                         },
-                        "description": "`activate` · `draft` · `archive` · `delete`, up to 200 ids. Ids from another store are counted in `skipped` rather than failing the call.",
+                        "description": "`activate` · `draft` · `archive` · `delete`, up to 200 ids. Ids from another store are counted in `skipped` rather than failing the call.\n\n`activate` sends products for pricing (`pending`) rather than putting them on sale; `changed` counts only the ones it moved.",
                         "body": {
                             "mode": "raw",
                             "raw": "{\n  \"action\": \"activate\",\n  \"ids\": [\n    \"{{product_id}}\"\n  ]\n}",

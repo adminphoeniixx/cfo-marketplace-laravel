@@ -6,6 +6,8 @@ use App\Concerns\SyncsChildRecords;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Seller\ProductResource;
 use App\Models\Product;
+use App\Notifications\ProductAwaitingPrice;
+use App\Services\Notifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -14,7 +16,7 @@ use Illuminate\Validation\Rule;
 
 class ProductController extends Controller
 {
-    use ScopesToStore, SyncsChildRecords;
+    use LeavesPricingToMarketplace, ScopesToStore, SyncsChildRecords;
 
     public function index(Request $request): AnonymousResourceCollection
     {
@@ -60,6 +62,8 @@ class ProductController extends Controller
             return $product;
         });
 
+        $this->announceIfAwaitingPrice($product, null, $request->user());
+
         return response()->json(
             ['data' => new ProductResource($this->loaded($product))],
             201,
@@ -75,12 +79,15 @@ class ProductController extends Controller
     {
         $model = $this->findOwned($request, $product);
         $data = $this->validated($request, $model);
+        $before = $model->status;
 
         DB::transaction(function () use ($model, $data) {
             $model->update($this->payload($data, $model));
 
             $this->syncRelations($model, $data);
         });
+
+        $this->announceIfAwaitingPrice($model, $before, $request->user());
 
         return new ProductResource($this->loaded($model->fresh()));
     }
@@ -93,22 +100,21 @@ class ProductController extends Controller
     }
 
     /**
-     * Flip status without sending the whole product back.
+     * Flip status without sending the whole product back. `active` on a
+     * product that is not already live sends it for pricing instead.
      */
     public function updateStatus(Request $request, int $product): ProductResource
     {
         $model = $this->findOwned($request, $product);
+        $before = $model->status;
 
         $data = $request->validate([
             'status' => ['required', Rule::in(Product::STATUSES)],
         ]);
 
-        $model->update([
-            'status' => $data['status'],
-            'published_at' => $data['status'] === 'active'
-                ? ($model->published_at ?? now())
-                : $model->published_at,
-        ]);
+        $model->update(['status' => $this->sellerStatus($data['status'], $model)]);
+
+        $this->announceIfAwaitingPrice($model, $before, $request->user());
 
         return new ProductResource($this->loaded($model));
     }
@@ -146,6 +152,9 @@ class ProductController extends Controller
      * Change several products at once. Ids that are not this store's are
      * dropped silently rather than failing the whole call — a stale multi-select
      * on the client should not block the ones that are still valid.
+     *
+     * `activate` sends anything not already live to `pending` for pricing;
+     * `changed` then counts only the products that moved.
      */
     public function bulk(Request $request): JsonResponse
     {
@@ -163,17 +172,21 @@ class ProductController extends Controller
 
         $query = Product::whereIn('id', $owned);
 
-        match ($data['action']) {
-            'activate' => $query->update(['status' => 'active', 'published_at' => now()]),
+        $changed = match ($data['action']) {
+            'activate' => $query->whereNotIn('status', ['active', 'pending'])->update(['status' => 'pending']),
             'draft' => $query->update(['status' => 'draft']),
             'archive' => $query->update(['status' => 'archived']),
             'delete' => $query->delete(),
-            default => null,
+            default => 0,
         };
+
+        if ($data['action'] === 'activate' && $changed > 0) {
+            Notifier::send(new ProductAwaitingPrice($request->user()->vendor, $changed), $request->user());
+        }
 
         return response()->json([
             'action' => $data['action'],
-            'changed' => $owned->count(),
+            'changed' => $data['action'] === 'activate' ? $changed : $owned->count(),
             'skipped' => count($data['ids']) - $owned->count(),
         ]);
     }
@@ -198,9 +211,6 @@ class ProductController extends Controller
             'tax_class_id' => ['nullable', 'integer', 'exists:tax_classes,id'],
             'short_description' => ['nullable', 'string', 'max:500'],
             'description' => ['nullable', 'string', 'max:20000'],
-            'price' => ['required', 'numeric', 'min:0', 'max:99999999'],
-            'compare_at_price' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
-            'cost_price' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
             'track_inventory' => ['boolean'],
             'stock_quantity' => ['required_if:track_inventory,true', 'nullable', 'integer', 'min:0'],
             'low_stock_threshold' => ['nullable', 'integer', 'min:0'],
@@ -232,14 +242,14 @@ class ProductController extends Controller
             'variants.*.id' => ['nullable', 'integer'],
             'variants.*.name' => ['nullable', 'string', 'max:200'],
             'variants.*.sku' => ['nullable', 'string', 'max:80'],
-            'variants.*.price' => ['required', 'numeric', 'min:0'],
-            'variants.*.compare_at_price' => ['nullable', 'numeric', 'min:0'],
             'variants.*.stock_quantity' => ['required', 'integer', 'min:0'],
             'variants.*.weight' => ['nullable', 'numeric', 'min:0'],
             'variants.*.is_active' => ['boolean'],
             'variants.*.values' => ['array'],
             'variants.*.values.*.attribute_id' => ['required', 'integer', 'exists:attributes,id'],
             'variants.*.values.*.attribute_value_id' => ['required', 'integer', 'exists:attribute_values,id'],
+
+            ...$this->sellerPricingRules(),
         ]);
     }
 
@@ -260,8 +270,9 @@ class ProductController extends Controller
         $payload['stock_quantity'] = $data['stock_quantity'] ?? 0;
         $payload['low_stock_threshold'] = $data['low_stock_threshold'] ?? 5;
         $payload['weight'] = $data['weight'] ?? 0;
+        $payload['status'] = $this->sellerStatus($data['status'], $product, $data);
 
-        if ($data['status'] === 'active' && ! $product?->published_at) {
+        if ($payload['status'] === 'active' && ! $product?->published_at) {
             $payload['published_at'] = now();
         }
 
@@ -305,8 +316,9 @@ class ProductController extends Controller
                 [
                     'name' => $variant['name'] ?? null,
                     'sku' => $variant['sku'] ?? null,
-                    'price' => $variant['price'],
-                    'compare_at_price' => $variant['compare_at_price'] ?? null,
+                    // Price is the marketplace's: a new variant arrives at
+                    // zero and an existing one keeps what staff gave it.
+                    'cost_price' => $variant['cost_price'],
                     'stock_quantity' => $variant['stock_quantity'],
                     'weight' => $variant['weight'] ?? 0,
                     'is_active' => $variant['is_active'] ?? true,

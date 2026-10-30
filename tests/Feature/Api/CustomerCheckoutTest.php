@@ -50,7 +50,7 @@ test('the checkout screen quotes the same total the cart did', function () {
 
 test('placing an order empties the basket and writes the money', function () {
     $vendor = Vendor::factory()->create(['status' => 'approved', 'commission_rate' => 10]);
-    addToCart(sellableProduct(['price' => 1000], $vendor)->id, 2);
+    addToCart(sellableProduct(['price' => 1000, 'cost_price' => 700], $vendor)->id, 2);
 
     $response = $this->postJson(route('api.customer.orders.store'), [
         'address_id' => $this->address->id,
@@ -65,9 +65,10 @@ test('placing an order empties the basket and writes the money', function () {
         ->and($order->payment_method)->toBe('UPI')
         ->and($order->payment_status)->toBe('paid')
         ->and($order->status)->toBe('processing')
-        // Commission is the marketplace's business, not the shopper's.
-        ->and((float) $order->commission_total)->toBe(200.0)
-        ->and((float) $order->items->first()->vendor_earning)->toBe(1800.0);
+        // The seller is paid their cost, the marketplace keeps the rest —
+        // and that is the marketplace's business, not the shopper's.
+        ->and((float) $order->commission_total)->toBe(600.0)
+        ->and((float) $order->items->first()->vendor_earning)->toBe(1400.0);
 
     $response->assertJsonPath('data.number', $order->number)
         ->assertJsonMissingPath('data.items.0.commission_amount');
@@ -93,8 +94,9 @@ test('one basket across two sellers is one order with two sets of lines', functi
     $one = Vendor::factory()->create(['status' => 'approved', 'commission_rate' => 10]);
     $two = Vendor::factory()->create(['status' => 'approved', 'commission_rate' => 20]);
 
-    addToCart(sellableProduct(['price' => 1000], $one)->id);
-    addToCart(sellableProduct(['price' => 2000], $two)->id);
+    addToCart(sellableProduct(['price' => 1000, 'cost_price' => 900], $one)->id);
+    // From before sellers named a cost: charged on the store's rate instead.
+    addToCart(sellableProduct(['price' => 2000, 'cost_price' => null], $two)->id);
 
     $this->postJson(route('api.customer.orders.store'), [
         'address_id' => $this->address->id,
@@ -105,8 +107,9 @@ test('one basket across two sellers is one order with two sets of lines', functi
 
     expect(Order::count())->toBe(1)
         ->and($order->items)->toHaveCount(2)
-        // Each line is charged its own store's rate.
+        // Each line is settled on its own store's terms.
         ->and((float) $order->items->firstWhere('vendor_id', $one->id)->commission_amount)->toBe(100.0)
+        ->and((float) $order->items->firstWhere('vendor_id', $one->id)->vendor_earning)->toBe(900.0)
         ->and((float) $order->items->firstWhere('vendor_id', $two->id)->commission_amount)->toBe(400.0);
 });
 

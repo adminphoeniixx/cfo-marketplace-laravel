@@ -35,6 +35,22 @@ step with both.
 
 ---
 
+## 2026-10-29
+
+### Changed
+
+- **`POST /orders` refuses a product that has come off sale.** A product can
+  leave the shop while it sits in a basket — archived by its seller, or sent
+  back to the marketplace for re-pricing. Placing the order is now a `422` on
+  `items` naming it ("… is no longer available. Remove it to continue.").
+  Before, it was sold at the price it had when it went off sale. **What an app
+  must do:** show the message and send the shopper back to the basket.
+- Prices are now set by the marketplace rather than the seller. Nothing in the
+  shopper's API changes shape: `price` and `mrp` are what they always were, and
+  a product still waiting on a price is never listed.
+
+---
+
 ## 2026-09-07 — store credit
 
 ### Added

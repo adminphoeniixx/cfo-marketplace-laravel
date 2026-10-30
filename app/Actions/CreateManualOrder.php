@@ -5,6 +5,7 @@ namespace App\Actions;
 use App\Models\Customer;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Notifications\LowStockReached;
@@ -93,6 +94,58 @@ class CreateManualOrder
             ->first();
 
         return (float) ($rate->rate ?? 0);
+    }
+
+    /**
+     * What the store is paid for one unit, when the store has said: the
+     * variant's own cost, else the product's. Null for a product from before
+     * sellers named a cost, which `splitFor()` charges by commission instead.
+     */
+    public static function unitCostFor(Product $product, ?ProductVariant $variant): ?float
+    {
+        // `->` rather than `?->`: on the left of `??` PHP already reads the
+        // property with isset semantics, so a null variant falls through.
+        $cost = $variant->cost_price ?? $product->cost_price;
+
+        return $cost === null ? null : (float) $cost;
+    }
+
+    /**
+     * How one line's money divides between the marketplace and the store.
+     *
+     * Where the seller named a cost, the cost is what they are paid, whatever
+     * the shopper paid: the marketplace sets the price, keeps the difference,
+     * and so carries any coupon too. The difference is booked as commission,
+     * which is what the commission invoice and every report already read.
+     *
+     * Without a cost, the store's commission rate comes off what was paid.
+     *
+     * @param  float  $paid  The line after its share of any discount, before tax.
+     * @return array{commission_rate: float, commission_amount: float, vendor_earning: float}
+     */
+    public static function splitFor(float $paid, ?float $unitCost, int $quantity, float $commissionRate): array
+    {
+        if ($unitCost === null) {
+            $commission = round($paid * $commissionRate / 100, 2);
+
+            return [
+                'commission_rate' => $commissionRate,
+                'commission_amount' => $commission,
+                'vendor_earning' => round($paid - $commission, 2),
+            ];
+        }
+
+        $earning = round($unitCost * $quantity, 2);
+        $margin = round($paid - $earning, 2);
+
+        return [
+            // The margin as a share of the sale, so a line reads the same way
+            // under either model. Clamped to what the column holds: a line
+            // given away for next to nothing has a meaningless percentage.
+            'commission_rate' => $paid > 0 ? max(round($margin / $paid * 100, 2), -999999.0) : 0.0,
+            'commission_amount' => $margin,
+            'vendor_earning' => $earning,
+        ];
     }
 
     /**
@@ -229,7 +282,7 @@ class CreateManualOrder
 
             $lineTotal = round($line['unit_price'] * $line['quantity'], 2);
             $taxAmount = round($lineTotal * $line['tax_rate'] / 100, 2);
-            $commissionAmount = round($lineTotal * $commissionRate / 100, 2);
+            $split = self::splitFor($lineTotal, self::unitCostFor($product, $variant), $line['quantity'], $commissionRate);
 
             $order->items()->create([
                 'product_id' => $product->id,
@@ -244,9 +297,7 @@ class CreateManualOrder
                 'tax_rate' => $line['tax_rate'],
                 'tax_amount' => $taxAmount,
                 'total' => $lineTotal,
-                'commission_rate' => $commissionRate,
-                'commission_amount' => $commissionAmount,
-                'vendor_earning' => round($lineTotal - $commissionAmount, 2),
+                ...$split,
             ]);
 
             if ($product->track_inventory) {
@@ -257,7 +308,7 @@ class CreateManualOrder
 
             $subtotal += $lineTotal;
             $taxTotal += $taxAmount;
-            $commissionTotal += $commissionAmount;
+            $commissionTotal += $split['commission_amount'];
         }
 
         $shipping = round((float) ($data['shipping_total'] ?? 0), 2);

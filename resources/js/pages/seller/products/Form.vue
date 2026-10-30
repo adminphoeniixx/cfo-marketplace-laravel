@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, router, useForm } from '@inertiajs/vue3';
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import PBadge from '@/components/admin/PBadge.vue';
 import PButton from '@/components/admin/PButton.vue';
 import PCard from '@/components/admin/PCard.vue';
@@ -13,7 +13,13 @@ import PTextarea from '@/components/admin/PTextarea.vue';
 import PTextField from '@/components/admin/PTextField.vue';
 import PToggle from '@/components/admin/PToggle.vue';
 import { compressImage } from '@/lib/compressImage';
-import { currency, number, statusTone, titleCase } from '@/lib/format';
+import {
+    currency,
+    number,
+    productStatusLabel,
+    statusTone,
+    titleCase,
+} from '@/lib/format';
 
 type AttributeValue = { id: number; value: string; color_hex: string | null };
 type AttributeOption = {
@@ -28,8 +34,9 @@ type Variant = {
     id: number | null;
     name: string;
     sku: string;
-    price: number | string;
-    compare_at_price: number | string | null;
+    cost_price: number | string | null;
+    // The marketplace's figure: shown to the seller, ignored if sent back.
+    price?: number | string;
     stock_quantity: number;
     weight: number;
     is_active: boolean;
@@ -102,8 +109,6 @@ const form = useForm<{
     tax_class_id: number | null;
     short_description: string;
     description: string;
-    price: number | string;
-    compare_at_price: number | string | null;
     cost_price: number | string | null;
     track_inventory: boolean;
     stock_quantity: number;
@@ -133,8 +138,6 @@ const form = useForm<{
     tax_class_id: props.product?.tax_class_id ?? null,
     short_description: props.product?.short_description ?? '',
     description: props.product?.description ?? '',
-    price: props.product?.price ?? '',
-    compare_at_price: props.product?.compare_at_price ?? null,
     cost_price: props.product?.cost_price ?? null,
     track_inventory: props.product?.track_inventory ?? true,
     stock_quantity: props.product?.stock_quantity ?? 0,
@@ -145,7 +148,9 @@ const form = useForm<{
     width: props.product?.width ?? null,
     height: props.product?.height ?? null,
     requires_shipping: props.product?.requires_shipping ?? true,
-    status: props.product?.status ?? 'draft',
+    // A new product is usually finished when it is saved, and the next step
+    // is the marketplace pricing it.
+    status: props.product?.status ?? 'pending',
     brand: props.product?.brand ?? '',
     tags: props.product?.tags ?? [],
     seo_title: props.product?.seo_title ?? '',
@@ -164,8 +169,8 @@ const form = useForm<{
             id: variant.id,
             name: variant.name ?? '',
             sku: variant.sku ?? '',
+            cost_price: variant.cost_price ?? null,
             price: variant.price,
-            compare_at_price: variant.compare_at_price,
             stock_quantity: variant.stock_quantity,
             weight: Number(variant.weight ?? 0),
             is_active: variant.is_active,
@@ -179,9 +184,6 @@ const form = useForm<{
 /* ---------------------------------------------------------- disclosures */
 // Shopify keeps the rarely-touched fields behind a chip row you click to open.
 const open = ref({
-    // Open on arrival when the product already has one of the fields inside,
-    // so nothing a seller has set is hidden behind a click.
-    pricing: !!props.product?.compare_at_price || !!props.product?.cost_price,
     inventory: false,
     shipping: false,
     seo: false,
@@ -404,8 +406,7 @@ const regenerate = () => {
             sku: form.sku
                 ? `${form.sku}-${label.replace(/[^a-zA-Z0-9]+/g, '-').toUpperCase()}`
                 : '',
-            price: form.price,
-            compare_at_price: form.compare_at_price,
+            cost_price: form.cost_price,
             stock_quantity: 0,
             weight: Number(form.weight) || 0,
             is_active: true,
@@ -437,31 +438,33 @@ const totalVariantStock = computed(() =>
     form.variants.reduce((sum, v) => sum + Number(v.stock_quantity || 0), 0),
 );
 
-// Once variants carry the price and stock, the product-level fields are only
-// noise — Shopify hides them the same way.
-watch(hasVariants, (has) => {
-    if (has) {
-        open.value.pricing = false;
-    }
-});
+/* ------------------------------------------------------------- pricing */
+// The seller names a cost; the marketplace names the price and puts the
+// product on sale. What shoppers pay is shown here, never edited.
+const shopperPrice = computed(() => Number(props.product?.price ?? 0));
+const isLive = computed(() => props.product?.status === 'active');
 
-/* ------------------------------------------------------------- computed */
-const margin = computed(() => {
-    const price = Number(form.price) || 0;
-    const cost = Number(form.cost_price) || 0;
-
-    if (!price || !cost) {
-        return null;
+// Mirrors the server: a live product whose cost moves, or that gains a
+// variant, comes off sale until the marketplace re-prices it.
+const costMoved = computed(() => {
+    if (!isLive.value) {
+        return false;
     }
 
-    return (((price - cost) / price) * 100).toFixed(1);
-});
+    if (!hasVariants.value) {
+        return Number(form.cost_price) !== Number(props.product!.cost_price);
+    }
 
-const profit = computed(() => {
-    const price = Number(form.price) || 0;
-    const cost = Number(form.cost_price) || 0;
+    const before = new Map(
+        props.product!.variants.map((v) => [v.id, Number(v.cost_price)]),
+    );
 
-    return price && cost ? price - cost : null;
+    return form.variants.some(
+        (v) =>
+            v.id === null ||
+            !before.has(v.id) ||
+            before.get(v.id) !== Number(v.cost_price),
+    );
 });
 
 const categoryOptions = computed(() =>
@@ -476,10 +479,15 @@ const taxOptions = computed(() => [
     ...props.taxClasses.map((t) => ({ value: t.id, label: t.name })),
 ]);
 
+// Going live is the marketplace's call. A live product can stay live or come
+// down; anything else can only be sent to be priced.
 const statusOptions = computed(() =>
-    props.statuses.map((status) => ({
+    (isLive.value
+        ? ['active', 'draft', 'archived']
+        : ['pending', 'draft', 'archived']
+    ).map((status) => ({
         value: status,
-        label: titleCase(status),
+        label: status === 'pending' ? 'Send for pricing' : titleCase(status),
     })),
 );
 
@@ -611,8 +619,8 @@ onBeforeUnmount(() => {
             <h1 class="min-w-0 truncate text-lg font-semibold">
                 {{ isEdit ? product!.name : 'Add product' }}
             </h1>
-            <PBadge v-if="isEdit" :tone="statusTone(form.status)" dot>
-                {{ titleCase(form.status) }}
+            <PBadge v-if="isEdit" :tone="statusTone(product!.status)" dot>
+                {{ productStatusLabel(product!.status) }}
             </PBadge>
         </div>
 
@@ -774,65 +782,34 @@ onBeforeUnmount(() => {
 
                 <!-- Pricing -->
                 <PCard title="Pricing" padding>
-                    <PTextField
-                        v-model="form.price"
-                        label="Price"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        prefix="₹"
-                        placeholder="0.00"
-                        :error="form.errors.price"
-                        required
-                        class="sm:max-w-xs"
-                    />
-
-                    <button
-                        type="button"
-                        class="mt-3 flex w-full items-center gap-2 rounded-lg border border-[#e3e3e3] px-3 py-2 text-left hover:bg-[#f7f7f7] dark:border-[#3a3a3a] dark:hover:bg-[#232323]"
-                        @click="open.pricing = !open.pricing"
-                    >
-                        <span
-                            v-for="chip in [
-                                'Compare-at',
-                                'Cost per item',
-                                'Tax class',
-                                'Margin',
-                            ]"
-                            :key="chip"
-                            class="rounded-md bg-[#f0f0f0] px-1.5 py-0.5 text-[11px] text-[#616161] dark:bg-[#303030] dark:text-[#b5b5b5]"
+                    <div v-if="!hasVariants" class="grid gap-4 sm:grid-cols-2">
+                        <PTextField
+                            v-model="form.cost_price"
+                            label="Cost per item"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            prefix="₹"
+                            placeholder="0.00"
+                            :error="form.errors.cost_price"
+                            help-text="What you are paid for each unit sold."
+                            required
+                        />
+                        <PSelect
+                            v-model="form.tax_class_id"
+                            label="Tax class"
+                            :options="taxOptions"
+                            :error="form.errors.tax_class_id"
+                        />
+                    </div>
+                    <div v-else class="space-y-3">
+                        <p
+                            class="text-[13px] text-[#616161] dark:text-[#b5b5b5]"
                         >
-                            {{ chip }}
-                        </span>
-                        <span class="ml-auto text-xs text-[#8a8a8a]">{{
-                            open.pricing ? '▲' : '▼'
-                        }}</span>
-                    </button>
-
-                    <div v-if="open.pricing" class="mt-3 space-y-3">
-                        <div class="grid gap-4 sm:grid-cols-2">
-                            <PTextField
-                                v-model="form.compare_at_price"
-                                label="Compare-at price"
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                prefix="₹"
-                                placeholder="0.00"
-                                :error="form.errors.compare_at_price"
-                                help-text="Shown struck through next to the price."
-                            />
-                            <PTextField
-                                v-model="form.cost_price"
-                                label="Cost per item"
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                prefix="₹"
-                                placeholder="0.00"
-                                :error="form.errors.cost_price"
-                                help-text="Only you see this."
-                            />
+                            Each variant carries its own cost — set it in the
+                            Variants table below.
+                        </p>
+                        <div class="sm:max-w-xs">
                             <PSelect
                                 v-model="form.tax_class_id"
                                 label="Tax class"
@@ -840,21 +817,36 @@ onBeforeUnmount(() => {
                                 :error="form.errors.tax_class_id"
                             />
                         </div>
-                        <p
-                            v-if="margin"
-                            class="text-[13px] text-[#616161] dark:text-[#b5b5b5]"
-                        >
-                            Profit
+                    </div>
+
+                    <div
+                        class="mt-3 rounded-lg bg-[#f7f7f7] px-3 py-2 text-[13px] text-[#616161] dark:bg-[#232323] dark:text-[#b5b5b5]"
+                    >
+                        <template v-if="shopperPrice > 0">
+                            Shoppers pay
                             <strong
                                 class="text-[#303030] dark:text-[#e3e3e3]"
-                                >{{ currency(profit) }}</strong
+                                >{{ currency(shopperPrice) }}</strong
                             >
-                            · Margin
-                            <strong class="text-[#303030] dark:text-[#e3e3e3]"
-                                >{{ margin }}%</strong
+                            <span
+                                v-if="Number(product?.compare_at_price) > 0"
+                                class="ml-1 line-through"
+                                >{{ currency(product!.compare_at_price) }}</span
                             >
-                        </p>
+                            · set by the marketplace
+                        </template>
+                        <template v-else>
+                            The marketplace sets the price shoppers pay once it
+                            has reviewed your cost.
+                        </template>
                     </div>
+                    <p
+                        v-if="costMoved"
+                        class="mt-2 text-[13px] text-[#8a6116] dark:text-[#ffd79d]"
+                    >
+                        Saving a new cost takes this product off sale until the
+                        marketplace re-prices it.
+                    </p>
                 </PCard>
 
                 <!-- Inventory -->
@@ -1175,7 +1167,7 @@ onBeforeUnmount(() => {
                             v-if="hasVariants"
                             class="mt-4 overflow-x-auto rounded-lg border border-[#e3e3e3] dark:border-[#3a3a3a]"
                         >
-                            <table class="w-full min-w-[560px] text-[13px]">
+                            <table class="w-full min-w-[640px] text-[13px]">
                                 <thead
                                     class="bg-[#f7f7f7] text-left text-[11px] tracking-wide text-[#616161] uppercase dark:bg-[#232323] dark:text-[#b5b5b5]"
                                 >
@@ -1184,7 +1176,12 @@ onBeforeUnmount(() => {
                                             Variant
                                         </th>
                                         <th class="px-3 py-2 font-semibold">
-                                            Price
+                                            Your cost
+                                        </th>
+                                        <th
+                                            class="px-3 py-2 text-right font-semibold"
+                                        >
+                                            Shopper price
                                         </th>
                                         <th class="px-3 py-2 font-semibold">
                                             Available
@@ -1209,15 +1206,27 @@ onBeforeUnmount(() => {
                                         </td>
                                         <td class="px-3 py-2">
                                             <PTextField
-                                                v-model="variant.price"
+                                                v-model="variant.cost_price"
                                                 type="number"
                                                 step="0.01"
                                                 min="0"
                                                 prefix="₹"
                                                 :error="
-                                                    variantError(index, 'price')
+                                                    variantError(
+                                                        index,
+                                                        'cost_price',
+                                                    )
                                                 "
                                             />
+                                        </td>
+                                        <td
+                                            class="px-3 py-2 text-right text-[#616161] dark:text-[#b5b5b5]"
+                                        >
+                                            {{
+                                                Number(variant.price) > 0
+                                                    ? currency(variant.price!)
+                                                    : '—'
+                                            }}
                                         </td>
                                         <td class="px-3 py-2">
                                             <PTextField
@@ -1317,8 +1326,9 @@ onBeforeUnmount(() => {
                         :error="form.errors.status"
                     />
                     <p class="mt-2 text-xs text-[#8a8a8a]">
-                        Only <strong>Active</strong> products are visible to
-                        shoppers.
+                        Shoppers only see <strong>Active</strong> products, and
+                        only the marketplace can make one active — once it has
+                        set the price.
                     </p>
                 </PCard>
 

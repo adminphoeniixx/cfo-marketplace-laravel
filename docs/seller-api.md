@@ -138,6 +138,7 @@ the seller taps it; `kind` is the stable machine name for icons and filtering.
 | `order-placed` | An order lands with one of your lines on it. |
 | `order-status-changed` | The marketplace cancels, holds, or marks delivered an order of yours. Shipping is not announced — that is normally your own doing. |
 | `low-stock-reached` | An order pushes a tracked product to its low-stock threshold. |
+| `product-went-live` | The marketplace priced one of your products and put it on sale. `body` quotes the price shoppers now pay; `url` is `/seller/products/{id}/edit` — route to your own product screen by that id. |
 | `cancellation-requested` | A cancellation is raised on one of your orders. |
 | `cancellation-decided` | The marketplace approves or rejects one. |
 | `refund-requested` | A refund is raised on one of your orders. |
@@ -263,14 +264,16 @@ round trip — the product form only needs this one call.
 | GET | `/products/{id}` | |
 | PUT | `/products/{id}` | Full payload — anything omitted is cleared, including images. |
 | DELETE | `/products/{id}` | |
-| PATCH | `/products/{id}/status` | `status` only. |
+| PATCH | `/products/{id}/status` | `status` only. `active` on a product that is not already live answers `pending` — see **Pricing** below. |
 | PATCH | `/products/{id}/stock` | `stock_quantity`, optional `low_stock_threshold`. `422` on a variable product — change its variants instead. |
-| POST | `/products/bulk` | `action` (`activate`/`draft`/`archive`/`delete`) + `ids[]`, max 200. |
+| POST | `/products/bulk` | `action` (`activate`/`draft`/`archive`/`delete`) + `ids[]`, max 200. `activate` sends products for pricing rather than putting them on sale. |
 
 `/products/bulk` answers `{ action, changed, skipped }`. Ids belonging to
 another store are counted in `skipped` rather than failing the call, so a stale
 multi-select still applies to everything that is genuinely yours. If **nothing**
-in the list is yours the call is a `404`.
+in the list is yours the call is a `404`. For `activate`, `changed` counts only
+the products that were actually sent for pricing — one already live or already
+waiting is left alone.
 
 Minimum to create a product:
 
@@ -278,15 +281,42 @@ Minimum to create a product:
 {
   "name": "Kanchipuram silk saree",
   "type": "simple",
-  "price": 4999,
+  "cost_price": 3100,
   "status": "active",
   "stock_quantity": 12
 }
 ```
 
-A variable product carries `variants`, each with its own `price`,
+A variable product carries `variants`, each with its own `cost_price`,
 `stock_quantity` and `values` (`attribute_id` + `attribute_value_id`). The
-parent's stock is recomputed as the sum of its variants.
+parent's stock is recomputed as the sum of its variants. A variable product
+needs no `cost_price` of its own.
+
+#### Pricing
+
+The seller names the cost; the marketplace names the price.
+
+- **`cost_price` is what you are paid for each unit sold.** It is required on a
+  simple product and on every variant.
+- **`price` and `compare_at_price` are the marketplace's.** They come back on
+  every product and variant, read-only, and are ignored if sent. A new product
+  or variant reads `0` until it has been priced.
+- **You cannot make a product live.** Saving with `status: "active"` — or
+  `PATCH …/status` to `active`, or bulk `activate` — leaves it `pending`. The
+  marketplace sets the price and makes it `active`, and you get a
+  `product-went-live` notification.
+- **A live product stays live through an edit**, unless the cost moves: a
+  changed `cost_price`, a changed variant `cost_price`, or a new variant. Then it
+  drops back to `pending` and comes off sale until the marketplace re-prices it.
+  The old price stays on the product meanwhile, but nobody can buy at it.
+- `draft` and `archived` are still yours to set at any time. Bringing a product
+  back from either goes through `pending` again.
+
+On each order line you are paid `cost_price × quantity` as `vendor_earning`, and
+`commission_amount` is whatever the marketplace kept above that, after any
+coupon — the marketplace carries the discount, not you. A product from before
+this change with no `cost_price` is still settled on the store's
+`commission_rate`.
 
 Images are attached by path, not by file: upload first, then send the returned
 path in `images[].path`.

@@ -315,13 +315,16 @@ POST /orders
   caught here rather than sold at the stale figure.
 - Anything that cannot be shipped stops the order with `422` and a message
   naming the line — nothing is half-sold.
+- So does a product that has **come off sale** since it went in the basket —
+  archived by its seller, or waiting on the marketplace to re-price it. The
+  `422` is on `items` and names the product: "… is no longer available. Remove
+  it to continue."
 - `payment_method` is a **code from `/reference`**, not free text. The order
   records the label the shopper saw. What happens to `payment_status` next
   depends on whether a gateway is configured — see [Paying](#paying).
 - One basket across two sellers becomes **one order with two sets of lines**,
-  each line carrying its own vendor, commission rate and vendor earning. The
-  discount is spread across the lines it came off, so a seller's commission is
-  charged on what the basket actually paid them.
+  each line carrying its own vendor and its own split between seller and
+  marketplace. None of that is in the shopper's response.
 - Stock comes down, the coupon's `used_count` goes up, the basket is emptied
   (saved-for-later survives), and every seller involved is notified with their
   own share rather than the shopper's total.

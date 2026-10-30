@@ -10,7 +10,7 @@ import PFilters from '@/components/admin/PFilters.vue';
 import PModal from '@/components/admin/PModal.vue';
 import PPagination from '@/components/admin/PPagination.vue';
 import PTable from '@/components/admin/PTable.vue';
-import { currency, number, statusTone, titleCase } from '@/lib/format';
+import { currency, number, productStatusLabel, statusTone } from '@/lib/format';
 
 type Product = {
     id: number;
@@ -18,6 +18,7 @@ type Product = {
     sku: string | null;
     type: string;
     price: string;
+    cost_price: string | null;
     stock_quantity: number;
     low_stock_threshold: number;
     track_inventory: boolean;
@@ -39,7 +40,13 @@ const props = defineProps<{
     filters: Record<string, string>;
     vendors: { id: number; name: string }[];
     categories: { id: number; name: string }[];
-    counts: { all: number; active: number; draft: number; archived: number };
+    counts: {
+        all: number;
+        pending: number;
+        active: number;
+        draft: number;
+        archived: number;
+    };
 }>();
 
 const selected = ref<number[]>([]);
@@ -131,6 +138,11 @@ const confirmDelete = () => {
             search-placeholder="Search by name, SKU or brand"
             :tabs="[
                 { value: '', label: 'All', count: counts.all },
+                {
+                    value: 'pending',
+                    label: 'Awaiting price',
+                    count: counts.pending,
+                },
                 { value: 'active', label: 'Active', count: counts.active },
                 { value: 'draft', label: 'Draft', count: counts.draft },
                 {
@@ -286,7 +298,7 @@ const confirmDelete = () => {
                 </td>
                 <td class="px-4 py-2.5">
                     <PBadge :tone="statusTone(product.status)" dot>{{
-                        titleCase(product.status)
+                        productStatusLabel(product.status)
                     }}</PBadge>
                 </td>
                 <td class="px-4 py-2.5">
@@ -314,7 +326,17 @@ const confirmDelete = () => {
                 <td
                     class="px-4 py-2.5 text-right text-[13px] font-medium text-[#303030] tabular-nums dark:text-[#e3e3e3]"
                 >
-                    {{ currency(product.price) }}
+                    <span v-if="Number(product.price) > 0">{{
+                        currency(product.price)
+                    }}</span>
+                    <span v-else class="font-normal text-[#8a8a8a]"
+                        >Not priced</span
+                    >
+                    <span
+                        v-if="product.cost_price !== null"
+                        class="block text-xs font-normal text-[#8a8a8a]"
+                        >cost {{ currency(product.cost_price) }}</span
+                    >
                 </td>
                 <td class="px-4 py-2.5 text-right">
                     <div class="flex items-center justify-end gap-1">

@@ -2,6 +2,7 @@
 
 namespace App\Actions\Customer;
 
+use App\Actions\CreateManualOrder;
 use App\Models\Cart;
 use App\Models\CartItem;
 use App\Models\Coupon;
@@ -51,6 +52,17 @@ class PlaceOrder
             throw ValidationException::withMessages(['cart' => 'Your cart is empty.']);
         }
 
+        // A product can come off sale while it sits in a basket — archived by
+        // its seller, or sent back for pricing because its cost moved. Selling
+        // it then would be at a price nobody stands behind any more.
+        $offSale = $items->first(fn (CartItem $item) => $item->product->status !== 'active');
+
+        if ($offSale) {
+            throw ValidationException::withMessages([
+                'items' => "{$offSale->product->name} is no longer available. Remove it to continue.",
+            ]);
+        }
+
         $address = $customer->addresses()->findOrFail((int) $data['address_id']);
         $coupon = $cart->coupon_code
             ? Coupon::usable()->where('code', $cart->coupon_code)->first()
@@ -60,7 +72,13 @@ class PlaceOrder
 
         $this->assertSellable($quote['lines']);
 
-        $order = DB::transaction(fn () => $this->persist($customer, $cart, $address, $quote, $coupon, $data));
+        // Read here rather than carried on the quote: the quote is what the
+        // shopper's app is shown, and what a seller is paid is not theirs.
+        $costs = $items->mapWithKeys(fn (CartItem $item) => [
+            $item->id => CreateManualOrder::unitCostFor($item->product, $item->product_variant_id ? $item->variant : null),
+        ])->all();
+
+        $order = DB::transaction(fn () => $this->persist($customer, $cart, $address, $quote, $coupon, $data, $costs));
 
         $this->notify($order);
 
@@ -89,6 +107,7 @@ class PlaceOrder
     /**
      * @param  array<string, mixed>  $quote
      * @param  array<string, mixed>  $data
+     * @param  array<int, float|null>  $costs  Unit cost per cart item id.
      */
     protected function persist(
         Customer $customer,
@@ -97,6 +116,7 @@ class PlaceOrder
         array $quote,
         ?Coupon $coupon,
         array $data,
+        array $costs,
     ): Order {
         // Whether the money is already in decides `payment_status`; the caller
         // works that out from the chosen method, because the codes are the
@@ -188,7 +208,7 @@ class PlaceOrder
             // seller's commission is charged on what the basket actually paid
             // them — not on the pre-coupon price.
             $netTotal = round($lineTotal * $ratio, 2);
-            $commission = round($netTotal * $commissionRate / 100, 2);
+            $split = CreateManualOrder::splitFor($netTotal, $costs[$line['cart_item_id']] ?? null, (int) $line['quantity'], $commissionRate);
             $tax = round($netTotal * (float) $line['tax_rate'] / 100, 2);
 
             $order->items()->create([
@@ -205,13 +225,11 @@ class PlaceOrder
                 'tax_rate' => $line['tax_rate'],
                 'tax_amount' => $tax,
                 'total' => $lineTotal,
-                'commission_rate' => $commissionRate,
-                'commission_amount' => $commission,
-                'vendor_earning' => round($netTotal - $commission, 2),
+                ...$split,
             ]);
 
             $this->decrementStock($line);
-            $commissionTotal += $commission;
+            $commissionTotal += $split['commission_amount'];
         }
 
         $order->update([

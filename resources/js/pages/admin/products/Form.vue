@@ -14,8 +14,8 @@ import {
     compactCurrency,
     currency,
     number,
+    productStatusLabel,
     statusTone,
-    titleCase,
 } from '@/lib/format';
 
 type AttributeValue = { id: number; value: string; color_hex: string | null };
@@ -33,6 +33,8 @@ type Variant = {
     sku: string;
     price: number | string;
     compare_at_price: number | string | null;
+    // The seller's figure: shown so the price can be set against it.
+    cost_price?: number | string | null;
     stock_quantity: number;
     weight: number;
     is_active: boolean;
@@ -181,6 +183,7 @@ const form = useForm<{
             sku: variant.sku ?? '',
             price: variant.price,
             compare_at_price: variant.compare_at_price,
+            cost_price: variant.cost_price ?? null,
             stock_quantity: variant.stock_quantity,
             weight: Number(variant.weight ?? 0),
             is_active: variant.is_active,
@@ -458,8 +461,8 @@ const submit = () => {
             back-href="/admin/products"
         >
             <template #badge>
-                <PBadge v-if="isEdit" :tone="statusTone(form.status)" dot>{{
-                    titleCase(form.status)
+                <PBadge v-if="isEdit" :tone="statusTone(product!.status)" dot>{{
+                    productStatusLabel(product!.status)
                 }}</PBadge>
             </template>
             <template #actions>
@@ -474,6 +477,17 @@ const submit = () => {
                 </PButton>
             </template>
         </PageHeader>
+
+        <!-- A seller's product waiting on a price -->
+        <div
+            v-if="product?.status === 'pending'"
+            class="mb-4 rounded-xl border border-[#ffd6a4] bg-[#fff1c9] px-4 py-3 text-[13px] text-[#5e4200] dark:border-[#5e4200] dark:bg-[#3a2c00] dark:text-[#ffd79d]"
+        >
+            <strong>Waiting for you to set a price.</strong>
+            The seller is paid their cost on every unit sold; you keep whatever
+            the price is above it. Set the price, then switch the status to
+            <strong>Active</strong> to put it on sale.
+        </div>
 
         <!-- Sales snapshot on edit -->
         <div v-if="isEdit && stats" class="mb-4 grid gap-3 sm:grid-cols-3">
@@ -683,8 +697,8 @@ const submit = () => {
                                 :error="form.errors.cost_price"
                                 :help-text="
                                     margin
-                                        ? `Margin ${margin}%`
-                                        : 'Used to calculate margin.'
+                                        ? `Paid to the seller per unit · margin ${margin}%`
+                                        : 'Paid to the seller per unit.'
                                 "
                             />
                         </div>
@@ -859,6 +873,9 @@ const submit = () => {
                                             Price
                                         </th>
                                         <th class="px-3 py-2 font-semibold">
+                                            Seller cost
+                                        </th>
+                                        <th class="px-3 py-2 font-semibold">
                                             Stock
                                         </th>
                                         <th class="px-3 py-2 font-semibold">
@@ -901,6 +918,46 @@ const submit = () => {
                                                     variantError(index, 'price')
                                                 "
                                             />
+                                        </td>
+                                        <td
+                                            class="px-3 py-2 text-[13px] whitespace-nowrap text-[#616161] dark:text-[#b5b5b5]"
+                                        >
+                                            <template
+                                                v-if="
+                                                    variant.cost_price != null
+                                                "
+                                            >
+                                                {{
+                                                    currency(variant.cost_price)
+                                                }}
+                                                <span
+                                                    v-if="
+                                                        Number(variant.price) >
+                                                        0
+                                                    "
+                                                    class="block text-xs"
+                                                    :class="
+                                                        Number(variant.price) <
+                                                        Number(
+                                                            variant.cost_price,
+                                                        )
+                                                            ? 'text-[#e51c00]'
+                                                            : 'text-[#8a8a8a]'
+                                                    "
+                                                    >{{
+                                                        currency(
+                                                            Number(
+                                                                variant.price,
+                                                            ) -
+                                                                Number(
+                                                                    variant.cost_price,
+                                                                ),
+                                                        )
+                                                    }}
+                                                    margin</span
+                                                >
+                                            </template>
+                                            <template v-else>—</template>
                                         </td>
                                         <td class="w-28 px-3 py-2">
                                             <PTextField
@@ -1090,7 +1147,7 @@ const submit = () => {
                         :options="
                             statuses.map((status) => ({
                                 value: status,
-                                label: titleCase(status),
+                                label: productStatusLabel(status),
                             }))
                         "
                         :error="form.errors.status"
@@ -1116,7 +1173,7 @@ const submit = () => {
                             })),
                         ]"
                         :error="form.errors.vendor_id"
-                        help-text="Commission is taken from the vendor's rate."
+                        help-text="The seller is paid the cost per item. Products with no cost fall back to the vendor's commission rate."
                     />
                 </PCard>
 

@@ -36,7 +36,12 @@ class Product extends Model
     /** @use HasFactory<ProductFactory> */
     use HasFactory, SoftDeletes;
 
-    public const STATUSES = ['draft', 'active', 'archived'];
+    /**
+     * `pending` is a seller's product waiting on the marketplace: the seller
+     * names a cost, and only staff set the price a shopper pays and make it
+     * live. See `LeavesPricingToMarketplace`.
+     */
+    public const STATUSES = ['draft', 'pending', 'active', 'archived'];
 
     protected $guarded = [];
 
@@ -200,6 +205,20 @@ class Product extends Model
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('status', 'active');
+    }
+
+    /**
+     * Products a shopper could be charged for: a price above zero, and no
+     * live variant still waiting on one. A seller's new product and any
+     * variant it adds arrive at zero, and stay there until staff price them.
+     *
+     * @param  Builder<Product>  $query
+     * @return Builder<Product>
+     */
+    public function scopePriced(Builder $query): Builder
+    {
+        return $query->where('price', '>', 0)
+            ->whereDoesntHave('variants', fn ($q) => $q->where('is_active', true)->where('price', '<=', 0));
     }
 
     /**

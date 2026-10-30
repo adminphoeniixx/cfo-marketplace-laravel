@@ -15,6 +15,52 @@ with both.
 
 ---
 
+## 2026-10-29 — sellers set the cost, the marketplace sets the price
+
+### Changed
+
+- **Breaking — `price` is no longer yours to send.** Products and variants now
+  take `cost_price`: what you are paid per unit sold. It is **required** on a
+  simple product and on every variant. `price` and `compare_at_price` still come
+  back, read-only, and are silently ignored if sent; a new product or variant
+  reads `0` until the marketplace prices it. Before, `price` was required and
+  `cost_price` optional and never used. **What an app must do:** replace the
+  price field on the product form with a required "Cost per item", show the
+  shopper price as read-only text (or "Not priced yet" at `0`), and send
+  `variants[].cost_price` in place of `variants[].price`.
+- **Breaking — a seller can no longer make a product live.** `status: "active"`
+  on create or update, `PATCH /products/{id}/status` to `active`, and bulk
+  `activate` all leave the product `pending` — waiting on the marketplace —
+  unless it is already live. Before, each put it straight on sale. **What an app
+  must do:** label the action "Send for pricing", and treat `pending` as
+  "awaiting price".
+- **A live product whose cost moves comes off sale.** Changing `cost_price`, a
+  variant's `cost_price`, or adding a variant sends an `active` product back to
+  `pending` until it is re-priced. Edits that leave the cost alone keep it live.
+  **What an app must do:** warn before saving a new cost on a live product.
+- **Earnings follow the cost.** `vendor_earning` on a line is now
+  `cost_price × quantity`, and `commission_amount` is the marketplace's margin
+  above that — after any coupon, which the marketplace now carries. Products
+  with no `cost_price` are still settled on `commission_rate`.
+- `/products/bulk` with `activate` counts in `changed` only the products it
+  actually sent for pricing.
+
+### Added
+
+- `pending` is a product status, in `/catalog/options` and `?status=`.
+- `cost_price` on each entry of `variants[]` in the product response.
+- **`product-went-live` notification** when the marketplace prices and publishes
+  one of your products. `url` is `/seller/products/{id}/edit`.
+
+### Fixed
+
+- A payout's `net_amount` is now the sum of the `vendor_earning` booked on its
+  lines (plus any adjustment), and `gross_sales` is net of coupons. Before, it
+  was the pre-coupon total less commission, which paid the store the coupon the
+  marketplace had given.
+
+---
+
 ## 2026-09-07 — invoices
 
 ### Added

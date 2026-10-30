@@ -67,7 +67,7 @@ test('the store is taken from the session, never from the payload', function () 
     $this->post(route('seller.products.store'), [
         'name' => 'Hand-loom saree',
         'type' => 'simple',
-        'price' => 2499,
+        'cost_price' => 1800,
         'status' => 'draft',
         'track_inventory' => true,
         'stock_quantity' => 5,
@@ -92,7 +92,7 @@ test('another store\'s product is a 404 on every route that takes an id', functi
     $this->put(route('seller.products.update', $theirs), [
         'name' => 'Renamed by the wrong seller',
         'type' => 'simple',
-        'price' => 1,
+        'cost_price' => 1,
         'status' => 'draft',
         'stock_quantity' => 0,
     ])->assertNotFound();
@@ -116,7 +116,7 @@ test('a bulk action silently drops ids belonging to another store', function () 
         'ids' => [$mine->id, $theirs->id],
     ])->assertRedirect();
 
-    expect($mine->fresh()->status)->toBe('active')
+    expect($mine->fresh()->status)->toBe('pending')
         ->and($theirs->fresh()->status)->toBe('draft');
 });
 

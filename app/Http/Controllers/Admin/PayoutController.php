@@ -68,8 +68,12 @@ class PayoutController extends Controller
                 ->whereNotIn('status', ['cancelled']))
             ->get();
 
-        $gross = (float) $items->sum('total');
+        // What the shopper paid for the goods, after any coupon. The store is
+        // paid the earning booked on each line when it sold — not this less
+        // commission, which handed the store the coupon the marketplace gave.
+        $gross = round((float) $items->sum('total') - (float) $items->sum('discount_amount'), 2);
         $commission = (float) $items->sum('commission_amount');
+        $earning = (float) $items->sum('vendor_earning');
         $adjustment = (float) ($data['adjustment_amount'] ?? 0);
 
         $payout = VendorPayout::create([
@@ -80,7 +84,7 @@ class PayoutController extends Controller
             'gross_sales' => $gross,
             'commission_amount' => $commission,
             'adjustment_amount' => $adjustment,
-            'net_amount' => round($gross - $commission + $adjustment, 2),
+            'net_amount' => round($earning + $adjustment, 2),
             'orders_count' => $items->unique('order_id')->count(),
             'status' => 'pending',
             'method' => $vendor->payout_method,

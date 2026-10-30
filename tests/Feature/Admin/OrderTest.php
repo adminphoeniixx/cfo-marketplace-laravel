@@ -313,6 +313,7 @@ test('an admin creates an order on behalf of a vendor', function () {
     $product = Product::factory()->for($vendor)->create([
         'status' => 'active',
         'price' => 1000,
+        'cost_price' => 700,
         'tax_class_id' => $taxClass->id,
         'track_inventory' => true,
         'stock_quantity' => 10,
@@ -336,6 +337,7 @@ test('an admin creates an order on behalf of a vendor', function () {
     $order = Order::latest('id')->first();
 
     // 2 x 1000 = 2000 subtotal, 18% tax = 360, + 50 shipping - 100 discount.
+    // The seller is paid their 700 cost per unit; the marketplace keeps 600.
     expect($order)
         ->customer_id->toBe($customer->id)
         ->status->toBe('processing')
@@ -343,7 +345,7 @@ test('an admin creates an order on behalf of a vendor', function () {
         ->and((float) $order->subtotal)->toBe(2000.0)
         ->and((float) $order->tax_total)->toBe(360.0)
         ->and((float) $order->grand_total)->toBe(2310.0)
-        ->and((float) $order->commission_total)->toBe(200.0)
+        ->and((float) $order->commission_total)->toBe(600.0)
         ->and($order->placed_at)->not->toBeNull();
 
     $item = $order->items->first();
@@ -352,7 +354,7 @@ test('an admin creates an order on behalf of a vendor', function () {
         ->vendor_id->toBe($vendor->id)
         ->product_id->toBe($product->id)
         ->quantity->toBe(2)
-        ->and((float) $item->vendor_earning)->toBe(1800.0);
+        ->and((float) $item->vendor_earning)->toBe(1400.0);
 
     // Stock is drawn down and the manual entry is recorded on the timeline.
     expect($product->fresh()->stock_quantity)->toBe(8);

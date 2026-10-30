@@ -92,10 +92,16 @@ A clickable version of exactly this screen is in
 [`seller-app.html`](./seller-app.html) — open it in a browser, sign in, and tap
 **Products → Add a product**.
 
-**One save action, not three.** Status is a field (Draft / Active / Archived);
-the save button just saves. If a two-button pattern is preferred on mobile, the
-buttons must *set* `status` and then submit — `Publish` → `status: "active"`,
-`Save as draft` → `status: "draft"` — and the top-right Save must go.
+**One save action, not three.** Status is a field (Send for pricing / Draft /
+Archived); the save button just saves. If a two-button pattern is preferred on
+mobile, the buttons must *set* `status` and then submit — `Send for pricing` →
+`status: "pending"`, `Save as draft` → `status: "draft"` — and the top-right
+Save must go.
+
+**The seller sets the cost, the marketplace sets the price.** There is no price
+field on this screen. The seller enters **Cost per item** — what they are paid
+for each unit sold — and the marketplace sets the price shoppers pay and puts
+the product on sale. See *Pricing* in [`seller-api.md`](./seller-api.md).
 
 ---
 
@@ -137,19 +143,20 @@ rate and where the product shows up in browse."
 
 | Label | Key | Control | Rules |
 |---|---|---|---|
-| Price * | `price` | number, prefix ₹ | required, ≥ 0 |
-| Compare-at price | `compare_at_price` | number, prefix ₹ | nullable. Helper: "Shown struck through next to the price." |
-| Cost per item | `cost_price` | number, prefix ₹ | nullable. Helper: "Only you see this." |
+| Cost per item * | `cost_price` | number, prefix ₹ | required on a simple product, ≥ 0. Helper: "What you are paid for each unit sold." |
 | Tax class | `tax_class_id` | select | nullable, from `options.tax_classes`, plus a "No tax class" row |
-| Profit / Margin | — | read-only text | shown only when price and cost are both set |
+| Shopper price | `price`, `compare_at_price` | read-only text | from the `GET /products/{id}` response; never sent |
 
-```
-profit = price − cost
-margin = ((price − cost) / price) × 100     → one decimal, e.g. "42.9%"
-```
+The shopper-price line reads *"Shoppers pay ₹4,999 ~~₹6,499~~ · set by the
+marketplace"*, or — while `price` is `0` — *"The marketplace sets the price
+shoppers pay once it has reviewed your cost."*
 
-Compare-at, cost, tax class and margin live behind the collapsed row.
-Collapse the whole pricing disclosure automatically once variants exist.
+Once variants exist, hide **Cost per item** (each variant carries its own) and
+say so: *"Each variant carries its own cost — set it in the Variants table."*
+
+On a product that is `active`, show a warning as soon as the cost differs from
+the saved one, or a variant is added: *"Saving a new cost takes this product off
+sale until the marketplace re-prices it."*
 
 ### Inventory
 
@@ -198,7 +205,9 @@ Flow, same as web:
    and regenerates.
 
 Each generated row is editable: **Variant name** (read-only label, e.g. `S / Red`),
-**Price**, **Available** (`stock_quantity`), **SKU**, and a remove ✕.
+**Your cost** (`cost_price`, required), **Available** (`stock_quantity`), **SKU**,
+and a remove ✕ — plus the variant's **Shopper price**, read-only, `—` while it is
+`0`.
 On mobile, render one card per variant rather than a table.
 
 New-row defaults:
@@ -206,8 +215,7 @@ New-row defaults:
 ```
 name  = "S / Red"                      (values joined with " / ")
 sku   = parent SKU ? "{sku}-S-RED" : ""
-price = parent price
-compare_at_price = parent compare-at
+cost_price = parent cost
 stock_quantity   = 0
 weight = parent weight
 is_active = true
@@ -246,10 +254,15 @@ Collapsed by default; the closed row previews `seo_title || name ||
 
 | Label | Key | Control | Rules |
 |---|---|---|---|
-| Status * | `status` | select | `draft` \| `active` \| `archived` (from `options.statuses`) |
+| Status * | `status` | select | not live: `pending` (label "Send for pricing") \| `draft` \| `archived`. Live: `active` \| `draft` \| `archived` |
 
-Helper: *"Only **Active** products are visible to shoppers."*
-Default on a new product: `draft`.
+Only the marketplace makes a product `active`; the seller's choices depend on
+whether it already is. Sending `active` on a product that is not live comes back
+`pending`. Show `pending` everywhere as **Awaiting price**.
+
+Helper: *"Shoppers only see **Active** products, and only the marketplace can
+make one active — once it has set the price."*
+Default on a new product: `pending`.
 
 ### Edit screen extras
 
@@ -257,8 +270,8 @@ Default on a new product: `draft`.
 - Sales snapshot strip above the form: **Units sold**, **Revenue**, **Orders**
   (`GET /products/{id}` response, if the app surfaces stats).
 - **Delete this product** at the bottom, confirm first.
-- Open the *Pricing* disclosure on arrival when the product already has a
-  compare-at or cost price, so nothing the seller set is hidden behind a tap.
+- The status badge reads the saved status, not the select — "Awaiting price"
+  for `pending`.
 
 ---
 
@@ -314,8 +327,8 @@ Minimum viable create payload:
 {
   "name": "Kanchipuram silk saree",
   "type": "simple",
-  "price": 4999,
-  "status": "active",
+  "cost_price": 3100,
+  "status": "pending",
   "stock_quantity": 12
 }
 ```
@@ -333,9 +346,7 @@ Full payload shape:
   "tax_class_id": 3,
   "short_description": "Handwoven, gold zari border",
   "description": "<p>…</p>",
-  "price": 4999,
-  "compare_at_price": 6499,
-  "cost_price": 3100,
+  "cost_price": null,
   "track_inventory": true,
   "stock_quantity": 12,
   "low_stock_threshold": 5,
@@ -356,8 +367,7 @@ Full payload shape:
       "id": null,
       "name": "S / Red",
       "sku": "SAR-001-S-RED",
-      "price": 4999,
-      "compare_at_price": 6499,
+      "cost_price": 3100,
       "stock_quantity": 4,
       "weight": 0.65,
       "is_active": true,
@@ -371,7 +381,8 @@ Full payload shape:
 ```
 
 `vendor_id` is never sent — the store comes from the token. Sending one is
-ignored.
+ignored. Neither are `price` or `compare_at_price`: they are the marketplace's,
+and ignored if sent.
 
 ### Reference data
 
@@ -382,7 +393,7 @@ GET /api/seller/catalog/options
 → { categories: [{id, name, parent_id}],
     attributes: [{id, name, type, is_variant, values:[{id, value, color_hex}]}],
     tax_classes: [{id, name}],
-    statuses: ["draft", "active", "archived"] }
+    statuses: ["draft", "pending", "active", "archived"] }
 ```
 
 ### Errors
@@ -395,7 +406,7 @@ and scroll to the first error, including nested variant keys:
   "message": "The sku has already been taken.",
   "errors": {
     "sku": ["The sku has already been taken."],
-    "variants.0.price": ["The variants.0.price field is required."]
+    "variants.0.cost_price": ["The variants.0.cost_price field is required."]
   }
 }
 ```
@@ -418,7 +429,9 @@ changes."* → **Stay** / **Leave page**.
 - [ ] Up to 10 photos: add, reorder, remove, cover badge, alt text.
 - [ ] Uploads go through `POST /uploads`; only the returned `path` is saved.
 - [ ] Category picker is wired to `catalog/options` and searchable.
-- [ ] Profit and margin update live from price and cost.
+- [ ] No price field anywhere; cost per item is required, and the shopper
+      price shows read-only (or "not priced yet").
+- [ ] Editing the cost of a live product warns that it will come off sale.
 - [ ] Track-quantity off hides the quantity fields.
 - [ ] Variants: add option → pick values → rows generate; edits survive a
       regenerate; cap of 100 respected.
@@ -426,7 +439,8 @@ changes."* → **Stay** / **Leave page**.
 - [ ] Inventory section shows the summed variant stock when variants exist.
 - [ ] Tags add on Enter and comma, dedupe, and remove.
 - [ ] SEO section collapsed, with the character counter on page title.
-- [ ] Status is a 3-way field; exactly one save action on the screen.
+- [ ] Status offers "Send for pricing" until the product is live; exactly one
+      save action on the screen.
 - [ ] `PUT` always sends the complete payload.
 - [ ] 422 errors land on the right fields, including `variants.N.field`.
 - [ ] Leaving with unsaved changes prompts first.

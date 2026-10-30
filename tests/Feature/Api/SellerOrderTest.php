@@ -23,6 +23,7 @@ test('a seller raises an order by hand and gets their share back', function () {
     $product = Product::factory()->for($store)->create([
         'status' => 'active',
         'price' => 500,
+        'cost_price' => 350,
         'track_inventory' => true,
         'stock_quantity' => 10,
     ]);
@@ -42,8 +43,8 @@ test('a seller raises an order by hand and gets their share back', function () {
         ->and($response->json('data.items'))->toHaveCount(1)
         // JSON drops a trailing `.0`, so compare loosely on the money.
         ->and($response->json('data.totals.items'))->toEqual(1000)
-        ->and($response->json('data.totals.commission'))->toEqual(100)
-        ->and($response->json('data.totals.earning'))->toEqual(900)
+        ->and($response->json('data.totals.commission'))->toEqual(300)
+        ->and($response->json('data.totals.earning'))->toEqual(700)
         ->and($response->json('data.to_pack'))->toBe(2)
         ->and($response->json('data.shared_basket'))->toBeFalse()
         ->and($order->items->first()->vendor_id)->toBe($store->id)

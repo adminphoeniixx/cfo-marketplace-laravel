@@ -258,7 +258,8 @@ test('bulk actions apply to my products and skip everyone else\'s', function () 
         ->assertJsonPath('changed', 2)
         ->assertJsonPath('skipped', 1);
 
-    expect($mine->every(fn ($p) => $p->fresh()->status === 'active'))->toBeTrue()
+    // Sent for pricing, not put on sale: that is the marketplace's call.
+    expect($mine->every(fn ($p) => $p->fresh()->status === 'pending'))->toBeTrue()
         // Untouched — it was never ours to change.
         ->and($theirs->fresh()->status)->toBe('draft');
 });

@@ -3,12 +3,15 @@
 namespace App\Http\Controllers\Seller;
 
 use App\Concerns\SyncsChildRecords;
+use App\Http\Controllers\Api\Seller\LeavesPricingToMarketplace;
 use App\Http\Controllers\Api\Seller\ScopesToStore;
 use App\Http\Controllers\Controller;
 use App\Models\Attribute;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\TaxClass;
+use App\Notifications\ProductAwaitingPrice;
+use App\Services\Notifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -27,7 +30,7 @@ use Inertia\Response;
  */
 class ProductController extends Controller
 {
-    use ScopesToStore, SyncsChildRecords;
+    use LeavesPricingToMarketplace, ScopesToStore, SyncsChildRecords;
 
     public function index(Request $request): Response
     {
@@ -60,6 +63,7 @@ class ProductController extends Controller
             'categories' => Category::orderBy('name')->get(['id', 'name']),
             'counts' => [
                 'all' => $this->storeProducts($request)->count(),
+                'pending' => $this->storeProducts($request)->where('status', 'pending')->count(),
                 'active' => $this->storeProducts($request)->where('status', 'active')->count(),
                 'draft' => $this->storeProducts($request)->where('status', 'draft')->count(),
                 'archived' => $this->storeProducts($request)->where('status', 'archived')->count(),
@@ -90,8 +94,12 @@ class ProductController extends Controller
             return $product;
         });
 
+        $this->announceIfAwaitingPrice($product, null, $request->user());
+
         return to_route('seller.products.edit', $product)
-            ->with('success', "Product \"{$product->name}\" created.");
+            ->with('success', $product->status === 'pending'
+                ? "Product \"{$product->name}\" sent to the marketplace for pricing."
+                : "Product \"{$product->name}\" created.");
     }
 
     public function show(Request $request, int $product): RedirectResponse
@@ -119,6 +127,7 @@ class ProductController extends Controller
     {
         $model = $this->findOwned($request, $product);
         $data = $this->validated($request, $model);
+        $before = $model->status;
 
         DB::transaction(function () use ($model, $data) {
             $model->update($this->productPayload($data, $model));
@@ -126,7 +135,13 @@ class ProductController extends Controller
             $this->syncRelations($model, $data);
         });
 
-        return back()->with('success', "Product \"{$model->name}\" updated.");
+        $this->announceIfAwaitingPrice($model, $before, $request->user());
+
+        return back()->with('success', match (true) {
+            $before === 'active' && $model->status === 'pending' => "Cost changed, so \"{$model->name}\" is off sale until the marketplace re-prices it.",
+            $before !== 'pending' && $model->status === 'pending' => "Product \"{$model->name}\" sent to the marketplace for pricing.",
+            default => "Product \"{$model->name}\" updated.",
+        });
     }
 
     public function destroy(Request $request, int $product): RedirectResponse
@@ -140,6 +155,9 @@ class ProductController extends Controller
      * Bulk status/delete from the index screen. Ids that are not this store's
      * are dropped rather than failing the batch, so a stale selection cannot
      * be used to probe whether another seller's product id exists.
+     *
+     * `activate` asks for the products to go live, which is the marketplace's
+     * call: anything not already on sale goes to `pending` for pricing.
      */
     public function bulk(Request $request): RedirectResponse
     {
@@ -157,8 +175,19 @@ class ProductController extends Controller
 
         $query = Product::whereIn('id', $owned);
 
+        if ($data['action'] === 'activate') {
+            $sent = Product::whereIn('id', $owned)->whereNotIn('status', ['active', 'pending'])->update(['status' => 'pending']);
+
+            if ($sent > 0) {
+                Notifier::send(new ProductAwaitingPrice($request->user()->vendor, $sent), $request->user());
+            }
+
+            return back()->with('success', $sent > 0
+                ? "{$sent} product(s) sent to the marketplace for pricing."
+                : 'Those products are already live or waiting on a price.');
+        }
+
         match ($data['action']) {
-            'activate' => $query->update(['status' => 'active', 'published_at' => now()]),
             'draft' => $query->update(['status' => 'draft']),
             'archive' => $query->update(['status' => 'archived']),
             'delete' => $query->delete(),
@@ -201,9 +230,6 @@ class ProductController extends Controller
             'tax_class_id' => ['nullable', 'integer', 'exists:tax_classes,id'],
             'short_description' => ['nullable', 'string', 'max:500'],
             'description' => ['nullable', 'string', 'max:20000'],
-            'price' => ['required', 'numeric', 'min:0', 'max:99999999'],
-            'compare_at_price' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
-            'cost_price' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
             'track_inventory' => ['boolean'],
             'stock_quantity' => ['required_if:track_inventory,true', 'nullable', 'integer', 'min:0'],
             'low_stock_threshold' => ['nullable', 'integer', 'min:0'],
@@ -235,14 +261,14 @@ class ProductController extends Controller
             'variants.*.id' => ['nullable', 'integer'],
             'variants.*.name' => ['nullable', 'string', 'max:200'],
             'variants.*.sku' => ['nullable', 'string', 'max:80'],
-            'variants.*.price' => ['required', 'numeric', 'min:0'],
-            'variants.*.compare_at_price' => ['nullable', 'numeric', 'min:0'],
             'variants.*.stock_quantity' => ['required', 'integer', 'min:0'],
             'variants.*.weight' => ['nullable', 'numeric', 'min:0'],
             'variants.*.is_active' => ['boolean'],
             'variants.*.values' => ['array'],
             'variants.*.values.*.attribute_id' => ['required', 'integer', 'exists:attributes,id'],
             'variants.*.values.*.attribute_value_id' => ['required', 'integer', 'exists:attribute_values,id'],
+
+            ...$this->sellerPricingRules(),
         ]);
     }
 
@@ -263,8 +289,9 @@ class ProductController extends Controller
         $payload['stock_quantity'] = $data['stock_quantity'] ?? 0;
         $payload['low_stock_threshold'] = $data['low_stock_threshold'] ?? 5;
         $payload['weight'] = $data['weight'] ?? 0;
+        $payload['status'] = $this->sellerStatus($data['status'], $product, $data);
 
-        if ($data['status'] === 'active' && ! $product?->published_at) {
+        if ($payload['status'] === 'active' && ! $product?->published_at) {
             $payload['published_at'] = now();
         }
 
@@ -308,8 +335,9 @@ class ProductController extends Controller
                 [
                     'name' => $variant['name'] ?? null,
                     'sku' => $variant['sku'] ?? null,
-                    'price' => $variant['price'],
-                    'compare_at_price' => $variant['compare_at_price'] ?? null,
+                    // Price is the marketplace's: a new variant arrives at
+                    // zero and an existing one keeps what staff gave it.
+                    'cost_price' => $variant['cost_price'],
                     'stock_quantity' => $variant['stock_quantity'],
                     'weight' => $variant['weight'] ?? 0,
                     'is_active' => $variant['is_active'] ?? true,

@@ -13,8 +13,7 @@ test('a product can be created, read back, edited and deleted', function () {
     $created = $this->postJson(route('api.seller.products.store'), [
         'name' => 'Hand-loom saree',
         'type' => 'simple',
-        'price' => 2499,
-        'compare_at_price' => 2999,
+        'cost_price' => 1800,
         'status' => 'active',
         'track_inventory' => true,
         'stock_quantity' => 12,
@@ -30,7 +29,11 @@ test('a product can be created, read back, edited and deleted', function () {
 
     $id = $created->json('data.id');
 
+    // Asking for `active` sends it to the marketplace to be priced.
     expect($created->json('data.name'))->toBe('Hand-loom saree')
+        ->and($created->json('data.status'))->toBe('pending')
+        ->and($created->json('data.cost_price'))->toEqual(1800)
+        ->and($created->json('data.price'))->toEqual(0)
         ->and($created->json('data.inventory.quantity'))->toBe(12)
         ->and($created->json('data.images'))->toHaveCount(1)
         ->and(Product::find($id)->vendor_id)->toBe($store->id);
@@ -42,7 +45,7 @@ test('a product can be created, read back, edited and deleted', function () {
     $this->putJson(route('api.seller.products.update', $id), [
         'name' => 'Hand-loom saree (updated)',
         'type' => 'simple',
-        'price' => 2599,
+        'cost_price' => 1850,
         'status' => 'active',
         'stock_quantity' => 8,
     ])->assertOk()->assertJsonPath('data.name', 'Hand-loom saree (updated)');
@@ -65,23 +68,24 @@ test('a variable product keeps its variants and sums their stock', function () {
     $response = $this->postJson(route('api.seller.products.store'), [
         'name' => 'Cotton kurta',
         'type' => 'variable',
-        'price' => 999,
         'status' => 'active',
         'stock_quantity' => 0,
         'attribute_ids' => [$attribute->id],
         'variants' => [
             [
-                'name' => 'Small', 'price' => 999, 'stock_quantity' => 4,
+                'name' => 'Small', 'cost_price' => 600, 'stock_quantity' => 4,
                 'values' => [['attribute_id' => $attribute->id, 'attribute_value_id' => $small->id]],
             ],
             [
-                'name' => 'Large', 'price' => 1099, 'stock_quantity' => 6,
+                'name' => 'Large', 'cost_price' => 700, 'stock_quantity' => 6,
                 'values' => [['attribute_id' => $attribute->id, 'attribute_value_id' => $large->id]],
             ],
         ],
     ])->assertCreated();
 
     expect($response->json('data.variants'))->toHaveCount(2)
+        ->and($response->json('data.variants.1.cost_price'))->toEqual(700)
+        ->and($response->json('data.variants.1.price'))->toEqual(0)
         ->and($response->json('data.inventory.quantity'))->toBe(10);
 });
 
@@ -95,11 +99,17 @@ test('status and stock can be changed on their own', function () {
         'type' => 'simple',
     ]);
 
+    // Going live is the marketplace's call: `active` sends it to be priced.
+    $this->patchJson(route('api.seller.products.status', $product->id), ['status' => 'active'])
+        ->assertOk()
+        ->assertJsonPath('data.status', 'pending');
+
+    $product->forceFill(['status' => 'active'])->save();
+
+    // Once live, a seller can take it down and the status call keeps it live.
     $this->patchJson(route('api.seller.products.status', $product->id), ['status' => 'active'])
         ->assertOk()
         ->assertJsonPath('data.status', 'active');
-
-    expect($product->fresh()->published_at)->not->toBeNull();
 
     $this->patchJson(route('api.seller.products.stock', $product->id), [
         'stock_quantity' => 42,
@@ -157,7 +167,12 @@ test('invalid product payloads are rejected', function () {
 
     $this->postJson(route('api.seller.products.store'), [])
         ->assertStatus(422)
-        ->assertJsonValidationErrors(['name', 'type', 'price', 'status']);
+        ->assertJsonValidationErrors(['name', 'type', 'status']);
+
+    // A simple product has to say what the seller wants paid for it.
+    $this->postJson(route('api.seller.products.store'), [
+        'name' => 'No cost', 'type' => 'simple', 'status' => 'draft', 'stock_quantity' => 1,
+    ])->assertStatus(422)->assertJsonValidationErrors(['cost_price']);
 });
 
 test('the catalog reference lists are readable', function () {
@@ -192,7 +207,6 @@ test('a variant with no id is inserted without writing a null primary key', func
     $this->postJson(route('api.seller.products.store'), [
         'name' => 'Cotton kurta',
         'type' => 'variable',
-        'price' => 999,
         'status' => 'active',
         'stock_quantity' => 0,
         'attribute_ids' => [$attribute->id],
@@ -201,7 +215,7 @@ test('a variant with no id is inserted without writing a null primary key', func
         ],
         'variants' => [
             [
-                'id' => null, 'name' => 'Small', 'price' => 999, 'stock_quantity' => 4,
+                'id' => null, 'name' => 'Small', 'cost_price' => 600, 'stock_quantity' => 4,
                 'values' => [['attribute_id' => $attribute->id, 'attribute_value_id' => $small->id]],
             ],
         ],
@@ -230,12 +244,11 @@ test('a variant id belonging to another product is not rewritten', function () {
     $this->putJson(route('api.seller.products.update', $mine->id), [
         'name' => $mine->name,
         'type' => 'variable',
-        'price' => 999,
         'status' => 'active',
         'attribute_ids' => [$attribute->id],
         'variants' => [
             [
-                'id' => $stranger->id, 'name' => 'Mine', 'price' => 999, 'stock_quantity' => 7,
+                'id' => $stranger->id, 'name' => 'Mine', 'cost_price' => 600, 'stock_quantity' => 7,
                 'values' => [['attribute_id' => $attribute->id, 'attribute_value_id' => $value->id]],
             ],
         ],

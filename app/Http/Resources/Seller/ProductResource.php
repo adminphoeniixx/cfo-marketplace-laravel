@@ -29,6 +29,7 @@ class ProductResource extends JsonResource
             'brand' => $this->brand,
             'short_description' => $this->short_description,
             'description' => $this->description,
+            // Set by the marketplace, read-only here; zero until it has been.
             'price' => (float) $this->price,
             'compare_at_price' => $this->compare_at_price !== null ? (float) $this->compare_at_price : null,
             'cost_price' => $this->cost_price !== null ? (float) $this->cost_price : null,
@@ -68,6 +69,7 @@ class ProductResource extends JsonResource
                 'sku' => $variant->sku,
                 'price' => (float) $variant->price,
                 'compare_at_price' => $variant->compare_at_price !== null ? (float) $variant->compare_at_price : null,
+                'cost_price' => $variant->cost_price !== null ? (float) $variant->cost_price : null,
                 'stock_quantity' => (int) $variant->stock_quantity,
                 'weight' => (float) $variant->weight,
                 'is_active' => (bool) $variant->is_active,

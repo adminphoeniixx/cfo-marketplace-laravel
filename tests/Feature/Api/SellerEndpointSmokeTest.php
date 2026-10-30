@@ -244,13 +244,13 @@ function storeCalls(array $f): array
         // The catalogue.
         'api.seller.products.index' => ['GET', route('api.seller.products.index'), []],
         'api.seller.products.store' => ['POST', route('api.seller.products.store'), [
-            'name' => 'Chettinad cotton saree', 'type' => 'simple', 'price' => 1899,
+            'name' => 'Chettinad cotton saree', 'type' => 'simple', 'cost_price' => 1300,
             'status' => 'active', 'track_inventory' => true, 'stock_quantity' => 5,
             'category_id' => $f['category']->id,
         ], 201],
         'api.seller.products.show' => ['GET', route('api.seller.products.show', $f['product']->id), []],
         'api.seller.products.update' => ['PUT', route('api.seller.products.update', $f['product']->id), [
-            'name' => 'Kanchipuram silk saree', 'type' => 'simple', 'price' => 5299,
+            'name' => 'Kanchipuram silk saree', 'type' => 'simple', 'cost_price' => 3900,
             'status' => 'active', 'track_inventory' => true, 'stock_quantity' => 12,
         ]],
         'api.seller.products.status' => ['PATCH', route('api.seller.products.status', $f['product']->id), [

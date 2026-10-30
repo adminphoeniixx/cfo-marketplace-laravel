@@ -29,7 +29,9 @@ class ProductFactory extends Factory
             'description' => fake()->paragraph(),
             'price' => $price,
             'compare_at_price' => round($price * 1.2, 2),
-            'cost_price' => round($price * 0.6, 2),
+            // Follows an overridden price, so a test that names one gets a
+            // seller cost to match rather than one cut from the random figure.
+            'cost_price' => fn (array $attributes) => round((float) $attributes['price'] * 0.6, 2),
             'track_inventory' => true,
             // Comfortably above low_stock_threshold: tests that care about a low or
             // empty stock level set it explicitly (or use the outOfStock state), and

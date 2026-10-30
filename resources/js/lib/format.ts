@@ -81,6 +81,12 @@ export const relativeDate = (value: string | null | undefined): string => {
 export const titleCase = (value: string | null | undefined): string =>
     (value ?? '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
+// A product's `pending` is a seller's product waiting on the marketplace to
+// price it — "Pending" alone reads like the seller has something left to do.
+export const productStatusLabel = (
+    status: string | null | undefined,
+): string => (status === 'pending' ? 'Awaiting price' : titleCase(status));
+
 type Tone =
     | 'neutral'
     | 'info'

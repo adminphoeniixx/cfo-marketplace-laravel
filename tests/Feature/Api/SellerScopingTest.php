@@ -55,7 +55,7 @@ test('a product is always filed under the token\'s own store', function () {
     $response = $this->postJson(route('api.seller.products.store'), [
         'name' => 'Hand-loom saree',
         'type' => 'simple',
-        'price' => 2499,
+        'cost_price' => 1800,
         'status' => 'active',
         'stock_quantity' => 10,
         'vendor_id' => $theirs->id,

@@ -9,6 +9,8 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\TaxClass;
 use App\Models\Vendor;
+use App\Notifications\ProductWentLive;
+use App\Services\Notifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -53,6 +55,7 @@ class ProductController extends Controller
             'categories' => Category::orderBy('name')->get(['id', 'name']),
             'counts' => [
                 'all' => Product::count(),
+                'pending' => Product::where('status', 'pending')->count(),
                 'active' => Product::where('status', 'active')->count(),
                 'draft' => Product::where('status', 'draft')->count(),
                 'archived' => Product::where('status', 'archived')->count(),
@@ -79,6 +82,8 @@ class ProductController extends Controller
 
             return $product;
         });
+
+        $this->announceIfWentLive($product, null, $request);
 
         return to_route('admin.products.edit', $product)
             ->with('success', "Product \"{$product->name}\" created.");
@@ -107,12 +112,15 @@ class ProductController extends Controller
     public function update(Request $request, Product $product): RedirectResponse
     {
         $data = $this->validated($request, $product);
+        $before = $product->status;
 
         DB::transaction(function () use ($product, $data) {
             $product->update($this->productPayload($data, $product));
 
             $this->syncRelations($product, $data);
         });
+
+        $this->announceIfWentLive($product, $before, $request);
 
         return back()->with('success', "Product \"{$product->name}\" updated.");
     }
@@ -126,6 +134,10 @@ class ProductController extends Controller
 
     /**
      * Bulk status/delete actions from the index screen.
+     *
+     * `activate` leaves anything still at a zero price where it is — a
+     * seller's product waiting on pricing cannot be put on sale by ticking a
+     * box, only by giving it a price.
      */
     public function bulk(Request $request): RedirectResponse
     {
@@ -137,8 +149,24 @@ class ProductController extends Controller
 
         $query = Product::whereIn('id', $data['ids']);
 
+        if ($data['action'] === 'activate') {
+            $going = Product::whereIn('id', $data['ids'])->where('status', '!=', 'active')->priced()->get();
+
+            Product::whereIn('id', $going->modelKeys())->update(['status' => 'active']);
+            Product::whereIn('id', $going->modelKeys())->whereNull('published_at')->update(['published_at' => now()]);
+
+            foreach ($going as $product) {
+                $this->announceIfWentLive($product->fill(['status' => 'active']), $product->getOriginal('status'), $request);
+            }
+
+            $unpriced = Product::whereIn('id', $data['ids'])->where('status', '!=', 'active')->count();
+
+            return back()->with('success', $unpriced > 0
+                ? "{$going->count()} product(s) activated. {$unpriced} skipped — they still need a price."
+                : "{$going->count()} product(s) activated.");
+        }
+
         match ($data['action']) {
-            'activate' => $query->update(['status' => 'active', 'published_at' => now()]),
             'draft' => $query->update(['status' => 'draft']),
             'archive' => $query->update(['status' => 'archived']),
             'delete' => $query->delete(),
@@ -146,6 +174,19 @@ class ProductController extends Controller
         };
 
         return back()->with('success', count($data['ids']).' product(s) updated.');
+    }
+
+    /**
+     * Tell the store its product is on sale, and at what price, when this
+     * save is what put it there.
+     */
+    protected function announceIfWentLive(Product $product, ?string $before, Request $request): void
+    {
+        if ($product->status !== 'active' || $before === 'active' || ! $product->vendor) {
+            return;
+        }
+
+        Notifier::toStore($product->vendor, new ProductWentLive($product), $request->user());
     }
 
     /**
@@ -170,6 +211,10 @@ class ProductController extends Controller
      */
     protected function validated(Request $request, ?Product $product = null): array
     {
+        // Nothing goes on sale at zero. A seller's product arrives unpriced,
+        // and this is the one place a price gets put on it.
+        $goingLive = $request->input('status') === 'active';
+
         return $request->validate([
             'name' => ['required', 'string', 'max:200'],
             'slug' => ['nullable', 'string', 'max:220'],
@@ -181,7 +226,7 @@ class ProductController extends Controller
             'tax_class_id' => ['nullable', 'integer', 'exists:tax_classes,id'],
             'short_description' => ['nullable', 'string', 'max:500'],
             'description' => ['nullable', 'string', 'max:20000'],
-            'price' => ['required', 'numeric', 'min:0', 'max:99999999'],
+            'price' => ['required', 'numeric', 'min:0', 'max:99999999', Rule::when($goingLive, ['gt:0'])],
             'compare_at_price' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
             'cost_price' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
             'track_inventory' => ['boolean'],
@@ -216,7 +261,7 @@ class ProductController extends Controller
             'variants.*.id' => ['nullable', 'integer'],
             'variants.*.name' => ['nullable', 'string', 'max:200'],
             'variants.*.sku' => ['nullable', 'string', 'max:80'],
-            'variants.*.price' => ['required', 'numeric', 'min:0'],
+            'variants.*.price' => ['required', 'numeric', 'min:0', Rule::when($goingLive, ['gt:0'])],
             'variants.*.compare_at_price' => ['nullable', 'numeric', 'min:0'],
             'variants.*.stock_quantity' => ['required', 'integer', 'min:0'],
             'variants.*.weight' => ['nullable', 'numeric', 'min:0'],
@@ -224,6 +269,9 @@ class ProductController extends Controller
             'variants.*.values' => ['array'],
             'variants.*.values.*.attribute_id' => ['required', 'integer', 'exists:attributes,id'],
             'variants.*.values.*.attribute_value_id' => ['required', 'integer', 'exists:attribute_values,id'],
+        ], [
+            'price.gt' => 'Set a price above zero before making this product active.',
+            'variants.*.price.gt' => 'Every variant needs a price before the product can be active.',
         ]);
     }
 

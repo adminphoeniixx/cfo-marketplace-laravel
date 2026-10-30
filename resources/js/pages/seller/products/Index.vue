@@ -9,7 +9,7 @@ import PEmptyState from '@/components/admin/PEmptyState.vue';
 import PFilters from '@/components/admin/PFilters.vue';
 import PPagination from '@/components/admin/PPagination.vue';
 import PTable from '@/components/admin/PTable.vue';
-import { currency, number, statusTone, titleCase } from '@/lib/format';
+import { currency, number, productStatusLabel, statusTone } from '@/lib/format';
 
 type ProductRow = {
     id: number;
@@ -18,6 +18,7 @@ type ProductRow = {
     status: string;
     type: string;
     price: string;
+    cost_price: string | null;
     stock_quantity: number;
     low_stock_threshold: number;
     track_inventory: boolean;
@@ -36,7 +37,13 @@ const props = defineProps<{
     };
     filters: Record<string, string>;
     categories: { id: number; name: string }[];
-    counts: { all: number; active: number; draft: number; archived: number };
+    counts: {
+        all: number;
+        pending: number;
+        active: number;
+        draft: number;
+        archived: number;
+    };
 }>();
 
 const selected = ref<number[]>([]);
@@ -55,6 +62,7 @@ const toggleAll = () => {
 
 const tabs = computed(() => [
     { value: '', label: 'All', count: props.counts.all },
+    { value: 'pending', label: 'Awaiting price', count: props.counts.pending },
     { value: 'active', label: 'Active', count: props.counts.active },
     { value: 'draft', label: 'Draft', count: props.counts.draft },
     { value: 'archived', label: 'Archived', count: props.counts.archived },
@@ -133,7 +141,7 @@ const stockLabel = (product: ProductRow) => {
             </button>
             <div class="ml-auto flex flex-wrap gap-2">
                 <PButton size="slim" @click="runBulk('activate')">
-                    Set active
+                    Send for pricing
                 </PButton>
                 <PButton size="slim" @click="runBulk('draft')">
                     Set draft
@@ -151,10 +159,11 @@ const stockLabel = (product: ProductRow) => {
                 'Product',
                 'Status',
                 'Inventory',
-                'Price',
+                'Your cost',
+                'Shopper price',
                 'Category',
             ]"
-            :align-right="[4]"
+            :align-right="[4, 5]"
         >
             <tr
                 v-for="product in products.data"
@@ -202,7 +211,7 @@ const stockLabel = (product: ProductRow) => {
                 </td>
                 <td class="px-4 py-2">
                     <PBadge :tone="statusTone(product.status)" dot>
-                        {{ titleCase(product.status) }}
+                        {{ productStatusLabel(product.status) }}
                     </PBadge>
                 </td>
                 <td class="px-4 py-2">
@@ -211,7 +220,17 @@ const stockLabel = (product: ProductRow) => {
                     </PBadge>
                 </td>
                 <td class="px-4 py-2 text-right text-[13px]">
-                    {{ currency(product.price) }}
+                    {{
+                        product.cost_price !== null
+                            ? currency(product.cost_price)
+                            : '—'
+                    }}
+                </td>
+                <td class="px-4 py-2 text-right text-[13px]">
+                    <span v-if="Number(product.price) > 0">{{
+                        currency(product.price)
+                    }}</span>
+                    <span v-else class="text-[#8a8a8a]">Not priced yet</span>
                 </td>
                 <td
                     class="px-4 py-2 text-[13px] text-[#616161] dark:text-[#b5b5b5]"

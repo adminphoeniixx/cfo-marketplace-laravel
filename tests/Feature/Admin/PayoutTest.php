@@ -60,6 +60,7 @@ test('a payout is generated from the vendor sales in the period', function () {
         'vendor_id' => $vendor->id,
         'total' => 4000,
         'commission_amount' => 400,
+        'vendor_earning' => 3600,
     ]);
 
     $cancelled = Order::factory()->cancelled()->create(['placed_at' => now()->subDays(3)]);
