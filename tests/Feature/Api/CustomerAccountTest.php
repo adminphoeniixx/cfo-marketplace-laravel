@@ -250,3 +250,31 @@ test('the reference lists say exactly what the API will accept', function () {
             'cancellation_reasons', 'refund_reasons', 'refund_methods', 'return_window_days',
         ]);
 });
+
+test('the reference lists every state and union territory', function () {
+    $states = collect($this->getJson(route('api.customer.reference'))->json('states'));
+
+    expect($states)->toHaveCount(36)
+        ->and($states->firstWhere('name', 'Bihar'))->toBe(['name' => 'Bihar', 'is_union_territory' => false])
+        ->and($states->firstWhere('name', 'Delhi')['is_union_territory'])->toBeTrue();
+});
+
+test('an address takes a state from the list, in any case', function () {
+    $address = $this->postJson(route('api.customer.addresses.store'), [
+        'first_name' => 'Priya', 'address_line1' => '42 Beach Road', 'city' => 'Chennai',
+        'state' => '  tamil   nadu ', 'postcode' => '600090',
+    ])->assertCreated()->json('data');
+
+    expect($address['state'])->toBe('Tamil Nadu');
+
+    $this->postJson(route('api.customer.addresses.store'), [
+        'first_name' => 'Priya', 'address_line1' => '42 Beach Road', 'city' => 'Chennai',
+        'state' => 'Narnia',
+    ])->assertStatus(422)->assertJsonValidationErrors('state');
+
+    // Abroad, the list does not apply.
+    $this->postJson(route('api.customer.addresses.store'), [
+        'first_name' => 'Priya', 'address_line1' => '1 Main St', 'city' => 'Austin',
+        'state' => 'Texas', 'country' => 'US',
+    ])->assertCreated();
+});

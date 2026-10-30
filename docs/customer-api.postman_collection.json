@@ -1233,6 +1233,7 @@
                 {
                     "name": "reference",
                     "request": {
+                        "description": "Payment methods, couriers, cancellation/refund reasons, refund methods, return window, and `states` — every Indian state and union territory, for the address form's picker.",
                         "method": "GET",
                         "header": [
                             {

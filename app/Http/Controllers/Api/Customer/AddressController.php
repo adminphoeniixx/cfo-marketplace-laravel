@@ -5,8 +5,11 @@ namespace App\Http\Controllers\Api\Customer;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Customer\AddressResource;
 use App\Models\CustomerAddress;
+use App\Support\IndianStates;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Fluent;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class AddressController extends Controller
@@ -25,7 +28,7 @@ class AddressController extends Controller
     public function store(Request $request): JsonResponse
     {
         $customer = $this->customer($request);
-        $data = $request->validate($this->rules());
+        $data = $this->validated($request);
 
         $address = $customer->addresses()->create($data);
 
@@ -41,7 +44,7 @@ class AddressController extends Controller
     public function update(Request $request, int $address): JsonResponse
     {
         $model = $this->findOwned($request, $address);
-        $model->update($request->validate($this->rules()));
+        $model->update($this->validated($request));
 
         if ($request->boolean('is_default_shipping')) {
             $this->makeDefault($request, $model->id);
@@ -95,6 +98,21 @@ class AddressController extends Controller
     }
 
     /**
+     * A state typed in any case is stored the way the list spells it, so
+     * shipping zones and invoices match on it.
+     *
+     * @return array<string, mixed>
+     */
+    protected function validated(Request $request): array
+    {
+        if ($state = IndianStates::canonical($request->input('state'))) {
+            $request->merge(['state' => $state]);
+        }
+
+        return $request->validate($this->rules());
+    }
+
+    /**
      * @return array<string, mixed>
      */
     protected function rules(): array
@@ -107,7 +125,12 @@ class AddressController extends Controller
             'address_line1' => ['required', 'string', 'max:180'],
             'address_line2' => ['nullable', 'string', 'max:180'],
             'city' => ['required', 'string', 'max:80'],
-            'state' => ['nullable', 'string', 'max:80'],
+            // One of `/reference`'s `states` for an Indian address; anything
+            // else is a picker that drifted from the API.
+            'state' => ['nullable', 'string', 'max:80', Rule::when(
+                fn (Fluent $input) => strtoupper((string) ($input->country ?: 'IN')) === 'IN',
+                [Rule::in(IndianStates::names())],
+            )],
             'postcode' => ['nullable', 'string', 'max:12'],
             'country' => ['nullable', 'string', 'size:2'],
             'is_default_shipping' => ['boolean'],

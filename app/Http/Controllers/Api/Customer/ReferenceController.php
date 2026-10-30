@@ -7,6 +7,7 @@ use App\Models\Cancellation;
 use App\Models\DeliveryPartner;
 use App\Models\Order;
 use App\Models\Refund;
+use App\Support\IndianStates;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -41,6 +42,8 @@ class ReferenceController extends Controller
                 ->map(fn (string $label, string $key) => ['key' => $key, 'label' => $label])
                 ->values(),
             'return_window_days' => Order::RETURN_WINDOW_DAYS,
+            // The address form's state picker. City stays free text.
+            'states' => IndianStates::options(),
         ]);
     }
 }

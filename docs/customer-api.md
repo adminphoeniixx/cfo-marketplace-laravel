@@ -72,7 +72,7 @@ another shopper's order, address, request or cart line is a **404**, never a
 | GET | `/products/{id}/reviews` | Published reviews, newest first. |
 | GET | `/sellers/{vendor}` | A storefront and its listings. Approved stores only. |
 | GET | `/products/filters` | The filter sheet, counted against the catalogue this search actually leaves. |
-| GET | `/reference` | Payment methods, couriers, cancellation/refund reasons, refund methods, return window. |
+| GET | `/reference` | Payment methods, couriers, cancellation/refund reasons, refund methods, return window, and `states` for the address form. |
 | GET | `/serviceability?pincode=` | Whether anybody delivers there, and whether cash is one of the ways. |
 | GET | `/app-config` | Store name, currency, support contacts, the "sell with us" link, and which legal pages exist. |
 | GET | `/support/config` | Chat, phone, hours and the answered questions. |
@@ -618,7 +618,7 @@ field that says so beats a step that never fills.
 |---|---|---|
 | GET/PUT | `/me` | Changing the email un-verifies it; changing the phone un-verifies that. |
 | PUT | `/me/password` | `current_password` required only if one is already set. Signs every other device out. |
-| GET/POST/PUT/DELETE | `/addresses`, `/addresses/{id}` | |
+| GET/POST/PUT/DELETE | `/addresses`, `/addresses/{id}` | `state` must be one of `/reference`'s `states` when `country` is `IN` (or absent); case is forgiven and stored as the list spells it. `city` is free text. |
 | PATCH | `/addresses/{id}/default` | |
 | GET/POST/DELETE | `/wishlist`, `/wishlist/{product}` | `POST` is idempotent — the heart is a toggle and a flaky tap must not be an error. |
 | GET | `/reviews` | What you wrote, and what is still waiting to be rated. |

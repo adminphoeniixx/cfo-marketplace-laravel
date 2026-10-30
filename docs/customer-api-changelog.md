@@ -15,6 +15,26 @@ step with both.
 
 ---
 
+## 2026-10-30
+
+### Added
+
+- **`states` on `GET /reference`.** All 28 states and 8 union territories,
+  alphabetical: `[{ "name": "Andaman and Nicobar Islands", "is_union_territory": true }, …]`.
+  **What an app must do:** build the address form's state picker from this
+  list. The picker that shipped hardcoded six states, so a shopper in Bihar or
+  Kerala could not save an address.
+
+### Changed
+
+- **`POST`/`PUT /addresses` check `state`.** For an Indian address (`country`
+  `IN` or absent) `state` must be a name from `/reference`'s `states`, or the
+  request is a `422` on `state`. Case and spacing are forgiven — `"tamil nadu"`
+  is saved as `"Tamil Nadu"`. `state` is still optional, and `city` is still
+  free text.
+
+---
+
 ## 2026-09-07 — store credit
 
 ### Added
